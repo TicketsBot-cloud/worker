@@ -2,6 +2,7 @@ package customisation
 
 import (
 	"fmt"
+
 	"github.com/rxdn/gdl/objects"
 	"github.com/rxdn/gdl/objects/guild/emoji"
 )
@@ -36,22 +37,22 @@ func (e CustomEmoji) BuildEmoji() *emoji.Emoji {
 }
 
 var (
-	EmojiId         = NewCustomEmoji("id", 1013527224722391181, false)
-	EmojiOpen       = NewCustomEmoji("open", 1013527364455649430, false)
-	EmojiOpenTime   = NewCustomEmoji("opentime", 1013527365638430790, false)
-	EmojiClose      = NewCustomEmoji("close", 1013527306192560188, false)
-	EmojiCloseTime  = NewCustomEmoji("closetime", 1013527317341012009, false)
-	EmojiReason     = NewCustomEmoji("reason", 1013527372399657023, false)
-	EmojiSubject    = NewCustomEmoji("subject", 1013527369832738907, false)
-	EmojiTranscript = NewCustomEmoji("transcript", 1013527375327281213, false)
-	EmojiClaim      = NewCustomEmoji("claim", 1013527266124369980, false)
-	EmojiPanel      = NewCustomEmoji("panel", 1013527367265820682, false)
-	EmojiRating     = NewCustomEmoji("rating", 1013527368360538244, false)
-	EmojiStaff      = NewCustomEmoji("staff", 1013527371216867370, false)
-	EmojiThread     = NewCustomEmoji("thread", 1013527373750214717, false)
-	EmojiBulletLine = NewCustomEmoji("bulletline", 1014161470491201596, false)
-	EmojiPatreon    = NewCustomEmoji("patreon", 1016062317210906704, false)
-	EmojiDiscord    = NewCustomEmoji("discord", 1278678797113233531, false)
+	EmojiId         = NewCustomEmoji("id", 1327350136170479638, false)
+	EmojiOpen       = NewCustomEmoji("open", 1327350149684400268, false)
+	EmojiOpenTime   = NewCustomEmoji("opentime", 1327350161206153227, false)
+	EmojiClose      = NewCustomEmoji("close", 1327350171121614870, false)
+	EmojiCloseTime  = NewCustomEmoji("closetime", 1327350182806949948, false)
+	EmojiReason     = NewCustomEmoji("reason", 1327350192801972224, false)
+	EmojiSubject    = NewCustomEmoji("subject", 1327350205896458251, false)
+	EmojiTranscript = NewCustomEmoji("transcript", 1327350249450111068, false)
+	EmojiClaim      = NewCustomEmoji("claim", 1327350259965235233, false)
+	EmojiPanel      = NewCustomEmoji("panel", 1327350268974600263, false)
+	EmojiRating     = NewCustomEmoji("rating", 1327350278973952045, false)
+	EmojiStaff      = NewCustomEmoji("staff", 1327350290558746674, false)
+	EmojiThread     = NewCustomEmoji("thread", 1327350300717355079, false)
+	EmojiBulletLine = NewCustomEmoji("bulletline", 1327350311110574201, false)
+	EmojiPatreon    = NewCustomEmoji("patreon", 1327350319612690563, false)
+	EmojiDiscord    = NewCustomEmoji("discord", 1327350329381228544, false)
 	//EmojiTime       = NewCustomEmoji("time", 974006684622159952, false)
 )
 
