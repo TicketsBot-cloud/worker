@@ -1,8 +1,16 @@
 package main
 
 import (
-	"cloud.google.com/go/profiler"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
+	"cloud.google.com/go/profiler"
 	"github.com/TicketsBot/archiverclient"
 	"github.com/TicketsBot/common/model"
 	"github.com/TicketsBot/common/observability"
@@ -24,13 +32,6 @@ import (
 	"github.com/TicketsBot/worker/i18n"
 	"github.com/rxdn/gdl/rest/request"
 	"go.uber.org/zap"
-	"net/http"
-	_ "net/http/pprof"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
 )
 
 func main() {

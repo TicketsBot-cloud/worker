@@ -2,6 +2,10 @@ package tickets
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"time"
+
 	"github.com/TicketsBot/common/permission"
 	"github.com/TicketsBot/common/sentry"
 	"github.com/TicketsBot/database"
@@ -19,8 +23,6 @@ import (
 	"github.com/rxdn/gdl/objects/channel/embed"
 	"github.com/rxdn/gdl/objects/interaction"
 	"github.com/rxdn/gdl/rest"
-	"strings"
-	"time"
 )
 
 type SwitchPanelCommand struct {
@@ -164,7 +166,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 
-		ctx.ReplyRaw(customisation.Green, "Success", "This ticket has been switched to the panel <value here>.\n\nNote: As this is a thread, the permissions could not be bulk updated.")
+		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", panel.Title))
 
 		// Modify join message
 		if ticket.JoinMessageId != nil && settings.TicketNotificationChannel != nil {
