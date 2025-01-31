@@ -23,7 +23,7 @@ require (
 	github.com/rxdn/gdl v0.0.0-20241027214923-02dff700595b
 	github.com/schollz/progressbar/v3 v3.8.2
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/twmb/franz-go v1.18.0
 	go.uber.org/atomic v1.10.0
 	go.uber.org/zap v1.24.0

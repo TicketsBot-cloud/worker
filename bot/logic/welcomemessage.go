@@ -19,6 +19,7 @@ import (
 	"github.com/TicketsBot/worker/bot/dbclient"
 	"github.com/TicketsBot/worker/bot/integrations"
 	"github.com/TicketsBot/worker/bot/utils"
+	"github.com/TicketsBot/worker/config"
 	"github.com/TicketsBot/worker/i18n"
 	"github.com/rxdn/gdl/objects/channel/embed"
 	"github.com/rxdn/gdl/objects/guild/emoji"
@@ -62,7 +63,7 @@ func SendWelcomeMessage(
 		}
 
 		if cmd.PremiumTier() == premium.None {
-			formAnswersEmbed.SetFooter("Powered by ticketsbot.cloud", "https://ticketsbot.cloud/assets/img/logo.png")
+			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
 		}
 
 		embeds = append(embeds, formAnswersEmbed)
@@ -581,7 +582,7 @@ func BuildCustomEmbed(
 	}
 
 	if branding {
-		e.SetFooter("Powered by ticketsbot.cloud", "https://ticketsbot.cloud/assets/img/logo.png")
+		e.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
 	} else if customEmbed.FooterText != nil {
 		e.SetFooter(*customEmbed.FooterText, utils.ValueOrZero(customEmbed.FooterIconUrl))
 	}

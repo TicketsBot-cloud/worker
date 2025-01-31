@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot/worker/bot/customisation"
 	"github.com/TicketsBot/worker/bot/dbclient"
 	"github.com/TicketsBot/worker/bot/utils"
+	"github.com/TicketsBot/worker/config"
 	"github.com/rxdn/gdl/objects/channel/embed"
 	"github.com/rxdn/gdl/objects/channel/message"
 	"github.com/rxdn/gdl/objects/guild/emoji"
@@ -37,7 +38,7 @@ func TranscriptLinkElement(condition bool) CloseEmbedElement {
 			transcriptEmoji = customisation.EmojiTranscript.BuildEmoji()
 		}
 
-		transcriptLink := fmt.Sprintf("https://dashboard.ticketsbot.cloud/manage/%d/transcripts/view/%d", ticket.GuildId, ticket.Id)
+		transcriptLink := fmt.Sprintf("%d/manage/%d/transcripts/view/%d", config.Conf.Bot.DashboardUrl, ticket.GuildId, ticket.Id)
 
 		return utils.Slice(component.BuildButton(component.Button{
 			Label: "View Online Transcript",

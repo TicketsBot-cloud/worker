@@ -1,6 +1,7 @@
 package general
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/TicketsBot/worker/bot/command/registry"
 	"github.com/TicketsBot/worker/bot/customisation"
 	"github.com/TicketsBot/worker/bot/utils"
+	"github.com/TicketsBot/worker/config"
 	"github.com/TicketsBot/worker/i18n"
 	"github.com/elliotchance/orderedmap"
 	"github.com/rxdn/gdl/objects/channel/embed"
@@ -125,7 +127,7 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	if ctx.PremiumTier() == premium.None {
-		embed.SetFooter("Powered by ticketsbot.cloud", "https://ticketsbot.cloud/assets/img/logo.png")
+		embed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
 	}
 
 	// Explicitly ignore error to fix 403 (Cannot send messages to this user)

@@ -10,6 +10,7 @@ import (
 	"github.com/TicketsBot/worker/bot/customisation"
 	"github.com/TicketsBot/worker/bot/dbclient"
 	"github.com/TicketsBot/worker/bot/utils"
+	"github.com/TicketsBot/worker/config"
 	"github.com/TicketsBot/worker/i18n"
 	"github.com/jackc/pgx/v4"
 	"github.com/rxdn/gdl/objects/channel/embed"
@@ -87,7 +88,7 @@ func buildVoteComponents(ctx registry.CommandContext, allowRedeem bool) []compon
 		Label: ctx.GetMessage(i18n.TitleVote),
 		Style: component.ButtonStyleLink,
 		Emoji: utils.BuildEmoji("🔗"),
-		Url:   utils.Ptr("https://vote.ticketsbot.cloud"),
+		Url:   utils.Ptr(config.Conf.Bot.VoteUrl),
 	})
 
 	redeemButton := component.BuildButton(component.Button{

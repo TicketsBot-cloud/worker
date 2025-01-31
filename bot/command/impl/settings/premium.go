@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/TicketsBot/common/permission"
@@ -10,6 +11,7 @@ import (
 	"github.com/TicketsBot/worker/bot/customisation"
 	"github.com/TicketsBot/worker/bot/dbclient"
 	"github.com/TicketsBot/worker/bot/utils"
+	"github.com/TicketsBot/worker/config"
 	"github.com/TicketsBot/worker/i18n"
 	"github.com/rxdn/gdl/objects/channel/embed"
 	"github.com/rxdn/gdl/objects/guild/emoji"
@@ -77,7 +79,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 					Label: ctx.GetMessage(i18n.MessagePremiumOpenServerSelector),
 					Style: component.ButtonStyleLink,
 					Emoji: utils.BuildEmoji("🔗"),
-					Url:   utils.Ptr("https://dashboard.ticketsbot.cloud/premium/select-servers"),
+					Url:   utils.Ptr(fmt.Sprintf("%d/premium/select-servers", config.Conf.Bot.DashboardUrl)),
 				}),
 			}, buttons...)
 		}
@@ -136,7 +138,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 						Label: ctx.GetMessage(i18n.Website),
 						Style: component.ButtonStyleLink,
 						Emoji: utils.BuildEmoji("🔗"),
-						Url:   utils.Ptr("https://ticketsbot.cloud/premium"),
+						Url:   utils.Ptr(fmt.Sprintf("%d/premium", config.Conf.Bot.FrontpageUrl)),
 					}),
 				),
 			),

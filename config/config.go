@@ -1,10 +1,11 @@
 package config
 
 import (
+	"time"
+
 	"github.com/caarlos0/env/v10"
 	"github.com/google/uuid"
 	"go.uber.org/zap/zapcore"
-	"time"
 )
 
 type (
@@ -29,7 +30,11 @@ type (
 
 		Bot struct {
 			HttpAddress         string   `env:"HTTP_ADDR"`
-			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE"`
+			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.ticketsbot.cloud"`
+			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://ticketsbot.cloud"`
+			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.ticketsbot.cloud"`
+			PoweredBy           string   `env:"POWEREDBY" envDefault:"ticketsbot.cloud"`
+			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
 		}

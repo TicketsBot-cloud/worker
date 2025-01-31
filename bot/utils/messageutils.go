@@ -2,12 +2,14 @@ package utils
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/TicketsBot/common/premium"
 	"github.com/TicketsBot/worker"
 	"github.com/TicketsBot/worker/bot/command/registry"
 	"github.com/TicketsBot/worker/bot/customisation"
 	"github.com/TicketsBot/worker/bot/dbclient"
+	"github.com/TicketsBot/worker/config"
 	"github.com/TicketsBot/worker/i18n"
 	"github.com/rxdn/gdl/objects/channel/embed"
 	"github.com/rxdn/gdl/objects/guild/emoji"
@@ -31,7 +33,7 @@ func BuildEmbed(
 	}
 
 	if ctx.PremiumTier() == premium.None {
-		msgEmbed.SetFooter("Powered by ticketsbot.cloud", "https://ticketsbot.cloud/assets/img/logo.png")
+		msgEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
 	}
 
 	return msgEmbed
@@ -50,7 +52,7 @@ func BuildEmbedRaw(
 	}
 
 	if tier == premium.None {
-		msgEmbed.SetFooter("Powered by ticketsbot.cloud", "https://ticketsbot.cloud/assets/img/logo.png")
+		msgEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
 	}
 
 	return msgEmbed
