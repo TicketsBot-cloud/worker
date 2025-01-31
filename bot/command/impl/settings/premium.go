@@ -79,7 +79,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 					Label: ctx.GetMessage(i18n.MessagePremiumOpenServerSelector),
 					Style: component.ButtonStyleLink,
 					Emoji: utils.BuildEmoji("🔗"),
-					Url:   utils.Ptr(fmt.Sprintf("%d/premium/select-servers", config.Conf.Bot.DashboardUrl)),
+					Url:   utils.Ptr(fmt.Sprintf("%s/premium/select-servers", config.Conf.Bot.DashboardUrl)),
 				}),
 			}, buttons...)
 		}
@@ -138,7 +138,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 						Label: ctx.GetMessage(i18n.Website),
 						Style: component.ButtonStyleLink,
 						Emoji: utils.BuildEmoji("🔗"),
-						Url:   utils.Ptr(fmt.Sprintf("%d/premium", config.Conf.Bot.FrontpageUrl)),
+						Url:   utils.Ptr(fmt.Sprintf("%s/premium", config.Conf.Bot.FrontpageUrl)),
 					}),
 				),
 			),
