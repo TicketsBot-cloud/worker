@@ -63,7 +63,7 @@ func SendWelcomeMessage(
 		}
 
 		if cmd.PremiumTier() == premium.None {
-			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
+			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 		}
 
 		embeds = append(embeds, formAnswersEmbed)
@@ -582,7 +582,7 @@ func BuildCustomEmbed(
 	}
 
 	if branding {
-		e.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
+		e.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 	} else if customEmbed.FooterText != nil {
 		e.SetFooter(*customEmbed.FooterText, utils.ValueOrZero(customEmbed.FooterIconUrl))
 	}

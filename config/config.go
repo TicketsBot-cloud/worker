@@ -34,6 +34,7 @@ type (
 			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://ticketsbot.cloud"`
 			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.ticketsbot.cloud"`
 			PoweredBy           string   `env:"POWEREDBY" envDefault:"ticketsbot.cloud"`
+			IconUrl             string   `env:"ICON_URL" envDefault:"https://ticketsbot.cloud/assets/img/logo.png"`
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`

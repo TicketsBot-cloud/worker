@@ -33,7 +33,7 @@ func BuildEmbed(
 	}
 
 	if ctx.PremiumTier() == premium.None {
-		msgEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
+		msgEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 	}
 
 	return msgEmbed
@@ -52,7 +52,7 @@ func BuildEmbedRaw(
 	}
 
 	if tier == premium.None {
-		msgEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), "https://ticketsbot.cloud/assets/img/logo.png")
+		msgEmbed.SetFooter(fmt.Sprintf("Powered by %d", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 	}
 
 	return msgEmbed
