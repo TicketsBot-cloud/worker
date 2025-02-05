@@ -344,6 +344,10 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		user, _ := worker.GetUser(ticket.UserId)
 		return user.Username
 	},
+	"nickname": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
+		member, _ := worker.GetMember(ticket.GuildId, ticket.UserId)
+		return member.Nick
+	},
 	"server": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		guild, _ := worker.GetGuild(ticket.GuildId)
 		return guild.Name
