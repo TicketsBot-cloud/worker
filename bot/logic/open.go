@@ -308,7 +308,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			span := sentry.StartSpan(rootSpan.Context(), "Send message to ticket notification channel")
 
 			buildSpan := sentry.StartSpan(span.Context(), "Build ticket notification message")
-			data := BuildJoinThreadMessage(ctx, cmd.Worker(), cmd.GuildId(), cmd.UserId(), ticketId, panel, nil, cmd.PremiumTier())
+			data := BuildJoinThreadMessage(ctx, cmd.Worker(), cmd.GuildId(), cmd.UserId(), name, ticketId, panel, nil, cmd.PremiumTier())
 			buildSpan.Finish()
 
 			// TODO: Check if channel exists
@@ -1023,12 +1023,13 @@ func BuildJoinThreadMessage(
 	ctx context.Context,
 	worker *worker.Context,
 	guildId, openerId uint64,
+	name string,
 	ticketId int,
 	panel *database.Panel,
 	staffMembers []uint64,
 	premiumTier premium.PremiumTier,
 ) command.MessageResponse {
-	return buildJoinThreadMessage(ctx, worker, guildId, openerId, ticketId, panel, staffMembers, premiumTier, false)
+	return buildJoinThreadMessage(ctx, worker, guildId, openerId, name, ticketId, panel, staffMembers, premiumTier, false)
 }
 
 func BuildThreadReopenMessage(
@@ -1048,6 +1049,7 @@ func buildJoinThreadMessage(
 	ctx context.Context,
 	worker *worker.Context,
 	guildId, openerId uint64,
+	name string,
 	ticketId int,
 	panel *database.Panel,
 	staffMembers []uint64,
@@ -1071,7 +1073,7 @@ func buildJoinThreadMessage(
 		title = "Ticket Reopened"
 	}
 
-	e := utils.BuildEmbedRaw(customisation.GetColourOrDefault(ctx, guildId, colour), title, "A ticket has been opened. Press the button below to join it.", nil, premiumTier)
+	e := utils.BuildEmbedRaw(customisation.GetColourOrDefault(ctx, guildId, colour), title, fmt.Sprintf("%s with ID: %d has been opened. Press the button below to join it.", name, ticketId), nil, premiumTier)
 	e.AddField(customisation.PrefixWithEmoji("Opened By", customisation.EmojiOpen, !worker.IsWhitelabel), customisation.PrefixWithEmoji(fmt.Sprintf("<@%d>", openerId), customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
 	e.AddField(customisation.PrefixWithEmoji("Panel", customisation.EmojiPanel, !worker.IsWhitelabel), customisation.PrefixWithEmoji(panelName, customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
 	e.AddField(customisation.PrefixWithEmoji("Staff In Ticket", customisation.EmojiStaff, !worker.IsWhitelabel), customisation.PrefixWithEmoji(strconv.Itoa(len(staffMembers)), customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
