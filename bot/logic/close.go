@@ -40,6 +40,20 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		return
 	}
 
+	// prevent duplicate ticket close
+	lock, err := redis.TakeTicketCloseLock(ctx, uint64(ticket.Id))
+	if err != nil {
+		cmd.HandleError(err)
+		return
+	}
+
+	defer func() {
+		_, unlockErr := lock.UnlockContext(ctx)
+		if unlockErr != nil {
+			sentry.ErrorWithContext(unlockErr, cmd.ToErrorContext())
+		}
+	}()
+
 	defer func() {
 		if !success {
 			if err := dbclient.Client.AutoCloseExclude.Exclude(ctx, ticket.GuildId, ticket.Id); err != nil {
