@@ -511,7 +511,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 			// here
 			span = sentry.StartSpan(rootSpan.Context(), "Get panel here mention setting from database")
-			shouldMentionHere, err := dbclient.Client2.PanelHereMention.ShouldMentionHere(ctx, panel.PanelId)
+			shouldMentionHere, err := dbclient.Client.PanelHereMention.ShouldMentionHere(ctx, panel.PanelId)
 			span.Finish()
 			if err != nil {
 				return err
