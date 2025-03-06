@@ -2,6 +2,8 @@ package listeners
 
 import (
 	"context"
+	"time"
+
 	"github.com/TicketsBot/common/sentry"
 	"github.com/TicketsBot/database"
 	"github.com/TicketsBot/worker"
@@ -12,7 +14,6 @@ import (
 	"github.com/TicketsBot/worker/bot/logic"
 	"github.com/TicketsBot/worker/bot/utils"
 	"github.com/rxdn/gdl/gateway/payloads/events"
-	"time"
 )
 
 func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
@@ -72,6 +73,7 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 				return
 			}
 
+			name, _ := logic.GenerateChannelName(ctx, worker, panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
 			data := logic.BuildThreadReopenMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, staffCount, premiumTier)
 			msg, err := worker.CreateMessageComplex(*settings.TicketNotificationChannel, data.IntoCreateMessageData())
 			if err != nil {

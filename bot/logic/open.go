@@ -273,7 +273,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 
 	span = sentry.StartSpan(rootSpan.Context(), "Generate channel name")
-	name, err := GenerateChannelName(ctx, cmd, panel, ticketId, cmd.UserId(), nil)
+	name, err := GenerateChannelName(ctx, cmd.Worker(), panel, cmd.GuildId(), ticketId, cmd.UserId(), nil)
 	if err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
@@ -927,25 +927,20 @@ func GetIntegrationRoleId(rootCtx context.Context, worker *worker.Context, guild
 	return nil, nil
 }
 
-func GenerateChannelName(ctx context.Context, cmd registry.CommandContext, panel *database.Panel, ticketId int, openerId uint64, claimer *uint64) (string, error) {
+func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *database.Panel, guildId uint64, ticketId int, openerId uint64, claimer *uint64) (string, error) {
 	// Create ticket name
 	var name string
 
 	// Use server default naming scheme
 	if panel == nil || panel.NamingScheme == nil {
-		namingScheme, err := dbclient.Client.NamingScheme.Get(ctx, cmd.GuildId())
+		namingScheme, err := dbclient.Client.NamingScheme.Get(ctx, guildId)
 		if err != nil {
 			return "", err
 		}
 
-		strTicket := strings.ToLower(cmd.GetMessage(i18n.Ticket))
+		strTicket := strings.ToLower(i18n.GetMessageFromGuild(guildId, i18n.Ticket))
 		if namingScheme == database.Username {
-			var user user.User
-			if cmd.UserId() == openerId {
-				user, err = cmd.User()
-			} else {
-				user, err = cmd.Worker().GetUser(openerId)
-			}
+			user, err := worker.GetUser(openerId)
 
 			if err != nil {
 				return "", err
@@ -957,7 +952,7 @@ func GenerateChannelName(ctx context.Context, cmd registry.CommandContext, panel
 		}
 	} else {
 		var err error
-		name, err = doSubstitutions(cmd, *panel.NamingScheme, openerId, []Substitutor{
+		name, err = doSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)

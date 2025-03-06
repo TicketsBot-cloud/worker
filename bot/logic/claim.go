@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/TicketsBot/database"
 	"github.com/TicketsBot/worker"
 	"github.com/TicketsBot/worker/bot/command/registry"
@@ -53,7 +54,7 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 
 	// If newOverwrites = nil, no changes to permissions should be made
 	if newOverwrites != nil {
-		channelName, err := GenerateChannelName(ctx, cmd, panel, ticket.Id, ticket.UserId, &userId)
+		channelName, err := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &userId)
 		if err != nil {
 			return err
 		}

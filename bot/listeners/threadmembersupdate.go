@@ -2,6 +2,8 @@ package listeners
 
 import (
 	"context"
+	"time"
+
 	"github.com/TicketsBot/common/sentry"
 	"github.com/TicketsBot/database"
 	"github.com/TicketsBot/worker"
@@ -10,7 +12,6 @@ import (
 	"github.com/TicketsBot/worker/bot/logic"
 	"github.com/TicketsBot/worker/bot/utils"
 	"github.com/rxdn/gdl/gateway/payloads/events"
-	"time"
 )
 
 func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate) {
@@ -60,6 +61,7 @@ func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate)
 		}
 
 		if settings.TicketNotificationChannel != nil {
+			name, _ := logic.GenerateChannelName(ctx, worker, panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
 			data := logic.BuildJoinThreadMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, threadStaff, premiumTier)
 			if _, err := worker.EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, data.IntoEditMessageData()); err != nil {
 				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})

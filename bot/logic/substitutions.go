@@ -2,10 +2,11 @@ package logic
 
 import (
 	"fmt"
-	"github.com/TicketsBot/worker/bot/command/registry"
+	"strings"
+
+	"github.com/TicketsBot/worker"
 	"github.com/rxdn/gdl/objects/member"
 	"github.com/rxdn/gdl/objects/user"
-	"strings"
 )
 
 type SubstitutionFunc func(user user.User, member member.Member) string
@@ -26,7 +27,7 @@ func NewSubstitutor(placeholder string, needsUser, needsMember bool, f Substitut
 	}
 }
 
-func doSubstitutions(ctx registry.CommandContext, s string, userId uint64, substitutors []Substitutor) (string, error) {
+func doSubstitutions(worker *worker.Context, s string, userId uint64, guildId uint64, substitutors []Substitutor) (string, error) {
 	var needsUser, needsMember bool
 
 	// Determine which objects we need to fetch
@@ -50,11 +51,7 @@ func doSubstitutions(ctx registry.CommandContext, s string, userId uint64, subst
 
 	var err error
 	if needsUser {
-		if ctx.UserId() == userId {
-			user, err = ctx.User()
-		} else {
-			user, err = ctx.Worker().GetUser(userId)
-		}
+		user, err = worker.GetUser(userId)
 	}
 
 	if err != nil {
@@ -62,11 +59,7 @@ func doSubstitutions(ctx registry.CommandContext, s string, userId uint64, subst
 	}
 
 	if needsMember {
-		if ctx.UserId() == userId {
-			member, err = ctx.Member()
-		} else {
-			member, err = ctx.Worker().GetGuildMember(ctx.GuildId(), userId)
-		}
+		member, err = worker.GetGuildMember(guildId, userId)
 	}
 
 	if err != nil {
