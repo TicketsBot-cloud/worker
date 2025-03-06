@@ -5,9 +5,9 @@ import (
 )
 
 type WorkerErrorContext struct {
-	Guild       uint64
-	User        uint64
-	Channel     uint64
+	Guild   uint64
+	User    uint64
+	Channel uint64
 }
 
 func (w WorkerErrorContext) ToMap() map[string]string {
