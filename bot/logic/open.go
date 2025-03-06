@@ -1036,12 +1036,13 @@ func BuildThreadReopenMessage(
 	ctx context.Context,
 	worker *worker.Context,
 	guildId, openerId uint64,
+	name string,
 	ticketId int,
 	panel *database.Panel,
 	staffMembers []uint64,
 	premiumTier premium.PremiumTier,
 ) command.MessageResponse {
-	return buildJoinThreadMessage(ctx, worker, guildId, openerId, ticketId, panel, staffMembers, premiumTier, true)
+	return buildJoinThreadMessage(ctx, worker, guildId, openerId, name, ticketId, panel, staffMembers, premiumTier, true)
 }
 
 // TODO: Translations

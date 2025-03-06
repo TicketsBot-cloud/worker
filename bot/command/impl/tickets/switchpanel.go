@@ -176,7 +176,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 				return
 			}
 
-			msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, ticket.Id, &panel, threadStaff, ctx.PremiumTier())
+			msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, channelName, ticket.Id, &panel, threadStaff, ctx.PremiumTier())
 			if _, err := ctx.Worker().EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, msg.IntoEditMessageData()); err != nil {
 				sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
 				return
