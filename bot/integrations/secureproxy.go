@@ -7,9 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TicketsBot/common/sentry"
 	"io"
 	"net/http"
+
+	"github.com/TicketsBot-cloud/common/sentry"
 )
 
 type SecureProxyClient struct {

@@ -2,8 +2,9 @@ package registry
 
 import (
 	"fmt"
-	"github.com/TicketsBot/worker/i18n"
 	"strings"
+
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type Command interface {

@@ -5,12 +5,12 @@ package event
 
 import (
     "fmt"
-    "github.com/TicketsBot/worker/bot/command"
-    cmdcontext "github.com/TicketsBot/worker/bot/command/context"
+    "github.com/TicketsBot-cloud/worker/bot/command"
+    cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
     {{- range .imports}}
     "{{.}}"
     {{- end}}
-    "github.com/TicketsBot/worker/bot/command/registry"
+    "github.com/TicketsBot-cloud/worker/bot/command/registry"
     "github.com/pkg/errors"
     "github.com/rxdn/gdl/objects/interaction"
     "strconv"

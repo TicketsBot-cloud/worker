@@ -3,10 +3,11 @@ package redis
 import (
 	"errors"
 	"fmt"
-	"github.com/TicketsBot/common/utils"
-	"github.com/go-redis/redis/v8"
 	"strconv"
 	"time"
+
+	"github.com/TicketsBot-cloud/common/utils"
+	"github.com/go-redis/redis/v8"
 )
 
 var ErrNotCached = errors.New("channel not cached")
@@ -39,7 +40,7 @@ func GetDMChannel(userId, botId uint64) (*uint64, error) {
 
 func StoreNullDMChannel(userId, botId uint64) error {
 	key := fmt.Sprintf("dmchannel:%d:%d", botId, userId)
-	return Client.Set(utils.DefaultContext(), key, "null", time.Hour * 6).Err()
+	return Client.Set(utils.DefaultContext(), key, "null", time.Hour*6).Err()
 }
 
 func StoreDMChannel(userId, channelId, botId uint64) error {

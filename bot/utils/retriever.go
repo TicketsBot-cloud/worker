@@ -3,11 +3,12 @@ package utils
 import (
 	"context"
 	"errors"
-	"github.com/TicketsBot/common/permission"
-	"github.com/TicketsBot/database"
-	"github.com/TicketsBot/worker"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/redis"
+
+	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/rxdn/gdl/cache"
 )
 

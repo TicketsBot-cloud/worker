@@ -2,10 +2,11 @@ package blacklist
 
 import (
 	"context"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"go.uber.org/zap"
 	"sync"
 	"time"
+
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"go.uber.org/zap"
 )
 
 var (

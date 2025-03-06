@@ -2,12 +2,13 @@ package listeners
 
 import (
 	"context"
-	"github.com/TicketsBot/common/sentry"
-	"github.com/TicketsBot/worker"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/metrics/statsd"
-	"github.com/rxdn/gdl/gateway/payloads/events"
 	"time"
+
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
+	"github.com/rxdn/gdl/gateway/payloads/events"
 )
 
 /*

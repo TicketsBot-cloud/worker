@@ -3,11 +3,12 @@ package listeners
 import (
 	"context"
 	"errors"
-	"github.com/TicketsBot/worker"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/config"
-	"github.com/rxdn/gdl/cache"
 	"time"
+
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/config"
+	"github.com/rxdn/gdl/cache"
 )
 
 type BaseListener struct {

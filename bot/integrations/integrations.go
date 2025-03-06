@@ -1,10 +1,10 @@
 package integrations
 
 import (
-	"github.com/TicketsBot/common/integrations/bloxlink"
-	"github.com/TicketsBot/common/webproxy"
-	"github.com/TicketsBot/worker/bot/redis"
-	"github.com/TicketsBot/worker/config"
+	"github.com/TicketsBot-cloud/common/integrations/bloxlink"
+	"github.com/TicketsBot-cloud/common/webproxy"
+	"github.com/TicketsBot-cloud/worker/bot/redis"
+	"github.com/TicketsBot-cloud/worker/config"
 )
 
 var (

@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/TicketsBot/worker/config"
 	"net/http"
 	"strings"
+
+	"github.com/TicketsBot-cloud/worker/config"
 )
 
 // Twilight's HTTP proxy doesn't support the typical HTTP proxy protocol - instead you send the request directly
