@@ -3,8 +3,9 @@ package dbclient
 import (
 	"context"
 	"fmt"
-	"github.com/TicketsBot/database"
-	"github.com/TicketsBot/worker/config"
+
+	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"

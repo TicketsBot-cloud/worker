@@ -2,8 +2,9 @@ package customisation
 
 import (
 	"context"
-	"github.com/TicketsBot/common/sentry"
-	"github.com/TicketsBot/worker/bot/dbclient"
+
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 )
 
 type Colour int16

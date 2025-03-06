@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TicketsBot/database"
-	"github.com/TicketsBot/worker/bot/metrics/prometheus"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/config"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 )
 
 var (

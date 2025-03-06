@@ -2,21 +2,22 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/TicketsBot/common/premium"
-	"github.com/TicketsBot/worker/bot/button"
-	"github.com/TicketsBot/worker/bot/button/registry"
-	"github.com/TicketsBot/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot/worker/bot/command/context"
-	"github.com/TicketsBot/worker/bot/customisation"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/i18n"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/objects/interaction/component"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TicketsBot-cloud/common/premium"
+	"github.com/TicketsBot-cloud/worker/bot/button"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
+	"github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
+	"github.com/rxdn/gdl/objects/interaction"
+	"github.com/rxdn/gdl/objects/interaction/component"
 )
 
 type OpenSurveyHandler struct{}

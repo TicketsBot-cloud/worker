@@ -2,8 +2,9 @@ package permissionwrapper
 
 import (
 	"errors"
-	"github.com/TicketsBot/common/sentry"
-	"github.com/TicketsBot/worker"
+
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/rxdn/gdl/objects/channel"
 	"github.com/rxdn/gdl/objects/guild"
 	"github.com/rxdn/gdl/permission"

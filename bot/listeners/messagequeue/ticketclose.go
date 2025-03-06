@@ -2,18 +2,19 @@ package messagequeue
 
 import (
 	"context"
-	"github.com/TicketsBot/common/closerelay"
-	"github.com/TicketsBot/common/sentry"
-	"github.com/TicketsBot/worker"
-	"github.com/TicketsBot/worker/bot/cache"
-	cmdcontext "github.com/TicketsBot/worker/bot/command/context"
-	"github.com/TicketsBot/worker/bot/constants"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/errorcontext"
-	"github.com/TicketsBot/worker/bot/logic"
-	"github.com/TicketsBot/worker/bot/redis"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/config"
+
+	"github.com/TicketsBot-cloud/common/closerelay"
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/cache"
+	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/constants"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/redis"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 )
 
 // TODO: Make this good

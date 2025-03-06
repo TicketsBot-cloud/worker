@@ -1,15 +1,16 @@
 package handlers
 
 import (
-	"github.com/TicketsBot/worker/bot/button/registry"
-	"github.com/TicketsBot/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot/worker/bot/command"
-	"github.com/TicketsBot/worker/bot/command/context"
-	"github.com/TicketsBot/worker/bot/customisation"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/i18n"
 	"time"
+
+	"github.com/TicketsBot-cloud/worker/bot/button/registry"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type CloseRequestDenyHandler struct{}

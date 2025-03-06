@@ -2,13 +2,14 @@ package context
 
 import (
 	"context"
-	"github.com/TicketsBot/common/sentry"
-	"github.com/TicketsBot/worker/bot/button"
-	"github.com/TicketsBot/worker/bot/command"
-	"github.com/TicketsBot/worker/bot/command/registry"
-	"github.com/TicketsBot/worker/bot/customisation"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/i18n"
+
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker/bot/button"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/rxdn/gdl/objects/interaction"
 	"github.com/rxdn/gdl/objects/interaction/component"
 	"github.com/rxdn/gdl/rest"

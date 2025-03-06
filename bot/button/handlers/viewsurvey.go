@@ -1,21 +1,22 @@
 package handlers
 
 import (
-	"github.com/TicketsBot/common/permission"
-	"github.com/TicketsBot/common/premium"
-	"github.com/TicketsBot/worker/bot/button/registry"
-	"github.com/TicketsBot/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot/worker/bot/command/context"
-	"github.com/TicketsBot/worker/bot/customisation"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/logic"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/rxdn/gdl/objects/channel/embed"
-	"github.com/rxdn/gdl/objects/interaction/component"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/common/premium"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
+	"github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/rxdn/gdl/objects/channel/embed"
+	"github.com/rxdn/gdl/objects/interaction/component"
 )
 
 type ViewSurveyHandler struct{}

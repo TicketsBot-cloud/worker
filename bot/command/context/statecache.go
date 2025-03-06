@@ -2,11 +2,12 @@ package context
 
 import (
 	"context"
-	"github.com/TicketsBot/database"
-	"github.com/TicketsBot/worker/bot/command/registry"
-	"github.com/TicketsBot/worker/bot/dbclient"
 	"sync"
 	"time"
+
+	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 )
 
 type StateCache struct {

@@ -1,5 +1,5 @@
 package utils
 
-import "github.com/TicketsBot/common/premium"
+import "github.com/TicketsBot-cloud/common/premium"
 
 var PremiumClient premium.IPremiumLookupClient

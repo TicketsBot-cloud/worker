@@ -2,9 +2,10 @@ package utils
 
 import (
 	"context"
-	"github.com/TicketsBot/common/permission"
-	"github.com/TicketsBot/worker/bot/blacklist"
-	"github.com/TicketsBot/worker/bot/dbclient"
+
+	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/worker/bot/blacklist"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/rxdn/gdl/objects/member"
 	"golang.org/x/sync/errgroup"
 )

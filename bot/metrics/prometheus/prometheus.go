@@ -1,10 +1,11 @@
 package prometheus
 
 import (
-	"github.com/TicketsBot/database"
+	"strconv"
+
+	"github.com/TicketsBot-cloud/database"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"strconv"
 )
 
 const (

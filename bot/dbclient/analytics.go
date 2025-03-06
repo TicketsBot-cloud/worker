@@ -2,10 +2,11 @@ package dbclient
 
 import (
 	"context"
-	"github.com/TicketsBot/analytics-client"
-	"github.com/TicketsBot/worker/config"
-	"go.uber.org/zap"
 	"time"
+
+	"github.com/TicketsBot-cloud/worker/config"
+	"github.com/TicketsBot/analytics-client"
+	"go.uber.org/zap"
 )
 
 var Analytics *analytics.Client

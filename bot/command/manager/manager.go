@@ -1,15 +1,15 @@
 package manager
 
 import (
-	"github.com/TicketsBot/worker/bot/command/impl/admin"
-	"github.com/TicketsBot/worker/bot/command/impl/general"
-	"github.com/TicketsBot/worker/bot/command/impl/settings"
-	"github.com/TicketsBot/worker/bot/command/impl/settings/setup"
-	"github.com/TicketsBot/worker/bot/command/impl/statistics"
-	"github.com/TicketsBot/worker/bot/command/impl/tags"
-	"github.com/TicketsBot/worker/bot/command/impl/tickets"
-	"github.com/TicketsBot/worker/bot/command/registry"
-	"github.com/TicketsBot/worker/i18n"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/general"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings/setup"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/statistics"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/tags"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/tickets"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/rxdn/gdl/objects/interaction"
 	"github.com/rxdn/gdl/rest"
 )

@@ -6,7 +6,7 @@ package listeners
 import (
     "encoding/json"
     "fmt"
-    "github.com/TicketsBot/worker"
+    "github.com/TicketsBot-cloud/worker"
     "github.com/getsentry/sentry-go"
     "github.com/rxdn/gdl/gateway/payloads"
     "github.com/rxdn/gdl/gateway/payloads/events"

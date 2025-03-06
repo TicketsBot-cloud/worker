@@ -2,8 +2,9 @@ package button
 
 import (
 	"context"
-	"github.com/TicketsBot/worker"
-	"github.com/TicketsBot/worker/bot/command"
+
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/rxdn/gdl/objects/interaction"
 	"github.com/rxdn/gdl/rest"
 )

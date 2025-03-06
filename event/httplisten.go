@@ -3,16 +3,19 @@ package event
 import (
 	"context"
 	"fmt"
-	"github.com/TicketsBot/common/eventforwarding"
-	"github.com/TicketsBot/common/sentry"
-	"github.com/TicketsBot/worker"
-	"github.com/TicketsBot/worker/bot/button"
-	btn_manager "github.com/TicketsBot/worker/bot/button/manager"
-	"github.com/TicketsBot/worker/bot/command"
-	cmd_manager "github.com/TicketsBot/worker/bot/command/manager"
-	"github.com/TicketsBot/worker/bot/metrics/prometheus"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/config"
+	"strings"
+	"time"
+
+	"github.com/TicketsBot-cloud/common/eventforwarding"
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/button"
+	btn_manager "github.com/TicketsBot-cloud/worker/bot/button/manager"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	cmd_manager "github.com/TicketsBot-cloud/worker/bot/command/manager"
+	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/rxdn/gdl/cache"
@@ -20,8 +23,6 @@ import (
 	"github.com/rxdn/gdl/objects/interaction"
 	"github.com/rxdn/gdl/rest"
 	"github.com/sirupsen/logrus"
-	"strings"
-	"time"
 )
 
 type response struct {

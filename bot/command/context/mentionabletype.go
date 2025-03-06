@@ -1,7 +1,7 @@
 package context
 
 import (
-	"github.com/TicketsBot/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/rxdn/gdl/objects"
 	"github.com/rxdn/gdl/objects/channel"
 )

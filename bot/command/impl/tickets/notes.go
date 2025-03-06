@@ -1,20 +1,21 @@
 package tickets
 
 import (
-	permcache "github.com/TicketsBot/common/permission"
-	"github.com/TicketsBot/database"
-	"github.com/TicketsBot/worker/bot/command"
-	"github.com/TicketsBot/worker/bot/command/registry"
-	"github.com/TicketsBot/worker/bot/customisation"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/logic"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/i18n"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/rest"
 	"strconv"
 	"strings"
 	"time"
+
+	permcache "github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
+	"github.com/rxdn/gdl/objects/interaction"
+	"github.com/rxdn/gdl/rest"
 )
 
 type NotesCommand struct {

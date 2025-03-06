@@ -2,22 +2,23 @@ package statistics
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/TicketsBot/analytics-client"
-	"github.com/TicketsBot/common/permission"
-	"github.com/TicketsBot/worker/bot/command"
-	"github.com/TicketsBot/worker/bot/command/registry"
-	"github.com/TicketsBot/worker/bot/customisation"
-	"github.com/TicketsBot/worker/bot/dbclient"
-	"github.com/TicketsBot/worker/bot/utils"
-	"github.com/TicketsBot/worker/i18n"
 	"github.com/getsentry/sentry-go"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/rxdn/gdl/objects/channel/embed"
 	"github.com/rxdn/gdl/objects/interaction"
 	"golang.org/x/sync/errgroup"
-	"strconv"
-	"time"
 )
 
 type StatsServerCommand struct {

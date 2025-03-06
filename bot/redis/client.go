@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"github.com/TicketsBot/worker/config"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
 	redsyncredis "github.com/go-redsync/redsync/v4/redis/goredis/v8"
