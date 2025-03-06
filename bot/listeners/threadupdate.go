@@ -72,7 +72,7 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 				return
 			}
 
-			data := logic.BuildThreadReopenMessage(ctx, worker, ticket.GuildId, ticket.UserId, ticket.Id, panel, staffCount, premiumTier)
+			data := logic.BuildThreadReopenMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, staffCount, premiumTier)
 			msg, err := worker.CreateMessageComplex(*settings.TicketNotificationChannel, data.IntoCreateMessageData())
 			if err != nil {
 				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})

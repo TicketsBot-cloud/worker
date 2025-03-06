@@ -60,7 +60,7 @@ func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate)
 		}
 
 		if settings.TicketNotificationChannel != nil {
-			data := logic.BuildJoinThreadMessage(ctx, worker, ticket.GuildId, ticket.UserId, ticket.Id, panel, threadStaff, premiumTier)
+			data := logic.BuildJoinThreadMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, threadStaff, premiumTier)
 			if _, err := worker.EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, data.IntoEditMessageData()); err != nil {
 				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
 			}
