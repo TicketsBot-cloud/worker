@@ -3,6 +3,8 @@ package dbclient
 import (
 	"context"
 	"fmt"
+
+	database2 "github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot/database"
 	"github.com/TicketsBot/worker/config"
 	"github.com/jackc/pgx/v4"
@@ -11,6 +13,7 @@ import (
 )
 
 var Client *database.Database
+var Client2 *database2.Database
 
 func Connect(logger *zap.Logger) {
 	cfg, err := pgxpool.ParseConfig(fmt.Sprintf(
@@ -38,4 +41,5 @@ func Connect(logger *zap.Logger) {
 	}
 
 	Client = database.NewDatabase(pool)
+	Client2 = database2.NewDatabase(pool)
 }

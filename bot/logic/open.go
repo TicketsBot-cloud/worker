@@ -508,6 +508,18 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 					content += fmt.Sprintf("<@%d>", cmd.UserId())
 				}
 			}
+
+			// here
+			span = sentry.StartSpan(rootSpan.Context(), "Get panel here mention setting from database")
+			shouldMentionHere, err := dbclient.Client2.PanelHereMention.ShouldMentionHere(ctx, panel.PanelId)
+			span.Finish()
+			if err != nil {
+				return err
+			} else {
+				if shouldMentionHere {
+					content += "@here"
+				}
+			}
 		}
 
 		if content != "" {

@@ -41,6 +41,8 @@ require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/ClickHouse/ch-go v0.52.1 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.10.0 // indirect
+	github.com/TicketsBot-cloud/common v0.0.0-20250208132851-d5083bb04d98 // indirect
+	github.com/TicketsBot-cloud/database v0.0.0-20250305075424-7e225cd21603 // indirect
 	github.com/TicketsBot/logarchiver v0.0.0-20241012220745-5f3ba17a5138 // indirect
 	github.com/TicketsBot/ttlcache v1.6.1-0.20200405150101-acc18e37b261 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect

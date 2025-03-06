@@ -53,6 +53,8 @@ github.com/ClickHouse/clickhouse-go/v2 v2.10.0 h1:0w/A50D5MfsRUYBaV6rLKwZ4LXWKLZ
 github.com/ClickHouse/clickhouse-go/v2 v2.10.0/go.mod h1:teXfZNM90iQ99Jnuht+dxQXCuhDZ8nvvMoTJOFrcmcg=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/ReneKroon/ttlcache v1.6.0/go.mod h1:DG6nbhXKUQhrExfwwLuZUdH7UnRDDRA1IW+nBuCssvs=
+github.com/TicketsBot-cloud/common v0.0.0-20250208132851-d5083bb04d98 h1:HwtXrqSv6y5E8mTnkOtISTaQr6dsK/lfUC8tUA6SzSU=
+github.com/TicketsBot-cloud/common v0.0.0-20250208132851-d5083bb04d98/go.mod h1:iiZhl7w5DeTEGzAeq/hzani8+ILQz60g4JFkOy2vkuM=
 github.com/TicketsBot/analytics-client v0.0.0-20240724103359-30f5dac821e6 h1:JigBTrKv/wRkCnz0G9m/EsqmG5DU6pFWBtrXNhcvK3E=
 github.com/TicketsBot/analytics-client v0.0.0-20240724103359-30f5dac821e6/go.mod h1:9Z9qP/yovb6DUe1KlzgN2wicc+8ey6MMoxfynFbMyRg=
 github.com/TicketsBot/archiverclient v0.0.0-20240613013458-accc062facc2 h1:x2AZWm2zeyIJxVJbq9JQB1Q2mAaaTuCbCiPIU1E8G1o=
