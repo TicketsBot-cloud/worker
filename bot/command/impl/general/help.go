@@ -122,7 +122,32 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 				formatted = append(formatted, registry.FormatHelp(cmd, ctx.GuildId(), commandId))
 			}
 
-			embed.AddField(string(category.(command.Category)), strings.Join(formatted, "\n"), false)
+			// if formatted is longer than 2000 characters, split it into multiple fields
+			if len(strings.Join(formatted, "\n")) > 2000 {
+				// split into chunks of 2000 characters
+				chunks := make([]string, 0)
+				currentChunk := ""
+				for _, line := range formatted {
+					if len(currentChunk)+len(line) > 2000 {
+						chunks = append(chunks, currentChunk)
+						currentChunk = ""
+					}
+
+					currentChunk += line + "\n"
+				}
+				if currentChunk != "" {
+					chunks = append(chunks, currentChunk)
+				}
+				for i, chunk := range chunks {
+					if i == 0 {
+						embed.AddField(string(category.(command.Category)), chunk, false)
+					} else {
+						embed.AddField(fmt.Sprintf("%s (%d)", string(category.(command.Category)), i+1), chunk, false)
+					}
+				}
+			} else {
+				embed.AddField(string(category.(command.Category)), strings.Join(formatted, "\n"), false)
+			}
 		}
 	}
 
