@@ -12,6 +12,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/rxdn/gdl/objects/interaction/component"
 )
@@ -76,5 +77,11 @@ func (h *ClaimHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	ctx.Edit(res)
-	ctx.ReplyPermanent(customisation.Green, i18n.TitleClaimed, i18n.MessageClaimed, fmt.Sprintf("<@%d>", ctx.UserId()))
+	m, err := ctx.ReplyWith(command.NewEmbedMessageResponse(utils.BuildEmbed(ctx, customisation.Green, i18n.TitleClaimed, i18n.MessageClaimed, nil, fmt.Sprintf("<@%d>", ctx.UserId()))))
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	ctx.Worker().AddPinnedChannelMessage(ctx.ChannelId(), m.Id)
 }

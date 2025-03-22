@@ -85,5 +85,11 @@ func (TransferCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		return
 	}
 
-	ctx.ReplyPermanent(customisation.Green, i18n.TitleClaim, i18n.MessageClaimed, fmt.Sprintf("<@%d>", userId))
+	m, err := ctx.ReplyWith(command.NewEmbedMessageResponse(utils.BuildEmbed(ctx, customisation.Green, i18n.TitleClaimed, i18n.MessageClaimed, nil, fmt.Sprintf("<@%d>", ctx.UserId()))))
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	ctx.Worker().AddPinnedChannelMessage(ctx.ChannelId(), m.Id)
 }
