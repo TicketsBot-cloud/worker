@@ -529,7 +529,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			}
 
 			span := sentry.StartSpan(rootSpan.Context(), "Send ping message")
-			_, err := cmd.Worker().CreateMessageComplex(ch.Id, rest.CreateMessageData{
+			msg, err := cmd.Worker().CreateMessageComplex(ch.Id, rest.CreateMessageData{
 				Content: content,
 				AllowedMentions: message.AllowedMention{
 					Parse: []message.AllowedMentionType{
@@ -545,11 +545,11 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 				return err
 			}
 
-			// Disable delete message
-			// error is likely to be a permission error
-			// span = sentry.StartSpan(span.Context(), "Delete ping message")
-			// _ = cmd.Worker().DeleteMessage(ch.Id, pingMessage.Id)
-			// span.Finish()
+			if panel != nil && panel.DeleteMentions {
+				span = sentry.StartSpan(rootSpan.Context(), "Delete ping message")
+				_ = cmd.Worker().DeleteMessage(ch.Id, msg.Id)
+				span.Finish()
+			}
 		}
 
 		return nil

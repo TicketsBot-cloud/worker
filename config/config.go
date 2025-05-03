@@ -58,7 +58,6 @@ type (
 
 		Integrations struct {
 			BloxlinkApiKey string `env:"BLOXLINK_API_KEY"`
-			RoverApiKey    string `env:"ROVER_API_KEY"`
 			SecureProxyUrl string `env:"SECURE_PROXY_URL"`
 		}
 

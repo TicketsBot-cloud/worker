@@ -37,13 +37,12 @@ func OnGuildCreate(worker *worker.Context, e events.GuildCreate) {
 	if time.Now().Sub(e.JoinedAt) < time.Minute {
 		statsd.Client.IncrementKey(statsd.KeyJoins)
 
-		// TODO: RM-78 Re-enable
-		// sendIntroMessage(ctx, worker, e.Guild, e.Guild.OwnerId)
+		sendIntroMessage(ctx, worker, e.Guild, e.Guild.OwnerId)
 
 		// find who invited the bot
-		// if inviter := getInviter(worker, e.Guild.Id); inviter != 0 && inviter != e.Guild.OwnerId {
-		// 	sendIntroMessage(ctx, worker, e.Guild, inviter)
-		// }
+		if inviter := getInviter(worker, e.Guild.Id); inviter != 0 && inviter != e.Guild.OwnerId {
+			sendIntroMessage(ctx, worker, e.Guild, inviter)
+		}
 
 		if err := dbclient.Client.GuildLeaveTime.Delete(ctx, e.Guild.Id); err != nil {
 			sentry.Error(err)

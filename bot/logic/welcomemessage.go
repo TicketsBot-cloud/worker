@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/integrations/bloxlink"
-	"github.com/TicketsBot-cloud/common/integrations/rover"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
@@ -501,28 +500,6 @@ var groupSubstitutions = []GroupSubstitutor{
 				"roblox_profile_url":     fmt.Sprintf("https://www.roblox.com/users/%d/profile", user.Id),
 				"roblox_account_age":     fmt.Sprintf("<t:%d:R>", user.Created.Unix()),
 				"roblox_account_created": fmt.Sprintf("<t:%d:D>", user.Created.Unix()),
-			}
-		},
-	),
-	NewGroupSubstitutor([]string{"rover_username", "rover_id", "rover_display_name", "rover_profile_url", "rover_account_age", "rover_account_created"},
-		func(ctx context.Context, worker *worker.Context, ticket database.Ticket) map[string]string {
-			user, err := integrations.Rover.GetRobloxUser(ctx, ticket.GuildId, ticket.UserId)
-			if err != nil {
-				if err == rover.ErrUserNotFound {
-					return nil
-				} else {
-					sentry.Error(err)
-					return nil
-				}
-			}
-
-			return map[string]string{
-				"rover_username":        user.Name,
-				"rover_id":              strconv.Itoa(user.Id),
-				"rover_display_name":    user.DisplayName,
-				"rover_profile_url":     fmt.Sprintf("https://www.roblox.com/users/%d/profile", user.Id),
-				"rover_account_age":     fmt.Sprintf("<t:%d:R>", user.Created.Unix()),
-				"rover_account_created": fmt.Sprintf("<t:%d:D>", user.Created.Unix()),
 			}
 		},
 	),
