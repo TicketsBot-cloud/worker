@@ -28,7 +28,7 @@ func BuildViewStaffComponents(page, totalPages int) []component.Component {
 				Disabled: page <= 0,
 			}),
 			component.BuildButton(component.Button{
-				CustomId: "checkperms_page_count",
+				CustomId: "viewstaff_page_count",
 				Style:    component.ButtonStyleSecondary,
 				Label:    fmt.Sprintf("%d/%d", page+1, totalPages),
 				Disabled: true,
