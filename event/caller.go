@@ -256,6 +256,9 @@ func callCommand(
 	case general.VoteCommand:
 
 		v.Execute(ctx)
+	case general.CheckPermissionsCommand:
+
+		v.Execute(ctx)
 	case settings.AddAdminCommand:
 		var arg0 uint64
 

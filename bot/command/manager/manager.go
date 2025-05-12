@@ -34,6 +34,8 @@ func (cm *CommandManager) RegisterCommands() {
 	cm.registry["jumptotop"] = general.JumpToTopCommand{}
 	cm.registry["vote"] = general.VoteCommand{}
 
+	cm.registry["checkpermissions"] = general.CheckPermissionsCommand{}
+
 	cm.registry["addadmin"] = settings.AddAdminCommand{}
 	cm.registry["addsupport"] = settings.AddSupportCommand{}
 	cm.registry["autoclose"] = settings.AutoCloseCommand{}
