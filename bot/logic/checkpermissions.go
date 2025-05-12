@@ -290,8 +290,11 @@ func BuildCheckPermissions(ctx registry.CommandContext) error {
 	pageIdx := 0
 	pageEmbed := BuildCheckPermissionsEmbed(state, pageIdx)
 
-	// Navigation buttons
-	components := BuildCheckPermissionsComponents(stateId, pageIdx, len(pages))
+	// Only show navigation if more than 1 page
+	components := []component.Component{}
+	if len(pages) > 1 {
+		components = BuildCheckPermissionsComponents(stateId, pageIdx, len(pages))
+	}
 
 	res := command.MessageResponse{
 		Embeds:     []*embed.Embed{pageEmbed},
