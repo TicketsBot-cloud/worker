@@ -129,6 +129,11 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 	)
 	embed.AddField(label, value, true)
 
+	// Add premium branding footer if not premium
+	if cmd.PremiumTier() == premium.None {
+		embed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
+	}
+
 	return embed, totalPages
 }
 
