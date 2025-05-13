@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -110,14 +112,16 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 	embed.AddBlankField(false)
 
 	// Support users
-	label, value = buildPaginatedField(
-		cmd, supportUsers, page,
-		i18n.MessageViewStaffSupportUsers,
-		i18n.MessageViewStaffNoSupportUsers,
-		i18n.MessageViewStaffUserFormat,
-		cmd.GetMessage(i18n.MessageViewStaffSupportUsersWarn),
-	)
-	embed.AddField(label, value, true)
+	if len(supportUsers) > 0 {
+		label, value = buildPaginatedField(
+			cmd, supportUsers, page,
+			i18n.MessageViewStaffSupportUsers,
+			"",
+			i18n.MessageViewStaffUserFormat,
+			cmd.GetMessage(i18n.MessageViewStaffSupportUsersWarn),
+		)
+		embed.AddField(label, value, true)
+	}
 
 	// Support roles
 	label, value = buildPaginatedField(

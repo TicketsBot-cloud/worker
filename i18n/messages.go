@@ -239,7 +239,6 @@ var (
 	MessageViewStaffAdminRoles       MessageId = "commands.viewstaff.admin.roles"
 	MessageViewStaffNoAdminRoles     MessageId = "commands.viewstaff.admin.no_roles"
 	MessageViewStaffSupportUsers     MessageId = "commands.viewstaff.support.users"
-	MessageViewStaffNoSupportUsers   MessageId = "commands.viewstaff.support.no_users"
 	MessageViewStaffSupportUsersWarn MessageId = "commands.viewstaff.support.users_warning"
 	MessageViewStaffSupportRoles     MessageId = "commands.viewstaff.support.roles"
 	MessageViewStaffNoSupportRoles   MessageId = "commands.viewstaff.support.no_roles"
