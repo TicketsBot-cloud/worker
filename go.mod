@@ -11,7 +11,7 @@ toolchain go1.24.2
 
 require (
 	cloud.google.com/go/profiler v0.4.2
-	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250509065859-111843dd3a2c
+	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
 	github.com/TicketsBot-cloud/database v0.0.0-20250320215455-17762cd7d39a
 	github.com/TicketsBot-cloud/gdl v0.0.0-20250509054940-2045fbe19c06
@@ -19,7 +19,7 @@ require (
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.9.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.13.0
 	github.com/google/uuid v1.6.0
@@ -48,7 +48,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/ClickHouse/ch-go v0.65.1 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.34.0 // indirect
-	github.com/TicketsBot-cloud/logarchiver v0.0.0-20250509065654-20309348e667 // indirect
+	github.com/TicketsBot-cloud/logarchiver v0.0.0-20250514201320-d5141071a6eb // indirect
 	github.com/TicketsBot/common v0.0.0-20241117150316-ff54c97b45c1 // indirect
 	github.com/TicketsBot/ttlcache v1.6.1-0.20200405150101-acc18e37b261 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.26.0 // indirect
+	github.com/go-playground/validator/v10 v10.14.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
 	github.com/google/pprof v0.0.0-20250501235452-c0086092b71a // indirect
@@ -99,7 +99,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/minio/crc64nvme v1.0.1 // indirect
+	github.com/minio/crc64nvme v1.0.2 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/minio-go/v7 v7.0.91 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
