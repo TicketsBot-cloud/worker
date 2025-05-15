@@ -10,12 +10,12 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/manager"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/rxdn/gdl/objects/channel"
-	"github.com/rxdn/gdl/objects/interaction"
 )
 
 type executorData struct {

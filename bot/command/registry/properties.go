@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/i18n"
-	"github.com/rxdn/gdl/objects/interaction"
 )
 
 type Properties struct {

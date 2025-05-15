@@ -5,8 +5,8 @@ import (
 
 	"github.com/TicketsBot-cloud/common/eventforwarding"
 	"github.com/TicketsBot-cloud/common/rpc"
+	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker"
-	"github.com/rxdn/gdl/cache"
 	"go.uber.org/zap"
 )
 

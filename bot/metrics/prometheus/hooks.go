@@ -3,10 +3,11 @@ package prometheus
 import (
 	"context"
 	"encoding/json"
-	"github.com/rxdn/gdl/rest/request"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 )
 
 func PreRequestHook(_ string, req *http.Request) {

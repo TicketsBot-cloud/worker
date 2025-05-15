@@ -6,10 +6,10 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command/manager"
 	"github.com/TicketsBot-cloud/worker/i18n"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/rest"
 )
 
 var (

@@ -6,12 +6,12 @@ import (
 
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/rxdn/gdl/gateway/payloads/events"
 )
 
 func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate) {

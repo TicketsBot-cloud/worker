@@ -6,6 +6,8 @@ import (
 
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -14,8 +16,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/jackc/pgx/v4"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/objects/interaction/component"
 )
 
 const PremiumStoreSku uint64 = 1274473638065606656

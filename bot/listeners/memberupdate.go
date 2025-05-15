@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/rxdn/gdl/gateway/payloads/events"
 )
 
 // Remove user permissions when they leave

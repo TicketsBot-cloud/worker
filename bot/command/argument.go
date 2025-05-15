@@ -1,8 +1,8 @@
 package command
 
 import (
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/i18n"
-	"github.com/rxdn/gdl/objects/interaction"
 )
 
 type Argument struct {

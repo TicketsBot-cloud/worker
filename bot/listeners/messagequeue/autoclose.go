@@ -5,6 +5,7 @@ import (
 
 	"github.com/TicketsBot-cloud/common/autoclose"
 	"github.com/TicketsBot-cloud/common/sentry"
+	gdlUtils "github.com/TicketsBot-cloud/gdl/utils"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
@@ -13,7 +14,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	gdlUtils "github.com/rxdn/gdl/utils"
 )
 
 const AutoCloseReason = "Automatically closed due to inactivity"

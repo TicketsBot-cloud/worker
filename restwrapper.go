@@ -3,19 +3,20 @@ package worker
 import (
 	"context"
 	"errors"
-	"github.com/rxdn/gdl/cache"
-	"github.com/rxdn/gdl/objects/auditlog"
-	"github.com/rxdn/gdl/objects/channel"
-	"github.com/rxdn/gdl/objects/channel/embed"
-	"github.com/rxdn/gdl/objects/channel/message"
-	"github.com/rxdn/gdl/objects/guild"
-	"github.com/rxdn/gdl/objects/guild/emoji"
-	"github.com/rxdn/gdl/objects/integration"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/objects/invite"
-	"github.com/rxdn/gdl/objects/member"
-	"github.com/rxdn/gdl/objects/user"
-	"github.com/rxdn/gdl/rest"
+
+	"github.com/TicketsBot-cloud/gdl/cache"
+	"github.com/TicketsBot-cloud/gdl/objects/auditlog"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
+	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
+	"github.com/TicketsBot-cloud/gdl/objects/integration"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/invite"
+	"github.com/TicketsBot-cloud/gdl/objects/member"
+	"github.com/TicketsBot-cloud/gdl/objects/user"
+	"github.com/TicketsBot-cloud/gdl/rest"
 )
 
 func (ctx *Context) GetChannel(channelId uint64) (channel.Channel, error) {

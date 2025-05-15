@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/gdl/gateway/payloads"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/listeners"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/getsentry/sentry-go"
-	"github.com/rxdn/gdl/gateway/payloads"
 )
 
 func execute(c *worker.Context, event []byte) error {

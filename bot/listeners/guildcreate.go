@@ -6,18 +6,18 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
+	"github.com/TicketsBot-cloud/gdl/objects/auditlog"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
+	"github.com/TicketsBot-cloud/gdl/permission"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
 	"github.com/TicketsBot-cloud/worker/config"
-	"github.com/rxdn/gdl/gateway/payloads/events"
-	"github.com/rxdn/gdl/objects/auditlog"
-	"github.com/rxdn/gdl/objects/channel/embed"
-	"github.com/rxdn/gdl/objects/guild"
-	"github.com/rxdn/gdl/permission"
-	"github.com/rxdn/gdl/rest"
 )
 
 // Fires when we receive a guild

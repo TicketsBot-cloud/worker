@@ -1,8 +1,8 @@
 package utils
 
 import (
+	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
-	"github.com/rxdn/gdl/gateway/payloads/events"
 )
 
 func MessageCreateErrorContext(e events.MessageCreate) errorcontext.WorkerErrorContext {

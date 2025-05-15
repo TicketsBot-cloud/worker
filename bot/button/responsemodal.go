@@ -3,8 +3,8 @@ package button
 import (
 	"errors"
 
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker"
-	"github.com/rxdn/gdl/objects/interaction"
 )
 
 type ResponseModal struct {

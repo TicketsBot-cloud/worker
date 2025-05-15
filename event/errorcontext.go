@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/rxdn/gdl/objects/interaction"
 )
 
 type InteractionErrorContext struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/config"
-	"github.com/rxdn/gdl/cache"
 )
 
 func buildContext(ctx context.Context, ticket database.Ticket, cache *cache.PgCache) (*worker.Context, error) {

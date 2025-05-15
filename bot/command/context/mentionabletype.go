@@ -1,9 +1,9 @@
 package context
 
 import (
+	"github.com/TicketsBot-cloud/gdl/objects"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
-	"github.com/rxdn/gdl/objects"
-	"github.com/rxdn/gdl/objects/channel"
 )
 
 type MentionableType uint8

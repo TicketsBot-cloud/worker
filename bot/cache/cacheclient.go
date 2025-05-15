@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/log/logrusadapter"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/rxdn/gdl/cache"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )

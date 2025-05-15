@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/TicketsBot-cloud/worker/config"
-	"github.com/rxdn/gdl/objects"
-	"github.com/rxdn/gdl/objects/guild/emoji"
+	"github.com/TicketsBot-cloud/gdl/objects"
+	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 )
 
 type CustomEmoji struct {

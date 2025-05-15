@@ -7,11 +7,11 @@ import (
 
 	"github.com/TicketsBot-cloud/common/collections"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/member"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/rxdn/gdl/objects/member"
-	"github.com/rxdn/gdl/rest/request"
 	"golang.org/x/sync/errgroup"
 )
 

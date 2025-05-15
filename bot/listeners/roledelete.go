@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
-	"github.com/rxdn/gdl/gateway/payloads/events"
 	"golang.org/x/sync/errgroup"
 )
 

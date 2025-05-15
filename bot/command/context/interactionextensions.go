@@ -1,13 +1,13 @@
 package context
 
 import (
-	"github.com/rxdn/gdl/objects"
-	"github.com/rxdn/gdl/objects/channel"
-	"github.com/rxdn/gdl/objects/channel/message"
-	"github.com/rxdn/gdl/objects/guild"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/objects/member"
-	"github.com/rxdn/gdl/objects/user"
+	"github.com/TicketsBot-cloud/gdl/objects"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/member"
+	"github.com/TicketsBot-cloud/gdl/objects/user"
 )
 
 type InteractionExtension struct {

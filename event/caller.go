@@ -16,7 +16,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tickets"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/pkg/errors"
-	"github.com/rxdn/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"strconv"
 )
 

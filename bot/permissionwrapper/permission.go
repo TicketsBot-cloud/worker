@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
+	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/worker"
-	"github.com/rxdn/gdl/objects/channel"
-	"github.com/rxdn/gdl/objects/guild"
-	"github.com/rxdn/gdl/permission"
 )
 
 func HasPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, permissions ...permission.Permission) bool {

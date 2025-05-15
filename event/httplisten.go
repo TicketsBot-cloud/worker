@@ -8,6 +8,10 @@ import (
 
 	"github.com/TicketsBot-cloud/common/eventforwarding"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/gdl/cache"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	btn_manager "github.com/TicketsBot-cloud/worker/bot/button/manager"
@@ -18,10 +22,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	"github.com/rxdn/gdl/cache"
-	"github.com/rxdn/gdl/objects/channel/message"
-	"github.com/rxdn/gdl/objects/interaction"
-	"github.com/rxdn/gdl/rest"
 	"github.com/sirupsen/logrus"
 )
 

@@ -6,10 +6,10 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
-	"github.com/rxdn/gdl/cache"
 )
 
 func ToRetriever(worker *worker.Context) permission.Retriever {

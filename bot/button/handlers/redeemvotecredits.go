@@ -6,6 +6,7 @@ import (
 
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -15,7 +16,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/jackc/pgx/v4"
-	"github.com/rxdn/gdl/objects/interaction/component"
 )
 
 type RedeemVoteCreditsHandler struct{}
