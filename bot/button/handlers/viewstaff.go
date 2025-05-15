@@ -1,15 +1,12 @@
 package handlers
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
-	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
-	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -51,64 +48,21 @@ func (h *ViewStaffHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	msgEmbed, isBlank := logic.BuildViewStaffMessage(ctx.Context, ctx, page)
-	if !isBlank {
+	msgEmbed, totalPages := logic.BuildViewStaffMessage(ctx.Context, ctx, page)
+	if totalPages <= 1 {
 		ctx.Edit(command.MessageResponse{
-			Embeds: []*embed.Embed{msgEmbed},
-			Components: []component.Component{
-				component.BuildActionRow(
-					component.BuildButton(component.Button{
-						CustomId: fmt.Sprintf("viewstaff_%d", page-1),
-						Style:    component.ButtonStylePrimary,
-						Emoji: &emoji.Emoji{
-							Name: "◀️",
-						},
-						Disabled: page <= 0,
-					}),
-					component.BuildButton(component.Button{
-						CustomId: fmt.Sprintf("viewstaff_%d", page+1),
-						Style:    component.ButtonStylePrimary,
-						Emoji: &emoji.Emoji{
-							Name: "▶️",
-						},
-						Disabled: false,
-					}),
-				),
-			},
+			Embeds:     []*embed.Embed{msgEmbed},
+			Components: nil,
 		})
-	} else {
-		components := ctx.Interaction.Message.Components
-		if len(components) == 0 { // Impossible unless whitelabel
-			return
-		}
-
-		actionRow, ok := components[0].ComponentData.(component.ActionRow)
-		if !ok {
-			return
-		}
-
-		if len(actionRow.Components) < 2 {
-			return
-		}
-
-		nextButton := actionRow.Components[1].ComponentData.(component.Button)
-		if !ok {
-			return
-		}
-
-		nextButton.Disabled = true
-		actionRow.Components[1].ComponentData = nextButton
-		components[0].ComponentData = actionRow
-
-		// v hacky
-		embeds := make([]*embed.Embed, len(ctx.Interaction.Message.Embeds))
-		for i, e := range ctx.Interaction.Message.Embeds {
-			embeds[i] = &e
-		}
-
-		ctx.Edit(command.MessageResponse{
-			Embeds:     embeds,
-			Components: components,
-		})
+		return
 	}
+
+	if page >= totalPages {
+		page = totalPages - 1
+	}
+
+	ctx.Edit(command.MessageResponse{
+		Embeds:     []*embed.Embed{msgEmbed},
+		Components: logic.BuildViewStaffComponents(page, totalPages),
+	})
 }
