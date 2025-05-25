@@ -193,12 +193,14 @@ var (
 	MessageOpenCantSeeParentChannel MessageId = "commands.open.threads.cant_see_parent_channel"
 	MessageOpenCantMessageInThreads MessageId = "commands.open.threads.cant_message_in_threads"
 
-	MessageCloseRequestNoReason     MessageId = "commands.close_request.no_reason"
-	MessageCloseRequestWithReason   MessageId = "commands.close_request.with_reason"
+	MessageCloseRequestHeader       MessageId = "commands.close_request.header"
+	MessageCloseRequestReason       MessageId = "commands.close_request.reason"
+	MessageCloseRequestFooter       MessageId = "commands.close_request.footer"
+	MessageCloseRequestAutoClose    MessageId = "commands.close_request.autoclose"
 	MessageCloseRequestNoPermission MessageId = "commands.close_request.no_permission"
 	MessageCloseRequestDenied       MessageId = "commands.close_request.denied"
-	MessageCloseRequestAccept       MessageId = "commands.close_request.accept"
-	MessageCloseRequestDeny         MessageId = "commands.close_request.deny"
+	MessageCloseRequestAccept       MessageId = "commands.close_request.buttons.accept"
+	MessageCloseRequestDeny         MessageId = "commands.close_request.buttons.deny"
 
 	MessageSwitchPanelInvalidPanel MessageId = "commands.switch_panel.invalid_panel"
 	MessageSwitchPanelSuccess      MessageId = "commands.switch_panel.success"
