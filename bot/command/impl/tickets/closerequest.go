@@ -2,6 +2,8 @@ package tickets
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,7 +35,7 @@ func (c CloseRequestCommand) Properties() registry.Properties {
 		Category:        command.Tickets,
 		InteractionOnly: true,
 		Arguments: command.Arguments(
-			command.NewOptionalArgument("close_delay", "Hours to close the ticket in if the user does not respond", interaction.OptionTypeInteger, "infallible"),
+			command.NewOptionalArgument("close_delay", "Delay before the tickets gets automatically closed (e.g. 10m, 2h, 1d, 1h30m, or just hour)", interaction.OptionTypeString, "infallible"),
 			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.OptionTypeString, "infallible", c.ReasonAutoCompleteHandler),
 		),
 		Timeout: time.Second * 5,
@@ -44,7 +46,7 @@ func (c CloseRequestCommand) GetExecutor() interface{} {
 	return c.Execute
 }
 
-func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int, reason *string) {
+func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *string, reason *string) {
 	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, ctx.ChannelId(), ctx.GuildId())
 	if err != nil {
 		ctx.HandleError(err)
@@ -62,9 +64,16 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 	}
 
 	var closeAt *time.Time = nil
-	if closeDelay != nil {
-		tmp := time.Now().Add(time.Hour * time.Duration(*closeDelay))
-		closeAt = &tmp
+	if closeDelay != nil && *closeDelay != "" {
+		dur, err := ParseDuration(ctx, *closeDelay)
+		if err != nil {
+			ctx.ReplyRaw(customisation.Red, ctx.GetMessage(i18n.Error), err.Error())
+			return
+		}
+		if dur > 0 {
+			tmp := time.Now().Add(dur)
+			closeAt = &tmp
+		}
 	}
 
 	closeRequest := database.CloseRequest{
@@ -90,9 +99,9 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestReason, strings.ReplaceAll(*reason, "`", "\\`")), false)
 	}
 
-	if closeDelay != nil {
+	if closeAt != nil {
 		CloseAtUnix := (*closeAt).Unix()
-		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestAutoClose, CloseAtUnix, CloseAtUnix), false)
+		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestCloseDelay, CloseAtUnix, CloseAtUnix), false)
 	}
 
 	msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestFooter), false)
@@ -143,4 +152,46 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 // ReasonAutoCompleteHandler TODO: Make a utility function rather than call the Close handler directly
 func (CloseRequestCommand) ReasonAutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	return CloseCommand{}.AutoCompleteHandler(data, value)
+}
+
+// Parse a string like "10m", "2h", "1d", "1h30m", or just a number (as hour)
+func ParseDuration(ctx registry.CommandContext, input string) (time.Duration, error) {
+	// Remove all spaces from input
+	input = strings.ReplaceAll(input, " ", "")
+
+	// Regex to match segments like "10m", "2h", "1d", or just "1" (defaulting to hours)
+	re := regexp.MustCompile(`(?i)(\d+)([mhd]?)`)
+	matches := re.FindAllStringSubmatch(input, -1)
+	if len(matches) == 0 {
+		return 0, fmt.Errorf(ctx.GetMessage(i18n.MessageCloseRequestCloseDelayErrorInvalidFormat))
+	}
+
+	// Ensure the entire input is matched (no invalid chars)
+	var joined strings.Builder
+	for _, match := range matches {
+		joined.WriteString(match[0])
+	}
+	if joined.String() != input {
+		return 0, fmt.Errorf(ctx.GetMessage(i18n.MessageCloseRequestCloseDelayErrorInvalidFormat))
+	}
+
+	// Only allow a missing unit (i.e., default to hours) if there is exactly one segment
+	if len(matches) > 1 && matches[len(matches)-1][2] == "" {
+		return 0, fmt.Errorf(ctx.GetMessage(i18n.MessageCloseRequestCloseDelayErrorInvalidFormat))
+	}
+
+	total := time.Duration(0)
+	for _, match := range matches {
+		num, _ := strconv.Atoi(match[1])
+		switch strings.ToLower(match[2]) {
+		case "m":
+			total += time.Duration(num) * time.Minute
+		case "h", "":
+			total += time.Duration(num) * time.Hour
+		case "d":
+			total += time.Duration(num) * 24 * time.Hour
+		}
+	}
+
+	return total, nil
 }
