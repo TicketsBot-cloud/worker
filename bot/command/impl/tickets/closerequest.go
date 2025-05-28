@@ -20,6 +20,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -105,6 +106,8 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *stri
 	}
 
 	msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestFooter), false)
+
+	msgEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 
 	components := component.BuildActionRow(
 		component.BuildButton(component.Button{
