@@ -32,8 +32,9 @@ type (
 			HttpAddress         string   `env:"HTTP_ADDR"`
 			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.ticketsbot.cloud"`
 			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://ticketsbot.cloud"`
-			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.ticketsbot.cloud"`
-			PoweredBy           string   `env:"POWEREDBY" envDefault:"ticketsbot.cloud"`
+			VoteUrl1            string   `env:"VOTE_URL_1" envDefault:"https://top.gg/bot/1325579039888511056/vote"`
+			VoteUrl2            string   `env:"VOTE_URL_2" envDefault:"https://discordbotlist.com/bots/tickets-v2/upvote"`
+			PoweredBy           string   `env:"POWEREDBY" envDefault:"[ticketsbot.cloud](https://ticketsbot.cloud)"`
 			IconUrl             string   `env:"ICON_URL" envDefault:"https://ticketsbot.cloud/assets/img/logo.png"`
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`

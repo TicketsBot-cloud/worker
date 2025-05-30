@@ -3,6 +3,7 @@ package manager
 import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/general"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings"
@@ -20,6 +21,18 @@ type CommandManager struct {
 
 func (cm *CommandManager) GetCommands() map[string]registry.Command {
 	return cm.registry
+}
+
+func (cm *CommandManager) GetCommandByCategory(category command.Category) map[string]registry.Command {
+	commands := make(map[string]registry.Command)
+
+	for name, cmd := range cm.registry {
+		if cmd.Properties().Category == category {
+			commands[name] = cmd
+		}
+	}
+
+	return commands
 }
 
 func (cm *CommandManager) RegisterCommands() {

@@ -121,6 +121,7 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 			Cache:        cache,
 			RateLimiter:  nil, // Use http-proxy ratelimit functionality
 		}
+		fmt.Println("Handling interaction", payload.InteractionType)
 
 		switch payload.InteractionType {
 		case interaction.InteractionTypeApplicationCommand:
@@ -283,6 +284,7 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 					Embeds:          data.Embeds,
 					AllowedMentions: data.AllowedMentions,
 					Components:      data.Components,
+					Flags:           data.Flags,
 				}
 
 				if _, err := rest.CreateFollowupMessage(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
@@ -297,6 +299,7 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 					Embeds:          data.Embeds,
 					AllowedMentions: data.AllowedMentions,
 					Components:      data.Components,
+					Flags:           data.Flags,
 				}
 
 				if _, err := rest.EditOriginalInteractionResponse(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {

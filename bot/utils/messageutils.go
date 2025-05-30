@@ -7,6 +7,7 @@ import (
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -56,6 +57,33 @@ func BuildEmbedRaw(
 	}
 
 	return msgEmbed
+}
+
+func BuildContainerRaw(
+	colourHex int, title, content string, tier premium.PremiumTier,
+) component.Component {
+	components := Slice(
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("## %s", title),
+		}),
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: content,
+		}),
+	)
+
+	if tier == premium.None {
+		components = append(components,
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
+			}),
+		)
+	}
+
+	return component.BuildContainer(component.Container{
+		AccentColor: &colourHex,
+		Components:  components,
+	})
 }
 
 func GetColourForGuild(ctx context.Context, worker *worker.Context, colour customisation.Colour, guildId uint64) (int, error) {

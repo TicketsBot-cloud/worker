@@ -58,6 +58,13 @@ func NewEphemeralEmbedMessageResponseWithComponents(e *embed.Embed, components [
 	}
 }
 
+func NewEphemeralMessageResponseWithComponents(components []component.Component) MessageResponse {
+	return MessageResponse{
+		Flags:      message.SumFlags(message.FlagEphemeral, message.FlagComponentsV2),
+		Components: components,
+	}
+}
+
 func (r *MessageResponse) IntoApplicationCommandData() interaction.ApplicationCommandCallbackData {
 	return interaction.ApplicationCommandCallbackData{
 		Tts:             r.Tts,
