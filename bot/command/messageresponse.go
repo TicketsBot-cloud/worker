@@ -65,6 +65,13 @@ func NewEphemeralMessageResponseWithComponents(components []component.Component)
 	}
 }
 
+func NewMessageResponseWithComponents(components []component.Component) MessageResponse {
+	return MessageResponse{
+		Flags:      message.SumFlags(message.FlagComponentsV2),
+		Components: components,
+	}
+}
+
 func (r *MessageResponse) IntoApplicationCommandData() interaction.ApplicationCommandCallbackData {
 	return interaction.ApplicationCommandCallbackData{
 		Tts:             r.Tts,

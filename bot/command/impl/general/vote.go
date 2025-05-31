@@ -9,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
@@ -93,21 +94,13 @@ func (c VoteCommand) Execute(ctx registry.CommandContext) {
 			})
 		}
 
-		_, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-			component.BuildContainer(component.Container{
-				Components: []component.Component{
-					component.BuildTextDisplay(component.TextDisplay{
-						Content: fmt.Sprintf("### %s", ctx.GetMessage(i18n.TitleVote)),
-					}),
-					component.BuildSeparator(component.Separator{}),
-					componentBody,
-					component.BuildSeparator(component.Separator{Divider: utils.Ptr(false)}),
-					buildVoteComponent(ctx, true),
-				},
+		if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+			utils.BuildContainer(ctx, customisation.Green, i18n.TitleVote, ctx.PremiumTier(), []component.Component{
+				componentBody,
+				component.BuildSeparator(component.Separator{Divider: utils.Ptr(false)}),
+				buildVoteComponent(ctx, true),
 			}),
-		}))
-
-		if err != nil {
+		})); err != nil {
 			ctx.HandleError(err)
 			return
 		}
@@ -118,22 +111,19 @@ func buildVoteComponent(ctx registry.CommandContext, allowRedeem bool) component
 	voteButton1 := component.BuildButton(component.Button{
 		Label: fmt.Sprintf("%s (TopGG)", ctx.GetMessage(i18n.TitleVote)),
 		Style: component.ButtonStyleLink,
-		// Emoji: utils.BuildEmoji("🔗"),
-		Url: utils.Ptr(config.Conf.Bot.VoteUrl1),
+		Url:   utils.Ptr(config.Conf.Bot.VoteUrl1),
 	})
 
 	voteButton2 := component.BuildButton(component.Button{
 		Label: fmt.Sprintf("%s (DBL)", ctx.GetMessage(i18n.TitleVote)),
 		Style: component.ButtonStyleLink,
-		// Emoji: utils.BuildEmoji("🔗"),
-		Url: utils.Ptr(config.Conf.Bot.VoteUrl2),
+		Url:   utils.Ptr(config.Conf.Bot.VoteUrl2),
 	})
 
 	redeemButton := component.BuildButton(component.Button{
 		Label:    ctx.GetMessage(i18n.MessageVoteRedeemCredits),
 		CustomId: "redeem_vote_credits",
 		Style:    component.ButtonStyleSuccess,
-		// Emoji:    utils.BuildEmoji("💶"),
 	})
 
 	var actionRow component.Component

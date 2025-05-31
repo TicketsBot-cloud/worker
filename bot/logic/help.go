@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -21,8 +20,8 @@ import (
 func BuildHelpMessage(category command.Category, page int, ctx registry.CommandContext, cmds map[string]registry.Command) (*component.Component, error) {
 	componentList := []component.Component{}
 
-	// permLevel, _ := ctx.UserPermissionLevel(ctx)
-	permLevel := permission.Admin
+	permLevel, _ := ctx.UserPermissionLevel(ctx)
+	// permLevel := permission.Admin
 
 	commandIds, err := command.LoadCommandIds(ctx.Worker(), ctx.Worker().BotId)
 	if err != nil {
@@ -105,8 +104,6 @@ func BuildHelpMessage(category command.Category, page int, ctx registry.CommandC
 		)
 	}
 
-	accentColor := ctx.GetColour(customisation.Green)
-
 	container := component.BuildContainer(component.Container{
 		Components: append([]component.Component{
 			component.BuildTextDisplay(component.TextDisplay{
@@ -114,7 +111,7 @@ func BuildHelpMessage(category command.Category, page int, ctx registry.CommandC
 			}),
 			component.BuildSeparator(component.Separator{}),
 		}, componentList...),
-		AccentColor: &accentColor,
+		AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
 	})
 
 	return &container, nil
@@ -157,8 +154,8 @@ func BuildHelpMessageCategorySelector(r registry.Registry, ctx registry.CommandC
 		commandCategories.Set(category, nil)
 	}
 
-	// permLevel, _ := ctx.UserPermissionLevel(ctx)
-	permLevel := permission.Admin
+	permLevel, _ := ctx.UserPermissionLevel(ctx)
+	// permLevel := permission.Admin
 
 	for _, cmd := range r {
 		properties := cmd.Properties()

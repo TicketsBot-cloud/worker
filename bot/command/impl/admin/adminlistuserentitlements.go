@@ -5,12 +5,13 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -44,22 +45,18 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 		return
 	}
 
-	embed := embed.NewEmbed().
-		SetTitle("Entitlements").
-		SetColor(ctx.GetColour(customisation.Blue))
-
 	if len(entitlements) == 0 {
-		embed.SetDescription("No entitlements found")
+		ctx.ReplyRaw(customisation.Red, ctx.GetMessage(i18n.Error), "This user has no entitlements")
+		return
 	}
 
-	for i, entitlement := range entitlements {
-		if i >= 25 {
-			embed.SetDescription("Too many entitlements to display")
-			break
-		}
+	values := []component.Component{}
+
+	for _, entitlement := range entitlements {
 
 		value := fmt.Sprintf(
-			"**Tier:** %s\n**Source:** %s\n**Expires:** <t:%d>\n**SKU ID:** %s\n**SKU Priority:** %d",
+			"#### %s\n\n**Tier:** %s\n**Source:** %s\n**Expires:** <t:%d>\n**SKU ID:** %s\n**SKU Priority:** %d\n\n",
+			entitlement.SkuLabel,
 			entitlement.Tier,
 			entitlement.Source,
 			entitlement.ExpiresAt.Unix(),
@@ -67,8 +64,16 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 			entitlement.SkuPriority,
 		)
 
-		embed.AddField(entitlement.SkuLabel, value, false)
+		values = append(values, component.BuildTextDisplay(component.TextDisplay{Content: value}))
 	}
 
-	ctx.ReplyWithEmbed(embed)
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainer(
+			ctx,
+			customisation.Orange,
+			i18n.Admin,
+			ctx.PremiumTier(),
+			values,
+		),
+	}))
 }

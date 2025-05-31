@@ -7,9 +7,11 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -48,5 +50,12 @@ func (AdminGetOwnerCommand) Execute(ctx registry.CommandContext, raw string) {
 		return
 	}
 
-	ctx.ReplyRaw(customisation.Green, ctx.GetMessage(i18n.Admin), fmt.Sprintf("`%s` is owned by <@%d> (%d)", guild.Name, guild.OwnerId, guild.OwnerId))
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerRaw(
+			ctx.GetColour(customisation.Orange),
+			"Admin - Get Owner",
+			fmt.Sprintf("**Guild ID:** `%d`\n**Guild Name:** `%s`\n**Owner ID:** `%d`", guild.Id, guild.Name, guild.OwnerId),
+			ctx.PremiumTier(),
+		),
+	}))
 }

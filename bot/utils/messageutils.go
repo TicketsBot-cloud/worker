@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"github.com/TicketsBot/common/utils"
 )
 
 func BuildEmbed(
@@ -59,6 +60,62 @@ func BuildEmbedRaw(
 	return msgEmbed
 }
 
+func BuildContainer(
+	ctx registry.CommandContext, colour customisation.Colour, title i18n.MessageId, tier premium.PremiumTier, innerComponents []component.Component,
+) component.Component {
+	components := append(Slice(
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("### %s", ctx.GetMessage(title)),
+		}),
+		component.BuildSeparator(component.Separator{}),
+	), innerComponents...)
+
+	if tier == premium.None {
+		// check if last component is a separator, if not add one
+		if len(components) == 0 || components[len(components)-1].Type != component.ComponentSeparator {
+			components = append(components, component.BuildSeparator(component.Separator{}))
+		}
+		components = append(components,
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
+			}),
+		)
+	}
+
+	return component.BuildContainer(component.Container{
+		AccentColor: utils.Ptr(ctx.GetColour(colour)),
+		Components:  components,
+	})
+}
+
+func BuildContainerNoLocale(
+	ctx registry.CommandContext, colour customisation.Colour, title string, tier premium.PremiumTier, innerComponents []component.Component,
+) component.Component {
+	components := append(Slice(
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("### %s", title),
+		}),
+		component.BuildSeparator(component.Separator{}),
+	), innerComponents...)
+
+	if tier == premium.None {
+		// check if last component is a separator, if not add one
+		if len(components) == 0 || components[len(components)-1].Type != component.ComponentSeparator {
+			components = append(components, component.BuildSeparator(component.Separator{}))
+		}
+		components = append(components,
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
+			}),
+		)
+	}
+
+	return component.BuildContainer(component.Container{
+		AccentColor: utils.Ptr(ctx.GetColour(colour)),
+		Components:  components,
+	})
+}
+
 func BuildContainerRaw(
 	colourHex int, title, content string, tier premium.PremiumTier,
 ) component.Component {
@@ -66,6 +123,7 @@ func BuildContainerRaw(
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: fmt.Sprintf("## %s", title),
 		}),
+		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: content,
 		}),

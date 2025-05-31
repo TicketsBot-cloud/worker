@@ -5,9 +5,12 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -32,5 +35,13 @@ func (c InviteCommand) GetExecutor() interface{} {
 }
 
 func (InviteCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitleInvite, i18n.MessageInvite)
+	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+		utils.BuildContainer(ctx, customisation.Green, i18n.TitleInvite, ctx.PremiumTier(), []component.Component{
+			component.BuildActionRow(component.BuildButton(component.Button{
+				Label: ctx.GetMessage(i18n.ClickHere),
+				Style: component.ButtonStyleLink,
+				Url:   utils.Ptr(config.Conf.Bot.InviteUrl),
+			})),
+		}),
+	}))
 }

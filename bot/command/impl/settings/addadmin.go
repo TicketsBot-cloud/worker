@@ -62,17 +62,20 @@ func (c AddAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 	}
 
 	// Send confirmation message
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddAdmin, i18n.MessageAddAdminConfirm, nil, mention)
-	res := command.NewEphemeralEmbedMessageResponseWithComponents(e, utils.Slice(component.BuildActionRow(
-		component.BuildButton(component.Button{
-			Label:    ctx.GetMessage(i18n.Confirm),
-			CustomId: fmt.Sprintf("addadmin-%d-%d", mentionableType, id),
-			Style:    component.ButtonStylePrimary,
-			Emoji:    nil,
-		}),
-	)))
-
-	if _, err := ctx.ReplyWith(res); err != nil {
+	if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+		utils.BuildContainer(ctx, customisation.Green, i18n.TitleAddAdmin, ctx.PremiumTier(), []component.Component{
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: ctx.GetMessage(i18n.MessageAddAdminConfirm, mention),
+			}),
+			component.BuildActionRow(
+				component.BuildButton(component.Button{
+					Label:    ctx.GetMessage(i18n.Confirm),
+					CustomId: fmt.Sprintf("addadmin-%d-%d", mentionableType, id),
+					Style:    component.ButtonStyleSuccess,
+					Emoji:    nil,
+				}),
+			),
+		})})); err != nil {
 		ctx.HandleError(err)
 	}
 }
