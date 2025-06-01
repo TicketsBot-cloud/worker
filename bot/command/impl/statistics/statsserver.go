@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TicketsBot-cloud/analytics-client"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
@@ -14,7 +15,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
-	"github.com/TicketsBot/analytics-client"
 	"github.com/getsentry/sentry-go"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
