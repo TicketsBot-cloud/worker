@@ -89,18 +89,8 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		page = totalPages - 1
 	}
 
-	// Admin users
-	label, value := buildPaginatedField(
-		cmd, adminUsers, page,
-		i18n.MessageViewStaffAdminUsers,
-		i18n.MessageViewStaffNoAdminUsers,
-		i18n.MessageViewStaffUserFormat,
-		"",
-	)
-	embed.AddField(label, value, true)
-
 	// Admin roles
-	label, value = buildPaginatedField(
+	label, value := buildPaginatedField(
 		cmd, adminRoles, page,
 		i18n.MessageViewStaffAdminRoles,
 		i18n.MessageViewStaffNoAdminRoles,
@@ -109,7 +99,27 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 	)
 	embed.AddField(label, value, true)
 
+	// Admin users
+	label, value = buildPaginatedField(
+		cmd, adminUsers, page,
+		i18n.MessageViewStaffAdminUsers,
+		i18n.MessageViewStaffNoAdminUsers,
+		i18n.MessageViewStaffUserFormat,
+		"",
+	)
+	embed.AddField(label, value, true)
+
 	embed.AddBlankField(false)
+
+	// Support roles
+	label, value = buildPaginatedField(
+		cmd, supportRoles, page,
+		i18n.MessageViewStaffSupportRoles,
+		i18n.MessageViewStaffNoSupportRoles,
+		i18n.MessageViewStaffRoleFormat,
+		"",
+	)
+	embed.AddField(label, value, true)
 
 	// Support users
 	if len(supportUsers) > 0 {
@@ -122,16 +132,6 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		)
 		embed.AddField(label, value, true)
 	}
-
-	// Support roles
-	label, value = buildPaginatedField(
-		cmd, supportRoles, page,
-		i18n.MessageViewStaffSupportRoles,
-		i18n.MessageViewStaffNoSupportRoles,
-		i18n.MessageViewStaffRoleFormat,
-		"",
-	)
-	embed.AddField(label, value, true)
 
 	// Add premium branding footer if not premium
 	if cmd.PremiumTier() == premium.None {
