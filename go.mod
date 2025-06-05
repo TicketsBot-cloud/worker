@@ -11,7 +11,7 @@ replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
 require (
 	cloud.google.com/go/profiler v0.4.2
-	github.com/TicketsBot-cloud/analytics-client v0.0.0-20250601094429-441868dd0de0
+	github.com/TicketsBot-cloud/analytics-client v0.0.0-20250604180646-6606dfc8fc8c
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
 	github.com/TicketsBot-cloud/database v0.0.0-20250601094419-c168a11bd60a
@@ -47,7 +47,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/ClickHouse/ch-go v0.66.0 // indirect
-	github.com/ClickHouse/clickhouse-go/v2 v2.35.0 // indirect
+	github.com/ClickHouse/clickhouse-go/v2 v2.36.0 // indirect
 	github.com/TicketsBot-cloud/logarchiver v0.0.0-20250514201320-d5141071a6eb // indirect
 	github.com/TicketsBot/common v0.0.0-20241117150316-ff54c97b45c1 // indirect
 	github.com/TicketsBot/ttlcache v1.6.1-0.20200405150101-acc18e37b261 // indirect

@@ -220,6 +220,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		Name:                 channelName,
 		PermissionOverwrites: overwrites,
 		ParentId:             panel.TargetCategory,
+		Topic:                panel.Title,
 	}
 
 	if _, err = ctx.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
