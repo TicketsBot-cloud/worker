@@ -579,18 +579,17 @@ func callCommand(
 
 		v.Execute(ctx, arg0)
 	case tickets.CloseRequestCommand:
-		var arg0 *int
+		var arg0 *string
 
 		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
 		if !ok0 {
 			arg0 = nil
 		} else {
-			argValue, ok := opt0.Value.(float64)
+			argValue, ok := opt0.Value.(string)
 			if !ok {
-				return fmt.Errorf("option %s was not a float64", opt0.Name)
+				return fmt.Errorf("option %s was not a string", opt0.Name)
 			}
-			tmp := int(argValue)
-			arg0 = &tmp
+			arg0 = &argValue
 		}
 		var arg1 *string
 
