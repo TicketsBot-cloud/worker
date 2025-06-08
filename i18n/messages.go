@@ -232,8 +232,6 @@ var (
 	MessageNotesCreated         MessageId = "commands.notes.created"
 
 	MessageViewStaffTitle            MessageId = "commands.viewstaff.title"
-	MessageViewStaffUserFormat       MessageId = "commands.viewstaff.user_format"
-	MessageViewStaffRoleFormat       MessageId = "commands.viewstaff.role_format"
 	MessageViewStaffAdminUsers       MessageId = "commands.viewstaff.admin.users"
 	MessageViewStaffNoAdminUsers     MessageId = "commands.viewstaff.admin.no_users"
 	MessageViewStaffAdminRoles       MessageId = "commands.viewstaff.admin.roles"

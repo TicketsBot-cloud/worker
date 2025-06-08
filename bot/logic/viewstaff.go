@@ -16,6 +16,8 @@ import (
 )
 
 const perField = 8
+const viewStaffUserFormat = "- <@%d> (`%d`)\n"
+const viewStaffRoleFormat = "- <@&%d> (`%d`)\n"
 
 func BuildViewStaffComponents(page, totalPages int) []component.Component {
 	if totalPages <= 1 {
@@ -45,7 +47,7 @@ func BuildViewStaffComponents(page, totalPages int) []component.Component {
 	}
 }
 
-func buildPaginatedField(cmd registry.CommandContext, entries []uint64, page int, labelId, emptyId, formatId i18n.MessageId, prefix string) (string, string) {
+func buildPaginatedField(cmd registry.CommandContext, entries []uint64, page int, labelId, emptyId i18n.MessageId, format string, prefix string) (string, string) {
 	lower := perField * page
 	upper := perField * (page + 1)
 	if upper > len(entries) {
@@ -61,7 +63,7 @@ func buildPaginatedField(cmd registry.CommandContext, entries []uint64, page int
 		content.WriteString("\n\n")
 	}
 	for i := lower; i < upper; i++ {
-		content.WriteString(fmt.Sprintf(cmd.GetMessage(formatId, entries[i], entries[i])))
+		content.WriteString(fmt.Sprintf(format, entries[i], entries[i]))
 	}
 	return label, strings.TrimSuffix(content.String(), "\n")
 }
@@ -94,7 +96,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		cmd, adminRoles, page,
 		i18n.MessageViewStaffAdminRoles,
 		i18n.MessageViewStaffNoAdminRoles,
-		i18n.MessageViewStaffRoleFormat,
+		viewStaffRoleFormat,
 		"",
 	)
 	embed.AddField(label, value, true)
@@ -104,7 +106,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		cmd, adminUsers, page,
 		i18n.MessageViewStaffAdminUsers,
 		i18n.MessageViewStaffNoAdminUsers,
-		i18n.MessageViewStaffUserFormat,
+		viewStaffUserFormat,
 		"",
 	)
 	embed.AddField(label, value, true)
@@ -116,7 +118,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		cmd, supportRoles, page,
 		i18n.MessageViewStaffSupportRoles,
 		i18n.MessageViewStaffNoSupportRoles,
-		i18n.MessageViewStaffRoleFormat,
+		viewStaffRoleFormat,
 		"",
 	)
 	embed.AddField(label, value, true)
@@ -127,7 +129,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 			cmd, supportUsers, page,
 			i18n.MessageViewStaffSupportUsers,
 			"",
-			i18n.MessageViewStaffUserFormat,
+			viewStaffUserFormat,
 			cmd.GetMessage(i18n.MessageViewStaffSupportUsersWarn),
 		)
 		embed.AddField(label, value, true)
