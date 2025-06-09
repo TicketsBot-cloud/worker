@@ -18,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -92,10 +93,14 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 
 	if closeDelay != nil {
 		CloseAtUnix := (*closeAt).Unix()
-		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestAutoClose, CloseAtUnix, CloseAtUnix), false)
+		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestCloseDelay, CloseAtUnix, CloseAtUnix), false)
 	}
 
 	msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestFooter), false)
+
+	if ctx.PremiumTier() == premium.None {
+		msgEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
+	}
 
 	components := component.BuildActionRow(
 		component.BuildButton(component.Button{

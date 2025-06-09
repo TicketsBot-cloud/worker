@@ -195,8 +195,8 @@ var (
 
 	MessageCloseRequestHeader       MessageId = "commands.close_request.header"
 	MessageCloseRequestReason       MessageId = "commands.close_request.reason"
+	MessageCloseRequestCloseDelay   MessageId = "commands.close_request.close_delay"
 	MessageCloseRequestFooter       MessageId = "commands.close_request.footer"
-	MessageCloseRequestAutoClose    MessageId = "commands.close_request.autoclose"
 	MessageCloseRequestNoPermission MessageId = "commands.close_request.no_permission"
 	MessageCloseRequestDenied       MessageId = "commands.close_request.denied"
 	MessageCloseRequestAccept       MessageId = "commands.close_request.buttons.accept"
