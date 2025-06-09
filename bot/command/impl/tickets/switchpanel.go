@@ -77,27 +77,60 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	}
 
 	// Try to move ticket to new category
-	panel, err := dbclient.Client.Panel.GetById(ctx, panelId)
+	newPanel, err := dbclient.Client.Panel.GetById(ctx, panelId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
 	// Verify panel is from same guild
-	if panel.PanelId == 0 || panel.GuildId != ctx.GuildId() {
+	if newPanel.PanelId == 0 || newPanel.GuildId != ctx.GuildId() {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageSwitchPanelInvalidPanel)
 		return
 	}
 
-	// Update panel assigned to ticket in database
-	if err := dbclient.Client.Tickets.SetPanelId(ctx, ctx.GuildId(), ticket.Id, panelId); err != nil {
-		ctx.HandleError(err)
-		return
+	originalPanelId := ticket.PanelId
+	var oldPanel *database.Panel
+	if originalPanelId != nil {
+		tmp, err := dbclient.Client.Panel.GetById(ctx, *originalPanelId)
+		if err == nil && tmp.PanelId != 0 {
+			oldPanel = &tmp
+		}
 	}
 
 	// Get ticket claimer
 	claimer, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
 	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	// Generate old and new channel names
+	var oldChannelName string
+	if oldPanel != nil {
+		oldChannelName, _ = logic.GenerateChannelName(ctx.Context, ctx.Worker(), oldPanel, ticket.GuildId, ticket.Id, ticket.UserId, utils.NilIfZero(claimer))
+	}
+	newChannelName, err := logic.GenerateChannelName(ctx.Context, ctx.Worker(), &newPanel, ticket.GuildId, ticket.Id, ticket.UserId, utils.NilIfZero(claimer))
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	// Fetch current channel name
+	currentChannel, err := ctx.Worker().GetChannel(*ticket.ChannelId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	// Only update channel name if it matches the old panel's generated name (or if no old panel)
+	shouldUpdateName := false
+	if oldPanel == nil || currentChannel.Name == oldChannelName {
+		shouldUpdateName = true
+	}
+
+	// Update panel assigned to ticket in database
+	if err := dbclient.Client.Tickets.SetPanelId(ctx, ctx.GuildId(), ticket.Id, panelId); err != nil {
 		ctx.HandleError(err)
 		return
 	}
@@ -118,7 +151,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 				subject = embeds[0].Title // TODO: Store subjects in database
 			}
 
-			embeds[0], err = logic.BuildWelcomeMessageEmbed(ctx.Context, ctx, ticket, subject, &panel, nil)
+			embeds[0], err = logic.BuildWelcomeMessageEmbed(ctx.Context, ctx, ticket, subject, &newPanel, nil)
 			if err != nil {
 				ctx.HandleError(err)
 				return
@@ -141,13 +174,6 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		}
 	}
 
-	// Get new channel name
-	channelName, err := logic.GenerateChannelName(ctx.Context, ctx.Worker(), &panel, ticket.GuildId, ticket.Id, ticket.UserId, utils.NilIfZero(claimer))
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	// If the ticket is a thread, we cannot update the permissions (possibly remove a small amount of  members in the
 	// future), or the parent channel (user may not have access to it. can you even move threads anyway?)
 	if ticket.IsThread {
@@ -157,8 +183,9 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 
-		data := rest.ModifyChannelData{
-			Name: channelName,
+		data := rest.ModifyChannelData{}
+		if shouldUpdateName {
+			data.Name = newChannelName
 		}
 
 		if _, err := ctx.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
@@ -166,7 +193,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 
-		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", panel.Title))
+		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", newPanel.Title))
 
 		// Modify join message
 		if ticket.JoinMessageId != nil && settings.TicketNotificationChannel != nil {
@@ -176,7 +203,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 				return
 			}
 
-			msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, channelName, ticket.Id, &panel, threadStaff, ctx.PremiumTier())
+			msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, newChannelName, ticket.Id, &newPanel, threadStaff, ctx.PremiumTier())
 			if _, err := ctx.Worker().EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, msg.IntoEditMessageData()); err != nil {
 				sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
 				return
@@ -196,7 +223,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	// Calculate new channel permissions
 	var overwrites []channel.PermissionOverwrite
 	if claimer == 0 {
-		overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &panel, members...)
+		overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, members...)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -211,16 +238,18 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		// GenerateClaimedOverwrites returns nil if the permissions are the same as an unclaimed ticket
 		// so if this is the case, we still need to calculate permissions
 		if overwrites == nil {
-			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &panel, members...)
+			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, members...)
 		}
 	}
 
 	// Update channel permissions
 	data := rest.ModifyChannelData{
-		Name:                 channelName,
 		PermissionOverwrites: overwrites,
-		ParentId:             panel.TargetCategory,
-		Topic:                panel.Title,
+		ParentId:             newPanel.TargetCategory,
+		Topic:                newPanel.Title,
+	}
+	if shouldUpdateName {
+		data.Name = newChannelName
 	}
 
 	if _, err = ctx.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
@@ -228,7 +257,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		return
 	}
 
-	ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelSuccess, panel.Title, ctx.UserId())
+	ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelSuccess, newPanel.Title, ctx.UserId())
 }
 
 func (SwitchPanelCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
