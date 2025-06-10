@@ -62,7 +62,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		return
 	}
 
-	if *closeDelay > 0 {
+	if closeDelay != nil && *closeDelay <= 0 {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseRequestCloseDelayZero)
 		return
 	}
