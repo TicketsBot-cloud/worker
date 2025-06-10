@@ -62,6 +62,11 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		return
 	}
 
+	if *closeDelay > 0 {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseRequestCloseDelayZero)
+		return
+	}
+
 	var closeAt *time.Time = nil
 	if closeDelay != nil {
 		tmp := time.Now().Add(time.Hour * time.Duration(*closeDelay))
@@ -91,7 +96,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestReason, strings.ReplaceAll(*reason, "`", "\\`")), false)
 	}
 
-	if closeDelay != nil {
+	if closeAt != nil {
 		CloseAtUnix := (*closeAt).Unix()
 		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestCloseDelay, CloseAtUnix, CloseAtUnix), false)
 	}
