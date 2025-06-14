@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"flag"
 	"fmt"
+	"io"
 
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -13,12 +15,10 @@ import (
 )
 
 var (
-	Token         = flag.String("token", "", "Bot token to create commands for")
-	ApplicationId = flag.Uint64("id", 508391840525975553, "Application ID")
-	GuildId       = flag.Uint64("guild", 0, "Guild to create the commands for")
-
+	Token               = flag.String("token", "", "Bot token to create commands for")
+	GuildId             = flag.Uint64("guild", 0, "Guild to create the commands for")
 	AdminCommandGuildId = flag.Uint64("admin-guild", 0, "Guild to create the admin commands in")
-	MergeGuildCommands  = flag.Bool("merge", true, "Don't overwrite existing commands")
+	MergeGuildCommands  = flag.Bool("merge", true, "Merge new commands with existing ones instead of overwriting")
 )
 
 func main() {
@@ -27,6 +27,8 @@ func main() {
 		panic("no token")
 	}
 
+	applicationId := must(getApplicationId(*Token))
+
 	i18n.Init()
 
 	commandManager := new(manager.CommandManager)
@@ -34,21 +36,18 @@ func main() {
 
 	data, adminCommands := commandManager.BuildCreatePayload(false, AdminCommandGuildId)
 
-	var err error
+	// Register commands globally or for a specific guild
 	if *GuildId == 0 {
-		must(rest.ModifyGlobalCommands(context.Background(), *Token, nil, *ApplicationId, data))
+		must(rest.ModifyGlobalCommands(context.Background(), *Token, nil, applicationId, data))
 	} else {
-		must(rest.ModifyGuildCommands(context.Background(), *Token, nil, *ApplicationId, *GuildId, data))
+		must(rest.ModifyGuildCommands(context.Background(), *Token, nil, applicationId, *GuildId, data))
 	}
 
-	if err != nil {
-		panic(err)
-	}
-
-	if AdminCommandGuildId != nil && *AdminCommandGuildId != 0 {
-		if MergeGuildCommands != nil && *MergeGuildCommands {
-			cmds := must(rest.GetGuildCommands(context.Background(), *Token, nil, *ApplicationId, *AdminCommandGuildId))
-			for _, cmd := range cmds {
+	// Handle admin commands for a specific guild, merging if requested
+	if *AdminCommandGuildId != 0 {
+		if *MergeGuildCommands {
+			existingCmds := must(rest.GetGuildCommands(context.Background(), *Token, nil, applicationId, *AdminCommandGuildId))
+			for _, cmd := range existingCmds {
 				var found bool
 				for _, newCmd := range adminCommands {
 					if cmd.Name == newCmd.Name {
@@ -56,7 +55,6 @@ func main() {
 						break
 					}
 				}
-
 				if !found {
 					adminCommands = append(adminCommands, rest.CreateCommandData{
 						Id:          cmd.Id,
@@ -68,14 +66,48 @@ func main() {
 				}
 			}
 		}
-
-		must(rest.ModifyGuildCommands(context.Background(), *Token, nil, *ApplicationId, *AdminCommandGuildId, adminCommands))
+		must(rest.ModifyGuildCommands(context.Background(), *Token, nil, applicationId, *AdminCommandGuildId, adminCommands))
 	}
 
-	cmds := must(rest.GetGlobalCommands(context.Background(), *Token, nil, *ApplicationId))
+	// Output all global commands as JSON
+	cmds := must(rest.GetGlobalCommands(context.Background(), *Token, nil, applicationId))
 	marshalled := must(json.MarshalIndent(cmds, "", "    "))
-
 	fmt.Println(string(marshalled))
+}
+
+// getApplicationId fetches the application ID using the bot token
+func getApplicationId(token string) (uint64, error) {
+	req, err := http.NewRequest("GET", "https://discord.com/api/v10/oauth2/applications/@me", nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bot "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("failed to get application id: %s", string(body))
+	}
+
+	var data struct {
+		Id string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return 0, err
+	}
+
+	var id uint64
+	_, err = fmt.Sscanf(data.Id, "%d", &id)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func must[T any](t T, err error) T {
