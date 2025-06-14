@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -23,7 +24,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"golang.org/x/sync/errgroup"
 )
@@ -45,28 +45,38 @@ func SendWelcomeMessage(
 	}
 
 	// Build embeds
-	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
+	welcomeMessageEmbed, embedColor, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
 		return 0, err
 	}
 
-	embeds := utils.Slice(welcomeMessageEmbed)
+	embeds := utils.Slice(*welcomeMessageEmbed)
 
 	// Put form fields in a separate embed
 	fields := getFormDataFields(formData)
 	if len(fields) > 0 {
-		formAnswersEmbed := embed.NewEmbed().
-			SetColor(welcomeMessageEmbed.Color)
+		fieldStr := ""
 
 		for _, field := range fields {
-			formAnswersEmbed.AddField(field.Name, utils.EscapeMarkdown(field.Value), field.Inline)
+			fieldStr += fmt.Sprintf("**%s**\n%s\n", field.Name, utils.EscapeMarkdown(field.Value))
+		}
+
+		components := []component.Component{
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fieldStr,
+			}),
 		}
 
 		if cmd.PremiumTier() == premium.None {
-			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
+			components = utils.AddPremiumFooter(components)
 		}
 
-		embeds = append(embeds, formAnswersEmbed)
+		embeds = append(embeds, component.BuildContainer(component.Container{
+			AccentColor: &embedColor,
+			Components:  components,
+		}))
+
+		// embeds = append(embeds, formAnswersEmbed)
 	}
 
 	buttons := []component.Component{
@@ -94,10 +104,8 @@ func SendWelcomeMessage(
 	}
 
 	data := rest.CreateMessageData{
-		Embeds: embeds,
-		Components: []component.Component{
-			component.BuildActionRow(buttons...),
-		},
+		Components: append(embeds, component.BuildActionRow(buttons...)),
+		Flags:      message.SumFlags(message.FlagComponentsV2),
 	}
 
 	// Should never happen
@@ -121,11 +129,11 @@ func BuildWelcomeMessageEmbed(
 	panel *database.Panel,
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
-) (*embed.Embed, error) {
+) (*component.Component, int, error) {
 	if panel == nil || panel.WelcomeMessageEmbed == nil {
 		welcomeMessage, err := dbclient.Client.WelcomeMessages.Get(ctx, ticket.GuildId)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		if len(welcomeMessage) == 0 {
@@ -134,21 +142,21 @@ func BuildWelcomeMessageEmbed(
 
 		// Replace variables
 		welcomeMessage = DoPlaceholderSubstitutions(ctx, welcomeMessage, cmd.Worker(), ticket, additionalPlaceholders)
-
-		return utils.BuildEmbedRaw(cmd.GetColour(customisation.Green), subject, welcomeMessage, nil, cmd.PremiumTier()), nil
+		container := utils.BuildContainerRaw(cmd.GetColour(customisation.Green), subject, welcomeMessage, cmd.PremiumTier())
+		return &container, cmd.GetColour(customisation.Green), nil
 	} else {
 		data, err := dbclient.Client.Embeds.GetEmbed(ctx, *panel.WelcomeMessageEmbed)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		fields, err := dbclient.Client.EmbedFields.GetFieldsForEmbed(ctx, *panel.WelcomeMessageEmbed)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
-		e := BuildCustomEmbed(ctx, cmd.Worker(), ticket, data, fields, cmd.PremiumTier() == premium.None, additionalPlaceholders)
-		return e, nil
+		e := BuildCustomContainer(ctx, cmd.Worker(), ticket, data, fields, cmd.PremiumTier() == premium.None, additionalPlaceholders)
+		return e, int(data.Colour), nil
 	}
 }
 
@@ -563,7 +571,7 @@ func getFormDataFields(formData map[database.FormInput]string) []embed.EmbedFiel
 	return fields
 }
 
-func BuildCustomEmbed(
+func BuildCustomContainer(
 	ctx context.Context, worker *worker.Context,
 	ticket database.Ticket,
 	customEmbed database.CustomEmbed,
@@ -571,39 +579,62 @@ func BuildCustomEmbed(
 	branding bool,
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
-) *embed.Embed {
-	description := utils.ValueOrZero(customEmbed.Description)
-	if ticket.Id != 0 {
-		description = DoPlaceholderSubstitutions(ctx, description, worker, ticket, additionalPlaceholders)
+) *component.Component {
+
+	innerComponents := []component.Component{}
+
+	if customEmbed.Title != nil {
+		innerComponents = append(innerComponents,
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: *customEmbed.Title,
+			}),
+			component.BuildSeparator(component.Separator{}),
+		)
 	}
 
-	e := &embed.Embed{
-		Title:       utils.ValueOrZero(customEmbed.Title),
-		Description: description,
-		Url:         utils.ValueOrZero(customEmbed.Url),
-		Timestamp:   customEmbed.Timestamp,
-		Color:       int(customEmbed.Colour),
-	}
-
-	if branding {
-		e.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
-	} else if customEmbed.FooterText != nil {
-		e.SetFooter(*customEmbed.FooterText, utils.ValueOrZero(customEmbed.FooterIconUrl))
+	if customEmbed.Description != nil {
+		description := *customEmbed.Description
+		if ticket.Id != 0 {
+			description = DoPlaceholderSubstitutions(ctx, description, worker, ticket, additionalPlaceholders)
+		}
+		innerComponents = append(innerComponents,
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: description,
+			}),
+		)
 	}
 
 	if customEmbed.ImageUrl != nil {
 		imageUrl := replaceImagePlaceholder(worker, ticket, *customEmbed.ImageUrl)
-		e.SetImage(imageUrl)
+		innerComponents = append(innerComponents,
+			component.BuildMediaGallery(component.MediaGallery{
+				Items: []component.MediaGalleryItem{
+					{
+						Media: component.UnfurledMediaItem{
+							Url: imageUrl,
+						},
+					},
+				},
+			}),
+		)
 	}
 
 	if customEmbed.ThumbnailUrl != nil {
 		imageUrl := replaceImagePlaceholder(worker, ticket, *customEmbed.ThumbnailUrl)
-		e.SetThumbnail(imageUrl)
+		innerComponents = append(innerComponents,
+			component.BuildMediaGallery(component.MediaGallery{
+				Items: []component.MediaGalleryItem{
+					{
+						Media: component.UnfurledMediaItem{
+							Url: imageUrl,
+						},
+					},
+				},
+			}),
+		)
 	}
 
-	if customEmbed.AuthorName != nil {
-		e.SetAuthor(*customEmbed.AuthorName, utils.ValueOrZero(customEmbed.AuthorUrl), utils.ValueOrZero(customEmbed.AuthorIconUrl))
-	}
+	fieldStr := ""
 
 	for _, field := range fields {
 		value := field.Value
@@ -611,10 +642,31 @@ func BuildCustomEmbed(
 			value = DoPlaceholderSubstitutions(ctx, value, worker, ticket, additionalPlaceholders)
 		}
 
-		e.AddField(field.Name, value, field.Inline)
+		fieldStr += fmt.Sprintf("**%s**\n%s\n", field.Name, value)
 	}
 
-	return e
+	if branding {
+		innerComponents = utils.AddPremiumFooter(innerComponents)
+	} else if customEmbed.FooterText != nil {
+		innerComponents = append(innerComponents,
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: *customEmbed.FooterText,
+			}),
+		)
+	}
+
+	container := component.BuildContainer(component.Container{
+		AccentColor: utils.Ptr(int(customEmbed.Colour)),
+		Components:  innerComponents,
+	})
+
+	if len(innerComponents) == 0 {
+		// If there are no components, we should return nil
+		return nil
+	}
+
+	return &container
 }
 
 func replaceImagePlaceholder(worker *worker.Context, ticket database.Ticket, imageUrl string) string {

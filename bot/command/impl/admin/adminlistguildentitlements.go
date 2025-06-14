@@ -114,7 +114,7 @@ func (AdminListGuildEntitlementsCommand) Execute(ctx registry.CommandContext, gu
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainer(
+		utils.BuildContainerWithComponents(
 			ctx,
 			customisation.Orange,
 			i18n.Admin,

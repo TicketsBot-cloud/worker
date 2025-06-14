@@ -30,34 +30,6 @@ func NewEphemeralTextMessageResponse(content string) MessageResponse {
 	}
 }
 
-func NewEmbedMessageResponse(embeds ...*embed.Embed) MessageResponse {
-	return MessageResponse{
-		Embeds: embeds,
-	}
-}
-
-func NewEmbedMessageResponseWithComponents(e *embed.Embed, components []component.Component) MessageResponse {
-	return MessageResponse{
-		Embeds:     []*embed.Embed{e},
-		Components: components,
-	}
-}
-
-func NewEphemeralEmbedMessageResponse(embeds ...*embed.Embed) MessageResponse {
-	return MessageResponse{
-		Embeds: embeds,
-		Flags:  message.SumFlags(message.FlagEphemeral),
-	}
-}
-
-func NewEphemeralEmbedMessageResponseWithComponents(e *embed.Embed, components []component.Component) MessageResponse {
-	return MessageResponse{
-		Embeds:     []*embed.Embed{e},
-		Flags:      message.SumFlags(message.FlagEphemeral),
-		Components: components,
-	}
-}
-
 func NewEphemeralMessageResponseWithComponents(components []component.Component) MessageResponse {
 	return MessageResponse{
 		Flags:      message.SumFlags(message.FlagEphemeral, message.FlagComponentsV2),
@@ -148,16 +120,10 @@ func (r *MessageResponse) IntoUpdateMessageResponse() (res interaction.ResponseU
 
 func MessageIntoMessageResponse(msg message.Message) MessageResponse {
 	// TODO: Fix types
-	embeds := make([]*embed.Embed, len(msg.Embeds))
-	for i, embed := range msg.Embeds {
-		embed := embed // Loop values are pointers in Go and so change with each iteration
-		embeds[i] = &embed
-	}
 
 	return MessageResponse{
 		Tts:             msg.Tts,
 		Content:         msg.Content,
-		Embeds:          embeds,
 		AllowedMentions: message.AllowedMention{},
 		Flags:           uint(msg.Flags),
 		Components:      msg.Components,

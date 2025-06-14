@@ -15,7 +15,6 @@ import (
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -119,8 +118,12 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddAdmin, i18n.MessageAddAdminSuccess, nil)
-	ctx.Edit(command.NewEphemeralEmbedMessageResponse(e))
+	ctx.EditWithComponentsOnly(utils.Slice(utils.BuildContainerRaw(
+		ctx.GetColour(customisation.Green),
+		ctx.GetMessage(i18n.TitleAddAdmin),
+		ctx.GetMessage(i18n.MessageAddAdminSuccess),
+		ctx.PremiumTier(),
+	)))
 
 	settings, err := ctx.Settings()
 	if err != nil {

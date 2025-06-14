@@ -86,6 +86,7 @@ func (c *AutoCloseContext) ToErrorContext() errorcontext.WorkerErrorContext {
 		Guild:   c.guildId,
 		User:    c.userId,
 		Channel: c.channelId,
+		Command: "autoclose",
 	}
 }
 

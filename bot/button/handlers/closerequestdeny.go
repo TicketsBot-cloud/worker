@@ -50,7 +50,5 @@ func (h *CloseRequestDenyHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	ctx.Edit(command.MessageResponse{
-		Embeds: utils.Embeds(utils.BuildEmbed(ctx, customisation.Red, i18n.TitleCloseRequest, i18n.MessageCloseRequestDenied, nil, ctx.UserId())),
-	})
+	ctx.Edit(command.NewMessageResponseWithComponents(utils.Slice(utils.BuildContainer(ctx, customisation.Red, i18n.TitleCloseRequest, i18n.MessageCloseRequestDenied, ctx.UserId()))))
 }

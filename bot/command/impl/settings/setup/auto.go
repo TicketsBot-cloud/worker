@@ -7,8 +7,8 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	channel_permissions "github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -81,12 +81,9 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 		messageContent = fmt.Sprintf("❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoRolesFailure))
 	}
 
-	embed := embed.NewEmbed().
-		SetTitle("Setup").
-		SetColor(getColour(context.Background(), ctx.GuildId(), failed)). // TODO: Propagate context
-		SetDescription(messageContent)
+	c := utils.BuildContainerRaw(getColour(context.Background(), ctx.GuildId(), failed), "Setup", messageContent, ctx.PremiumTier())
 
-	ctx.ReplyWithEmbed(embed)
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(c)))
 
 	// create transcripts channel
 	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
@@ -101,10 +98,10 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelFailure))
 	}
 
-	embed.SetDescription(messageContent)
+	c = utils.BuildContainerRaw(getColour(context.Background(), ctx.GuildId(), failed), "Setup", messageContent, ctx.PremiumTier())
 
 	shouldEdit := true
-	if err := edit(interaction, embed); err != nil {
+	if err := edit(interaction, c); err != nil {
 		shouldEdit = false
 	}
 
@@ -130,17 +127,17 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 
 	// update status
 	if shouldEdit {
-		embed.SetDescription(messageContent)
+		c := utils.BuildContainerRaw(getColour(context.Background(), ctx.GuildId(), failed), "Setup", messageContent, ctx.PremiumTier())
 
-		if err := edit(interaction, embed); err != nil {
+		if err := edit(interaction, c); err != nil {
 			shouldEdit = false
 		}
 	}
 }
 
-func edit(ctx *cmdcontext.SlashCommandContext, e *embed.Embed) error {
+func edit(ctx *cmdcontext.SlashCommandContext, c component.Component) error {
 	data := rest.WebhookEditBody{
-		Embeds: utils.Slice(e),
+		Components: utils.Slice(c),
 	}
 
 	_, err := rest.EditOriginalInteractionResponse(context.Background(), ctx.Interaction.Token, ctx.Worker().RateLimiter, ctx.Worker().BotId, data)

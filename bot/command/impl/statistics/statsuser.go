@@ -114,7 +114,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		span := sentry.StartSpan(span.Context(), "Reply")
 
-		msgEmbed := embed.NewEmbed().
+		_ = embed.NewEmbed().
 			SetTitle("Statistics").
 			SetColor(ctx.GetColour(customisation.Green)).
 			SetAuthor(member.User.Username, "", member.User.AvatarUrl(256)).
@@ -124,7 +124,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			AddField("Total Tickets", strconv.Itoa(totalTickets), true).
 			AddField("Open Tickets", fmt.Sprintf("%d / %d", openTickets, ticketLimit), true)
 
-		_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
+		// _, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
 		span.Finish()
 	} else { // Support rep stats
 		group, _ := errgroup.WithContext(ctx)
@@ -275,7 +275,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		span := sentry.StartSpan(span.Context(), "Reply")
 
-		msgEmbed := embed.NewEmbed().
+		_ = embed.NewEmbed().
 			SetTitle("Statistics").
 			SetColor(ctx.GetColour(customisation.Green)).
 			SetAuthor(member.User.Username, "", member.User.AvatarUrl(256)).
@@ -292,7 +292,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			AddField("Claimed Tickets (Monthly)", strconv.Itoa(monthlyClaimedTickets), true).
 			AddField("Claimed Tickets (Total)", strconv.Itoa(totalClaimedTickets), true)
 
-		_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
+		// _, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
 		span.Finish()
 	}
 }

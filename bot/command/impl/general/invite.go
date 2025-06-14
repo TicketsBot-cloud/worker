@@ -36,7 +36,7 @@ func (c InviteCommand) GetExecutor() interface{} {
 
 func (InviteCommand) Execute(ctx registry.CommandContext) {
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainer(ctx, customisation.Green, i18n.TitleInvite, ctx.PremiumTier(), []component.Component{
+		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleInvite, ctx.PremiumTier(), []component.Component{
 			component.BuildActionRow(component.BuildButton(component.Button{
 				Label: ctx.GetMessage(i18n.ClickHere),
 				Style: component.ButtonStyleLink,

@@ -10,8 +10,8 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -110,29 +110,27 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		if err == nil {
 			var subject string
 
-			embeds := utils.PtrElems(msg.Embeds) // TODO: Fix types
-			if len(embeds) == 0 {
-				embeds = make([]*embed.Embed, 1)
+			c := msg.Components
+
+			// get the first c where its a Container
+
+			// embeds := utils.PtrElems(msg.Embeds) // TODO: Fix types
+			if len(c) == 0 {
+				c = make([]component.Component, 1)
 				subject = "No subject given"
-			} else {
-				subject = embeds[0].Title // TODO: Store subjects in database
 			}
 
-			embeds[0], err = logic.BuildWelcomeMessageEmbed(ctx.Context, ctx, ticket, subject, &panel, nil)
+			wm, _, err := logic.BuildWelcomeMessageEmbed(ctx.Context, ctx, ticket, subject, &panel, nil)
 			if err != nil {
 				ctx.HandleError(err)
 				return
 			}
 
-			for i := 1; i < len(embeds); i++ {
-				embeds[i].Color = embeds[0].Color
-			}
+			c[0] = *wm
 
 			editData := rest.EditMessageData{
-				Content:    msg.Content,
-				Embeds:     embeds,
 				Flags:      uint(msg.Flags),
-				Components: msg.Components,
+				Components: c,
 			}
 
 			if _, err = ctx.Worker().EditMessage(ctx.ChannelId(), *ticket.WelcomeMessageId, editData); err != nil {

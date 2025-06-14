@@ -121,7 +121,6 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 			Cache:        cache,
 			RateLimiter:  nil, // Use http-proxy ratelimit functionality
 		}
-		fmt.Println("Handling interaction", payload.InteractionType)
 
 		switch payload.InteractionType {
 		case interaction.InteractionTypeApplicationCommand:

@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"fmt"
+
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -56,23 +57,17 @@ func (h *CloseHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	}
 
 	if closeConfirmation {
-		// Send confirmation message
-		confirmEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleCloseConfirmation, i18n.MessageCloseConfirmation, nil)
-		confirmEmbed.SetAuthor(ctx.InteractionUser().Username, "", utils.Ptr(ctx.InteractionUser()).AvatarUrl(256))
+		container := utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleCloseConfirmation, ctx.PremiumTier(), []component.Component{
+			component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("<@%d>: %s", ctx.InteractionUser().Id, ctx.GetMessage(i18n.MessageCloseConfirmation))}),
+			component.BuildActionRow(component.BuildButton(component.Button{
+				Label:    ctx.GetMessage(i18n.TitleClose),
+				CustomId: "close_confirm",
+				Style:    component.ButtonStylePrimary,
+				Emoji:    utils.BuildEmoji("✔️"),
+			})),
+		})
 
-		msgData := command.MessageResponse{
-			Embeds: []*embed.Embed{confirmEmbed},
-			Components: []component.Component{
-				component.BuildActionRow(component.BuildButton(component.Button{
-					Label:    ctx.GetMessage(i18n.TitleClose),
-					CustomId: "close_confirm",
-					Style:    component.ButtonStylePrimary,
-					Emoji:    utils.BuildEmoji("✔️"),
-				})),
-			},
-		}
-
-		if _, err := ctx.ReplyWith(msgData); err != nil {
+		if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(container))); err != nil {
 			ctx.HandleError(err)
 			return
 		}

@@ -113,6 +113,7 @@ func (c *SlashCommandContext) ToErrorContext() errorcontext.WorkerErrorContext {
 		Guild:   c.GuildId(),
 		User:    c.Interaction.Member.User.Id,
 		Channel: c.ChannelId(),
+		Command: c.Interaction.Data.Name,
 	}
 }
 

@@ -5,13 +5,13 @@ import (
 	"time"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -39,10 +39,9 @@ func (c AddAdminCommand) GetExecutor() interface{} {
 }
 
 func (c AddAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
-	usageEmbed := embed.EmbedField{
-		Name:   "Usage",
-		Value:  "`/addadmin @User`\n`/addadmin @Role`",
-		Inline: false,
+	usageEmbed := model.Field{
+		Name:  "Usage",
+		Value: "`/addadmin @User`\n`/addadmin @Role`",
 	}
 
 	mentionableType, valid := context.DetermineMentionableType(ctx, id)
@@ -63,7 +62,7 @@ func (c AddAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 	// Send confirmation message
 	if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainer(ctx, customisation.Green, i18n.TitleAddAdmin, ctx.PremiumTier(), []component.Component{
+		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleAddAdmin, ctx.PremiumTier(), []component.Component{
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: ctx.GetMessage(i18n.MessageAddAdminConfirm, mention),
 			}),

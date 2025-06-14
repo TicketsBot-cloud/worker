@@ -66,26 +66,30 @@ func (e *MessageComponentExtensions) Edit(data command.MessageResponse) {
 
 func (e *MessageComponentExtensions) EditWith(colour customisation.Colour, title, content i18n.MessageId, format ...interface{}) {
 	e.Edit(command.MessageResponse{
-		Embeds: utils.Slice(utils.BuildEmbed(e.ctx, colour, title, content, nil, format...)),
+		Components: utils.Slice(utils.BuildContainer(e.ctx, colour, title, content, format...)),
+	})
+}
+
+func (e *MessageComponentExtensions) EditWithComponentsOnly(components []component.Component) {
+	e.Edit(command.MessageResponse{
+		Components: components,
 	})
 }
 
 func (e *MessageComponentExtensions) EditWithRaw(colour customisation.Colour, title, content string) {
 	e.Edit(command.MessageResponse{
-		Embeds: utils.Slice(utils.BuildEmbedRaw(e.ctx.GetColour(colour), title, content, nil, e.ctx.PremiumTier())),
+		Components: utils.Slice(utils.BuildContainerRaw(e.ctx.GetColour(colour), title, content, e.ctx.PremiumTier())),
 	})
 }
 
 func (e *MessageComponentExtensions) EditWithComponents(colour customisation.Colour, title, content i18n.MessageId, components []component.Component, format ...interface{}) {
 	e.Edit(command.MessageResponse{
-		Embeds:     utils.Slice(utils.BuildEmbed(e.ctx, colour, title, content, nil, format...)),
-		Components: components,
+		Components: append(utils.Slice(utils.BuildContainer(e.ctx, colour, title, content, format...)), components...),
 	})
 }
 
 func (e *MessageComponentExtensions) EditWithComponentsRaw(colour customisation.Colour, title, content string, components []component.Component) {
 	e.Edit(command.MessageResponse{
-		Embeds:     utils.Slice(utils.BuildEmbedRaw(e.ctx.GetColour(colour), title, content, nil, e.ctx.PremiumTier())),
-		Components: components,
+		Components: append(utils.Slice(utils.BuildContainerRaw(e.ctx.GetColour(colour), title, content, e.ctx.PremiumTier())), components...),
 	})
 }
