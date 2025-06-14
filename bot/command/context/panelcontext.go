@@ -96,6 +96,7 @@ func (c *PanelContext) ToErrorContext() errorcontext.WorkerErrorContext {
 		Guild:   c.guildId,
 		User:    c.userId,
 		Channel: c.channelId,
+		Command: "panel", // This is a panel context, so we use "panel" as the command
 	}
 }
 

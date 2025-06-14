@@ -114,8 +114,10 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 
 	cmd.Reply(customisation.Green, i18n.Success, i18n.MessageReopenSuccess, ticket.Id, *ticket.ChannelId)
 
-	embedData := utils.BuildEmbed(cmd, customisation.Green, i18n.TitleReopened, i18n.MessageReopenedTicket, nil, cmd.UserId())
-	if _, err := cmd.Worker().CreateMessageEmbed(*ticket.ChannelId, embedData); err != nil {
+	containerData := utils.BuildContainer(cmd, customisation.Green, i18n.TitleReopened, i18n.MessageReopenedTicket, cmd.UserId())
+	if _, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, rest.CreateMessageData{
+		Components: utils.Slice(containerData),
+	}); err != nil {
 		cmd.HandleError(err)
 		return
 	}

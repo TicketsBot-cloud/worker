@@ -5,9 +5,11 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -32,5 +34,10 @@ func (c AboutCommand) GetExecutor() interface{} {
 }
 
 func (AboutCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitleAbout, i18n.MessageAbout)
+	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{utils.BuildContainerRaw(
+		ctx.GetColour(customisation.Green),
+		ctx.GetMessage(i18n.TitleAbout),
+		ctx.GetMessage(i18n.MessageAbout),
+		ctx.PremiumTier(),
+	)}))
 }

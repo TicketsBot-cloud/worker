@@ -2,15 +2,19 @@ package admin
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -49,6 +53,8 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 		guildId = ctx.GuildId()
 	}
 
+	currentTime := time.Now()
+
 	// purge cache
 	ctx.Worker().Cache.DeleteGuild(ctx, guildId)
 	ctx.Worker().Cache.DeleteGuildChannels(ctx, guildId)
@@ -86,15 +92,33 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 		worker = ctx.Worker()
 	}
 
-	if _, err := worker.GetGuild(guildId); err != nil {
+	guild, err := worker.GetGuild(guildId)
+	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	if _, err := worker.GetGuildChannels(guildId); err != nil {
+	guildChannels, err := worker.GetGuildChannels(guildId)
+	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	ctx.ReplyPlainPermanent("done")
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerNoLocale(
+			ctx,
+			customisation.Orange,
+			"Admin - Recache",
+			ctx.PremiumTier(),
+			[]component.Component{
+				component.BuildTextDisplay(component.TextDisplay{
+					Content: fmt.Sprintf("**%s** has been recached successfully.\n\n**Guild ID:** %d\n**Time Taken:** %s", guild.Name, guildId, time.Since(currentTime).Round(time.Millisecond)),
+				}),
+				component.BuildSeparator(component.Separator{}),
+				component.BuildTextDisplay(component.TextDisplay{
+					Content: fmt.Sprintf("### Cache Stats\n**Channels:** `%d`\n**Roles:** `%d`", len(guildChannels), len(guild.Roles)),
+				}),
+			},
+		),
+	}))
 }

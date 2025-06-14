@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
+	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
@@ -13,6 +15,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
@@ -194,6 +197,105 @@ func BuildCloseEmbed(
 	}
 
 	return closeEmbed, rows
+}
+
+func BuildCloseContainer(
+	ctx context.Context,
+	cmd registry.CommandContext,
+	worker *worker.Context,
+	ticket database.Ticket,
+	closedBy uint64,
+	reason *string,
+	rating *uint8,
+	components [][]CloseEmbedElement,
+) *component.Component {
+	var formattedReason string
+	if reason == nil {
+		formattedReason = "No reason specified"
+	} else {
+		formattedReason = *reason
+		if len(formattedReason) > 1024 {
+			formattedReason = formattedReason[:1024]
+		}
+	}
+
+	var transcriptEmoji *emoji.Emoji
+	if !worker.IsWhitelabel {
+		transcriptEmoji = customisation.EmojiTranscript.BuildEmoji()
+	}
+
+	var claimedBy string
+	{
+		claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+		if err != nil {
+			sentry.Error(err)
+		}
+
+		if claimUserId == 0 {
+			claimedBy = ""
+		} else {
+			claimedBy = fmt.Sprintf("<@%d>", claimUserId)
+		}
+	}
+
+	section1Text := []string{
+		formatRow("Ticket ID", strconv.Itoa(ticket.Id)),
+		formatRow("Opened By", fmt.Sprintf("<@%d>", ticket.UserId)),
+		formatRow("Closed By", fmt.Sprintf("<@%d>", closedBy)),
+	}
+
+	section2Text := []string{
+		formatRow("Open Time", message.BuildTimestamp(ticket.OpenTime, message.TimestampStyleShortDateTime)),
+	}
+
+	if ticket.CloseTime != nil {
+		section2Text = append(section2Text, formatRow("Close Time", message.BuildTimestamp(*ticket.CloseTime, message.TimestampStyleShortDateTime)))
+	}
+
+	if claimedBy != "" {
+		section2Text = append(section2Text, formatRow("Claimed By", claimedBy))
+	}
+
+	if rating != nil {
+		section2Text = append(section2Text, formatRow("Rating", strings.Repeat("⭐", int(*rating))))
+	}
+
+	if reason != nil {
+		section2Text = append(section2Text, formatRow("Reason", formattedReason))
+	}
+
+	transcriptLink := fmt.Sprintf("%s/manage/%d/transcripts/view/%d", config.Conf.Bot.DashboardUrl, ticket.GuildId, ticket.Id)
+	cc := []component.Component{
+		component.BuildSection(component.Section{
+			Accessory: component.BuildButton(component.Button{
+				Label: "View Transcript",
+				Style: component.ButtonStyleLink,
+				Emoji: transcriptEmoji,
+				Url:   utils.Ptr(transcriptLink),
+			}),
+			Components: utils.Slice(component.BuildTextDisplay(component.TextDisplay{
+				Content: "## Ticket Closed",
+			})),
+		}),
+		component.BuildTextDisplay(component.TextDisplay{Content: strings.Join(section1Text, "\n")}),
+		component.BuildSeparator(component.Separator{}),
+		component.BuildTextDisplay(component.TextDisplay{Content: strings.Join(section2Text, "\n")}),
+	}
+
+	if cmd.PremiumTier() == premium.None {
+		cc = utils.AddPremiumFooter(cc)
+	}
+
+	container := component.BuildContainer(component.Container{
+		AccentColor: utils.Ptr(cmd.GetColour(customisation.Green)),
+		Components:  cc,
+	})
+
+	return &container
+}
+
+func formatRow(title, content string) string {
+	return fmt.Sprintf("` ⁍ ` **%s:** %s", title, content)
 }
 
 func formatTitle(s string, emoji customisation.CustomEmoji, isWhitelabel bool) string {

@@ -81,8 +81,8 @@ func BuildPatreonSubscriptionFoundMessage(ctx registry.CommandContext, legacyEnt
 			}),
 		))
 
-		embed := utils.BuildEmbed(ctx, customisation.Red, i18n.MessagePremiumSubscriptionFound, i18n.MessagePremiumSubscriptionFoundContent, nil, guild.OwnerId, commands["addadmin"], commands["viewstaff"])
-		return command.NewEphemeralEmbedMessageResponseWithComponents(embed, components), nil
+		embed := utils.BuildContainer(ctx, customisation.Red, i18n.MessagePremiumSubscriptionFound, i18n.MessagePremiumSubscriptionFoundContent, guild.OwnerId, commands["addadmin"], commands["viewstaff"])
+		return command.NewEphemeralMessageResponseWithComponents(append(utils.Slice(embed), components...)), nil
 	} else { // Modern entitlements
 		components := utils.Slice(component.BuildActionRow(
 			component.BuildButton(component.Button{
@@ -99,8 +99,8 @@ func BuildPatreonSubscriptionFoundMessage(ctx registry.CommandContext, legacyEnt
 			}),
 		))
 
-		embed := utils.BuildEmbed(ctx, customisation.Red, i18n.MessagePremiumSubscriptionFound, i18n.MessagePremiumSubscriptionFoundContentModern, nil)
-		return command.NewEphemeralEmbedMessageResponseWithComponents(embed, components), nil
+		embed := utils.BuildContainer(ctx, customisation.Red, i18n.MessagePremiumSubscriptionFound, i18n.MessagePremiumSubscriptionFoundContentModern)
+		return command.NewEphemeralMessageResponseWithComponents(append(utils.Slice(embed), components...)), nil
 	}
 }
 
@@ -126,14 +126,14 @@ func BuildPatreonNotLinkedMessage(ctx registry.CommandContext) command.MessageRe
 		}),
 	))
 
-	embed := utils.BuildEmbed(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumNoSubscription, nil)
-	return command.NewEphemeralEmbedMessageResponseWithComponents(embed, components)
+	embed := utils.BuildContainer(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumNoSubscription)
+	return command.NewEphemeralMessageResponseWithComponents(append(utils.Slice(embed), components...))
 }
 
 func BuildDiscordNotFoundMessage(ctx registry.CommandContext) command.MessageResponse {
-	embed := utils.BuildEmbed(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumDiscordNoSubscription, nil)
+	embed := utils.BuildContainer(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumDiscordNoSubscription)
 
-	return command.NewEphemeralEmbedMessageResponseWithComponents(embed, utils.Slice(component.BuildActionRow(
+	return command.NewEphemeralMessageResponseWithComponents(append(utils.Slice(embed), component.BuildActionRow(
 		component.BuildButton(component.Button{
 			Style: component.ButtonStylePremium,
 			SkuId: utils.Ptr(PremiumStoreSku),

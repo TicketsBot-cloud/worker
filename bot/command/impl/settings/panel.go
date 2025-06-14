@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -31,5 +32,7 @@ func (c PanelCommand) GetExecutor() interface{} {
 }
 
 func (PanelCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitlePanel, i18n.MessagePanel, ctx.GuildId())
+	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(
+		utils.BuildContainerRaw(ctx.GetColour(customisation.Green), ctx.GetMessage(i18n.TitlePanel), ctx.GetMessage(i18n.MessagePanel, ctx.GuildId()), ctx.PremiumTier()),
+	)))
 }

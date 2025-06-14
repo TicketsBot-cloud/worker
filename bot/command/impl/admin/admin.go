@@ -22,6 +22,7 @@ func (AdminCommand) Properties() registry.Properties {
 			AdminBlacklistCommand{},
 			AdminCheckBlacklistCommand{},
 			AdminCheckPremiumCommand{},
+			AdminDebugCommand{},
 			AdminGenPremiumCommand{},
 			AdminGetOwnerCommand{},
 			AdminListGuildEntitlementsCommand{},
