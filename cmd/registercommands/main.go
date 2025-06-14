@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
-	"net/http"
 	"flag"
 	"fmt"
-	"io"
+	"strings"
 
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -77,36 +77,19 @@ func main() {
 
 // getApplicationId fetches the application ID using the bot token
 func getApplicationId(token string) (uint64, error) {
-	req, err := http.NewRequest("GET", "https://discord.com/api/v10/oauth2/applications/@me", nil)
+	parts := strings.SplitN(token, ".", 2)
+	if len(parts) < 1 {
+		return 0, fmt.Errorf("invalid token format")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to base64 decode token: %w", err)
 	}
-	req.Header.Set("Authorization", "Bot "+token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("failed to get application id: %s", string(body))
-	}
-
-	var data struct {
-		Id string `json:"id"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return 0, err
-	}
-
 	var id uint64
-	_, err = fmt.Sscanf(data.Id, "%d", &id)
+	_, err = fmt.Sscanf(string(decoded), "%d", &id)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to parse application id: %w", err)
 	}
-
 	return id, nil
 }
 
