@@ -9,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -48,5 +49,11 @@ func (AutoCloseExcludeCommand) Execute(ctx registry.CommandContext) {
 		return
 	}
 
-	ctx.Reply(customisation.Green, i18n.TitleAutoclose, i18n.MessageAutoCloseExclude)
+	ctx.ReplyWith(
+		command.NewEphemeralMessageResponseWithComponents(
+			utils.Slice(
+				utils.BuildContainerRaw(ctx.GetColour(customisation.Green), ctx.GetMessage(i18n.TitleAutoclose), ctx.GetMessage(i18n.MessageAutoCloseExclude), ctx.PremiumTier()),
+			),
+		),
+	)
 }

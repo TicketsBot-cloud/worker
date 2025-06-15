@@ -11,7 +11,6 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -20,6 +19,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -175,11 +175,10 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		if reason == nil {
 			cmd.ReplyPermanent(customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, cmd.UserId())
 		} else {
-			fields := []embed.EmbedField{
+			fields := []model.Field{
 				{
-					Name:   cmd.GetMessage(i18n.Reason),
-					Value:  fmt.Sprintf("```%s```", *reason),
-					Inline: false,
+					Name:  cmd.GetMessage(i18n.Reason),
+					Value: fmt.Sprintf("```%s```", *reason),
 				},
 			}
 
@@ -257,11 +256,13 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			},
 		}
 
-		closeEmbed, closeComponents := BuildCloseEmbed(ctx, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
+		// closeEmbed, closeComponents := BuildCloseEmbed(ctx, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
+		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
 
 		data := rest.CreateMessageData{
-			Embeds:     utils.Slice(closeEmbed),
-			Components: closeComponents,
+			// Embeds:     utils.Slice(closeEmbed),
+			Flags:      uint(message.FlagComponentsV2),
+			Components: utils.Slice(*closeContainer),
 		}
 
 		msg, err := cmd.Worker().CreateMessageComplex(*archiveChannelId, data)

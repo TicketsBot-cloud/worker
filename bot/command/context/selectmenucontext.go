@@ -104,6 +104,7 @@ func (c *SelectMenuContext) ToErrorContext() errorcontext.WorkerErrorContext {
 		Guild:   c.GuildId(),
 		User:    c.UserId(),
 		Channel: c.ChannelId(),
+		Command: c.InteractionData.CustomId,
 	}
 }
 

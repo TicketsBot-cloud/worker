@@ -129,6 +129,7 @@ func (c *ModalContext) ToErrorContext() errorcontext.WorkerErrorContext {
 		Guild:   c.GuildId(),
 		User:    c.UserId(),
 		Channel: c.ChannelId(),
+		Command: c.Interaction.Data.CustomId,
 	}
 }
 

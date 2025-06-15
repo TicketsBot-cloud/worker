@@ -2,7 +2,7 @@ package settings
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"strings"
 	"time"
@@ -46,7 +46,7 @@ func (c *LanguageCommand) Execute(ctx registry.CommandContext) {
 		}
 
 		bar := progressbar.NewOptions(100,
-			progressbar.OptionSetWriter(ioutil.Discard),
+			progressbar.OptionSetWriter(io.Discard),
 			progressbar.OptionSetWidth(15),
 			progressbar.OptionSetPredictTime(false),
 			progressbar.OptionSetRenderBlankState(true),
@@ -65,11 +65,23 @@ func (c *LanguageCommand) Execute(ctx registry.CommandContext) {
 
 	languageList = strings.TrimSuffix(languageList, "\n")
 
-	helpWanted := utils.EmbedField(ctx.GuildId(), "ℹ️ Help Wanted", i18n.MessageLanguageHelpWanted, true)
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleLanguage, i18n.MessageLanguageCommand, utils.ToSlice(helpWanted), languageList)
-	res := command.NewEphemeralEmbedMessageResponseWithComponents(e, buildComponents(ctx))
+	innerComponents := []component.Component{
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: ctx.GetMessage(i18n.MessageLanguageCommand, languageList),
+		}),
+	}
+	innerComponents = append(innerComponents, buildComponents(ctx)...)
+	innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{
+		Content: ctx.GetMessage(i18n.MessageLanguageHelpWanted),
+	}))
 
-	_, _ = ctx.ReplyWith(res)
+	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(utils.BuildContainerWithComponents(
+		ctx,
+		customisation.Green,
+		i18n.TitleLanguage,
+		ctx.PremiumTier(),
+		innerComponents,
+	))))
 }
 
 func buildComponents(ctx registry.CommandContext) []component.Component {

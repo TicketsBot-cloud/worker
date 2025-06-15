@@ -6,13 +6,13 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -41,10 +41,9 @@ func (c BlacklistCommand) GetExecutor() interface{} {
 }
 
 func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
-	usageEmbed := embed.EmbedField{
-		Name:   "Usage",
-		Value:  "`/blacklist @User`\n`/blacklist @Role`",
-		Inline: false,
+	usageEmbed := model.Field{
+		Name:  "Usage",
+		Value: "`/blacklist @User`\n`/blacklist @Role`",
 	}
 
 	mentionableType, valid := context.DetermineMentionableType(ctx, id)
@@ -82,13 +81,13 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 			return
 		}
 
+		blacklistMsg := i18n.MessageBlacklistRemove
+
 		if isBlacklisted {
 			if err := dbclient.Client.Blacklist.Remove(ctx, ctx.GuildId(), id); err != nil {
 				ctx.HandleError(err)
 				return
 			}
-
-			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistRemove, id)
 		} else {
 			// Limit of 250 *users*
 			count, err := dbclient.Client.Blacklist.GetBlacklistedCount(ctx, ctx.GuildId())
@@ -106,9 +105,16 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 				ctx.HandleError(err)
 				return
 			}
-
-			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistAdd, member.User.Id)
+			blacklistMsg = i18n.MessageBlacklistAdd
 		}
+
+		ctx.ReplyWith(
+			command.NewEphemeralMessageResponseWithComponents(
+				utils.Slice(
+					utils.BuildContainerRaw(ctx.GetColour(customisation.Green), ctx.GetMessage(i18n.TitleBlacklist), ctx.GetMessage(blacklistMsg, id), ctx.PremiumTier()),
+				),
+			),
+		)
 	} else if mentionableType == context.MentionableTypeRole {
 		// Check if role is staff
 		isSupport, err := dbclient.Client.RolePermissions.IsSupport(ctx, id)
@@ -140,13 +146,13 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 			return
 		}
 
+		blacklistMsg := i18n.MessageBlacklistRemoveRole
+
 		if isBlacklisted {
 			if err := dbclient.Client.RoleBlacklist.Remove(ctx, ctx.GuildId(), id); err != nil {
 				ctx.HandleError(err)
 				return
 			}
-
-			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistRemoveRole, id)
 		} else {
 			// Limit of 50 *roles*
 			count, err := dbclient.Client.Blacklist.GetBlacklistedCount(ctx, ctx.GuildId())
@@ -164,9 +170,18 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 				ctx.HandleError(err)
 				return
 			}
+			blacklistMsg = i18n.MessageBlacklistAddRole
 
 			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistAddRole, id)
 		}
+
+		ctx.ReplyWith(
+			command.NewEphemeralMessageResponseWithComponents(
+				utils.Slice(
+					utils.BuildContainerRaw(ctx.GetColour(customisation.Green), ctx.GetMessage(i18n.TitleBlacklist), ctx.GetMessage(blacklistMsg, id), ctx.PremiumTier()),
+				),
+			),
+		)
 	} else {
 		ctx.HandleError(fmt.Errorf("infallible"))
 		return

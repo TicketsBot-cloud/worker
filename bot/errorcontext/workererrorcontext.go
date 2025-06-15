@@ -8,6 +8,7 @@ type WorkerErrorContext struct {
 	Guild   uint64
 	User    uint64
 	Channel uint64
+	Command string
 }
 
 func (w WorkerErrorContext) ToMap() map[string]string {

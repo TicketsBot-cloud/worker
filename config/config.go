@@ -30,6 +30,9 @@ type (
 
 		Bot struct {
 			HttpAddress         string   `env:"HTTP_ADDR"`
+			InviteUrl           string   `env:"INVITE_URL" envDefault:"https://discord.com/oauth2/authorize?client_id=1325579039888511056&scope=bot+applications.commands&permissions=395942816984"`
+			VoteUrl1            string   `env:"VOTE_URL_1" envDefault:"https://top.gg/bot/1325579039888511056/vote"`
+			VoteUrl2            string   `env:"VOTE_URL_2" envDefault:"https://discordbotlist.com/bots/tickets-v2/upvote"`
 			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.tickets.bot"`
 			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://tickets.bot"`
 			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.tickets.bot"`

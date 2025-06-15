@@ -5,12 +5,12 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -41,10 +41,9 @@ func (c ManageTagsAddCommand) GetExecutor() interface{} {
 }
 
 func (ManageTagsAddCommand) Execute(ctx registry.CommandContext, tagId, content string) {
-	usageEmbed := embed.EmbedField{
-		Name:   "Usage",
-		Value:  "`/managetags add [TagID] [Tag Contents]`",
-		Inline: false,
+	usageEmbed := model.Field{
+		Name:  "Usage",
+		Value: "`/managetags add [TagID] [Tag Contents]`",
 	}
 
 	// Limit of 200 tags
