@@ -67,7 +67,7 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 	messageId := interaction.Interaction.Data.TargetId
 
 	msg, ok := interaction.ResolvedMessage(messageId)
-	if err != nil {
+	if !ok {
 		ctx.HandleError(errors.New("Message missing from resolved data"))
 		return
 	}

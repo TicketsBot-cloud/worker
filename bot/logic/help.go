@@ -155,7 +155,6 @@ func BuildHelpMessageCategorySelector(r registry.Registry, ctx registry.CommandC
 	}
 
 	permLevel, _ := ctx.UserPermissionLevel(ctx)
-	// permLevel := permission.Admin
 
 	for _, cmd := range r {
 		properties := cmd.Properties()

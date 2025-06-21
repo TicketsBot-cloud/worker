@@ -43,8 +43,8 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 
 	_, err = ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
 		*container,
-		*logic.BuildHelpMessagePaginationButtons(command.General.ToRawString(), 1, 1),
 		*logic.BuildHelpMessageCategorySelector(c.Registry, ctx, command.General),
+		*logic.BuildHelpMessagePaginationButtons(command.General.ToRawString(), 1, 1),
 	}))
 
 	if err != nil {

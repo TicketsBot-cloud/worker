@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TicketsBot-cloud/common/premium"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/config"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -19,32 +17,27 @@ const perField = 8
 const viewStaffUserFormat = "- <@%d> (`%d`)\n"
 const viewStaffRoleFormat = "- <@&%d> (`%d`)\n"
 
-func BuildViewStaffComponents(page, totalPages int) []component.Component {
-	if totalPages <= 1 {
-		return nil
-	}
-	return []component.Component{
-		component.BuildActionRow(
-			component.BuildButton(component.Button{
-				CustomId: fmt.Sprintf("viewstaff_%d", page-1),
-				Style:    component.ButtonStyleDanger,
-				Label:    "<",
-				Disabled: page <= 0,
-			}),
-			component.BuildButton(component.Button{
-				CustomId: "viewstaff_page_count",
-				Style:    component.ButtonStyleSecondary,
-				Label:    fmt.Sprintf("%d/%d", page+1, totalPages),
-				Disabled: true,
-			}),
-			component.BuildButton(component.Button{
-				CustomId: fmt.Sprintf("viewstaff_%d", page+1),
-				Style:    component.ButtonStyleSuccess,
-				Label:    ">",
-				Disabled: page >= totalPages-1,
-			}),
-		),
-	}
+func BuildViewStaffButtons(page, totalPages int) component.Component {
+	return component.BuildActionRow(
+		component.BuildButton(component.Button{
+			CustomId: fmt.Sprintf("viewstaff_%d", page-1),
+			Style:    component.ButtonStyleDanger,
+			Label:    "<",
+			Disabled: page <= 0,
+		}),
+		component.BuildButton(component.Button{
+			CustomId: "viewstaff_page_count",
+			Style:    component.ButtonStyleSecondary,
+			Label:    fmt.Sprintf("%d/%d", page+1, totalPages),
+			Disabled: true,
+		}),
+		component.BuildButton(component.Button{
+			CustomId: fmt.Sprintf("viewstaff_%d", page+1),
+			Style:    component.ButtonStyleSuccess,
+			Label:    ">",
+			Disabled: page >= totalPages-1,
+		}),
+	)
 }
 
 func buildPaginatedField(cmd registry.CommandContext, entries []uint64, page int, labelId, emptyId i18n.MessageId, format string, prefix string) (string, string) {
@@ -68,10 +61,8 @@ func buildPaginatedField(cmd registry.CommandContext, entries []uint64, page int
 	return label, strings.TrimSuffix(content.String(), "\n")
 }
 
-func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, page int) (*embed.Embed, int) {
-	embed := embed.NewEmbed().
-		SetColor(cmd.GetColour(customisation.Green)).
-		SetTitle(cmd.GetMessage(i18n.MessageViewStaffTitle))
+func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, page int) (component.Component, int) {
+	comps := []component.Component{}
 
 	adminUsers, _ := dbclient.Client.Permissions.GetAdmins(ctx, cmd.GuildId())
 	adminRoles, _ := dbclient.Client.RolePermissions.GetAdminRoles(ctx, cmd.GuildId())
@@ -99,7 +90,8 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		viewStaffRoleFormat,
 		"",
 	)
-	embed.AddField(label, value, true)
+	comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
+	comps = append(comps, component.BuildSeparator(component.Separator{Divider: utils.Ptr(true), Spacing: utils.Ptr(1)}))
 
 	// Admin users
 	label, value = buildPaginatedField(
@@ -109,9 +101,9 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		viewStaffUserFormat,
 		"",
 	)
-	embed.AddField(label, value, true)
+	comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 
-	embed.AddBlankField(false)
+	comps = append(comps, component.BuildSeparator(component.Separator{Divider: utils.Ptr(true), Spacing: utils.Ptr(1)}))
 
 	// Support roles
 	label, value = buildPaginatedField(
@@ -121,7 +113,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		viewStaffRoleFormat,
 		"",
 	)
-	embed.AddField(label, value, true)
+	comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 
 	// Support users
 	if len(supportUsers) > 0 {
@@ -132,15 +124,12 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 			viewStaffUserFormat,
 			cmd.GetMessage(i18n.MessageViewStaffSupportUsersWarn),
 		)
-		embed.AddField(label, value, true)
+		comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 	}
 
-	// Add premium branding footer if not premium
-	if cmd.PremiumTier() == premium.None {
-		embed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
-	}
+	container := utils.BuildContainerWithComponents(cmd, customisation.Green, i18n.MessageViewStaffTitle, cmd.PremiumTier(), comps)
 
-	return embed, totalPages
+	return container, totalPages
 }
 
 func max(nums ...int) int {

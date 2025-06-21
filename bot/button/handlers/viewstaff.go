@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -48,21 +48,15 @@ func (h *ViewStaffHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	msgEmbed, totalPages := logic.BuildViewStaffMessage(ctx.Context, ctx, page)
-	if totalPages <= 1 {
-		ctx.Edit(command.MessageResponse{
-			Embeds:     []*embed.Embed{msgEmbed},
-			Components: nil,
-		})
-		return
-	}
-
+	comp, totalPages := logic.BuildViewStaffMessage(ctx.Context, ctx, page)
 	if page >= totalPages {
 		page = totalPages - 1
 	}
 
 	ctx.Edit(command.MessageResponse{
-		Embeds:     []*embed.Embed{msgEmbed},
-		Components: logic.BuildViewStaffComponents(page, totalPages),
+		Components: []component.Component{
+			comp,
+			logic.BuildViewStaffButtons(page, totalPages),
+		},
 	})
 }
