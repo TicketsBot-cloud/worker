@@ -127,7 +127,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 	}
 
-	container := utils.BuildContainerWithComponents(cmd, customisation.Green, i18n.MessageViewStaffTitle, cmd.PremiumTier(), comps)
+	container := utils.BuildContainerWithComponents(cmd, customisation.Green, i18n.MessageViewStaffTitle, comps)
 
 	return container, totalPages
 }

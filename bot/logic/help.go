@@ -21,7 +21,6 @@ func BuildHelpMessage(category command.Category, page int, ctx registry.CommandC
 	componentList := []component.Component{}
 
 	permLevel, _ := ctx.UserPermissionLevel(ctx)
-	// permLevel := permission.Admin
 
 	commandIds, err := command.LoadCommandIds(ctx.Worker(), ctx.Worker().BotId)
 	if err != nil {

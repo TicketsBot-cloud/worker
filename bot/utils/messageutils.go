@@ -18,7 +18,7 @@ import (
 )
 
 func BuildContainer(ctx registry.CommandContext, colour customisation.Colour, titleId, contentId i18n.MessageId, format ...interface{}) component.Component {
-	return BuildContainerWithComponents(ctx, colour, titleId, ctx.PremiumTier(), []component.Component{
+	return BuildContainerWithComponents(ctx, colour, titleId, []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: i18n.GetMessageFromGuild(ctx.GuildId(), contentId, format...),
 		})})
@@ -34,7 +34,7 @@ func BuildContainerWithFields(ctx registry.CommandContext, colour customisation.
 		}))
 	}
 
-	return BuildContainerWithComponents(ctx, colour, titleId, ctx.PremiumTier(), append([]component.Component{
+	return BuildContainerWithComponents(ctx, colour, titleId, append([]component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: i18n.GetMessageFromGuild(ctx.GuildId(), content, format...),
 		}),
@@ -43,7 +43,7 @@ func BuildContainerWithFields(ctx registry.CommandContext, colour customisation.
 }
 
 func BuildContainerWithComponents(
-	ctx registry.CommandContext, colour customisation.Colour, title i18n.MessageId, tier premium.PremiumTier, innerComponents []component.Component,
+	ctx registry.CommandContext, colour customisation.Colour, title i18n.MessageId, innerComponents []component.Component,
 ) component.Component {
 	components := append(Slice(
 		component.BuildTextDisplay(component.TextDisplay{
@@ -52,16 +52,8 @@ func BuildContainerWithComponents(
 		component.BuildSeparator(component.Separator{}),
 	), innerComponents...)
 
-	if tier == premium.None {
-		// check if last component is a separator, if not add one
-		if len(components) == 0 || components[len(components)-1].Type != component.ComponentSeparator {
-			components = append(components, component.BuildSeparator(component.Separator{}))
-		}
-		components = append(components,
-			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
-			}),
-		)
+	if ctx.PremiumTier() == premium.None {
+		components = AddPremiumFooter(components)
 	}
 
 	return component.BuildContainer(component.Container{
@@ -71,7 +63,7 @@ func BuildContainerWithComponents(
 }
 
 func BuildContainerNoLocale(
-	ctx registry.CommandContext, colour customisation.Colour, title string, tier premium.PremiumTier, innerComponents []component.Component,
+	ctx registry.CommandContext, colour customisation.Colour, title string, innerComponents []component.Component,
 ) component.Component {
 	components := append(Slice(
 		component.BuildTextDisplay(component.TextDisplay{
@@ -80,16 +72,8 @@ func BuildContainerNoLocale(
 		component.BuildSeparator(component.Separator{}),
 	), innerComponents...)
 
-	if tier == premium.None {
-		// check if last component is a separator, if not add one
-		if len(components) == 0 || components[len(components)-1].Type != component.ComponentSeparator {
-			components = append(components, component.BuildSeparator(component.Separator{}))
-		}
-		components = append(components,
-			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
-			}),
-		)
+	if ctx.PremiumTier() == premium.None {
+		components = AddPremiumFooter(components)
 	}
 
 	return component.BuildContainer(component.Container{
@@ -112,12 +96,7 @@ func BuildContainerRaw(
 	)
 
 	if tier == premium.None {
-		components = append(components,
-			component.BuildSeparator(component.Separator{}),
-			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
-			}),
-		)
+		components = AddPremiumFooter(components)
 	}
 
 	return component.BuildContainer(component.Container{
@@ -133,7 +112,7 @@ func AddPremiumFooter(components []component.Component) []component.Component {
 
 	components = append(components,
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("-# <:tkts_circle:1373407290912276642> Powered by %s", config.Conf.Bot.PoweredBy),
+			Content: fmt.Sprintf("-# %s Powered by %s", customisation.EmojiLogo, config.Conf.Bot.PoweredBy),
 		}),
 	)
 

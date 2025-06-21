@@ -105,13 +105,6 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		}),
 	)
 
-	// data := command.MessageResponse{
-	// 	AllowedMentions: message.AllowedMention{
-	// 		Users: []uint64{ticket.UserId},
-	// 	},
-
-	// }
-
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: fmt.Sprintf("<@%d>", ticket.UserId),

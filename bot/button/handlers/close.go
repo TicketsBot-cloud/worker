@@ -57,7 +57,7 @@ func (h *CloseHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	}
 
 	if closeConfirmation {
-		container := utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleCloseConfirmation, ctx.PremiumTier(), []component.Component{
+		container := utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleCloseConfirmation, []component.Component{
 			component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("<@%d>: %s", ctx.InteractionUser().Id, ctx.GetMessage(i18n.MessageCloseConfirmation))}),
 			component.BuildActionRow(component.BuildButton(component.Button{
 				Label:    ctx.GetMessage(i18n.TitleClose),
