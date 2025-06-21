@@ -75,8 +75,6 @@ func SendWelcomeMessage(
 			AccentColor: &embedColor,
 			Components:  components,
 		}))
-
-		// embeds = append(embeds, formAnswersEmbed)
 	}
 
 	buttons := []component.Component{

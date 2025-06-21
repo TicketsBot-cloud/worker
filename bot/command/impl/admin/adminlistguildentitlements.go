@@ -118,7 +118,6 @@ func (AdminListGuildEntitlementsCommand) Execute(ctx registry.CommandContext, gu
 			ctx,
 			customisation.Orange,
 			i18n.Admin,
-			ctx.PremiumTier(),
 			values,
 		),
 	}))

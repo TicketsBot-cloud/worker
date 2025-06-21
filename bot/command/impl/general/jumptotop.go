@@ -64,7 +64,7 @@ func (JumpToTopCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleJumpToTop, ctx.PremiumTier(), components),
+		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleJumpToTop, components),
 	})); err != nil {
 		ctx.HandleError(err)
 		return

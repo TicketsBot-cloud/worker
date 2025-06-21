@@ -72,7 +72,6 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 			ctx,
 			customisation.Orange,
 			i18n.Admin,
-			ctx.PremiumTier(),
 			values,
 		),
 	}))

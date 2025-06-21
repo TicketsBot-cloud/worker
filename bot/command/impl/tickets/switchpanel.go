@@ -113,8 +113,6 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			c := msg.Components
 
 			// get the first c where its a Container
-
-			// embeds := utils.PtrElems(msg.Embeds) // TODO: Fix types
 			if len(c) == 0 {
 				c = make([]component.Component, 1)
 				subject = "No subject given"
