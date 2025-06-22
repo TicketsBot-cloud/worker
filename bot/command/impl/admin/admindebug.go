@@ -199,5 +199,10 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 			strings.Join(debugResponse, "\n\n"),
 			ctx.PremiumTier(),
 		),
+		component.BuildActionRow(component.BuildButton(component.Button{
+			Label:    "Recache Guild",
+			Style:    component.ButtonStylePrimary,
+			CustomId: fmt.Sprintf("admin_debug_recache_%d", guild.Id),
+		})),
 	}))
 }

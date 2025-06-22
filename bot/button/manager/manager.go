@@ -67,6 +67,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.ViewStaffHandler),
 		new(handlers.ViewSurveyHandler),
 		new(handlers.HelpPageHandler),
+		new(handlers.RecacheHandler),
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
