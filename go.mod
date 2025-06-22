@@ -5,8 +5,11 @@ go 1.23.8
 toolchain go1.24.2
 
 replace github.com/TicketsBot-cloud/database => ../database
+
 replace github.com/TicketsBot-cloud/gdl => ../gdl
+
 replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
+
 replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
 require (
@@ -24,7 +27,6 @@ require (
 	github.com/go-redsync/redsync/v4 v4.13.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/joho/godotenv v1.5.1
 	github.com/json-iterator/go v1.1.12
 	github.com/pkg/errors v0.9.1
@@ -98,7 +100,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/minio/crc64nvme v1.0.2 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/minio-go/v7 v7.0.91 // indirect

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/premium"
+	"github.com/TicketsBot-cloud/common/utils"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker"
@@ -14,7 +15,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
-	"github.com/TicketsBot/common/utils"
 )
 
 func BuildContainer(ctx registry.CommandContext, colour customisation.Colour, titleId, contentId i18n.MessageId, format ...interface{}) component.Component {

@@ -3,19 +3,20 @@ package statistics
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/analytics-client"
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
-	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/getsentry/sentry-go"
+	"golang.org/x/sync/errgroup"
 )
 
 type StatsServerCommand struct {
@@ -43,185 +44,174 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 	span.SetTag("guild", strconv.FormatUint(ctx.GuildId(), 10))
 	defer span.Finish()
 
-	// group, _ := errgroup.WithContext(ctx)
+	group, _ := errgroup.WithContext(ctx)
 
 	var totalTickets, openTickets uint64
 
-	// totalTickets
-	// group.Go(func() (err error) {
-	// 	span := sentry.StartSpan(span.Context(), "GetTotalTicketCount")
-	// 	defer span.Finish()
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetTotalTicketCount")
+		defer span.Finish()
 
-	// 	totalTickets, err = dbclient.Analytics.GetTotalTicketCount(ctx, ctx.GuildId())
-	// 	return
-	// })
+		totalTickets, err = dbclient.Analytics.GetTotalTicketCount(ctx, ctx.GuildId())
+		return
+	})
 
-	// // openTickets
-	// group.Go(func() error {
-	// 	span := sentry.StartSpan(span.Context(), "GetGuildOpenTickets")
-	// 	defer span.Finish()
+	// openTickets
+	group.Go(func() error {
+		span := sentry.StartSpan(span.Context(), "GetGuildOpenTickets")
+		defer span.Finish()
 
-	// 	tickets, err := dbclient.Client.Tickets.GetGuildOpenTickets(ctx, ctx.GuildId())
-	// 	if err != nil {
-	// 		return err
-	// 	}
+		tickets, err := dbclient.Client.Tickets.GetGuildOpenTickets(ctx, ctx.GuildId())
+		if err != nil {
+			return err
+		}
 
-	// 	openTickets = uint64(len(tickets))
-	// 	return nil
-	// })
+		openTickets = uint64(len(tickets))
+		return nil
+	})
 
 	var feedbackRating float64
 	var feedbackCount uint64
 
-	// group.Go(func() (err error) {
-	// 	span := sentry.StartSpan(span.Context(), "GetAverageFeedbackRating")
-	// 	defer span.Finish()
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetAverageFeedbackRating")
+		defer span.Finish()
 
-	// 	feedbackRating, err = dbclient.Analytics.GetAverageFeedbackRatingGuild(ctx, ctx.GuildId())
-	// 	return
-	// })
+		feedbackRating, err = dbclient.Analytics.GetAverageFeedbackRatingGuild(ctx, ctx.GuildId())
+		return
+	})
 
-	// group.Go(func() (err error) {
-	// 	span := sentry.StartSpan(span.Context(), "GetFeedbackCount")
-	// 	defer span.Finish()
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetFeedbackCount")
+		defer span.Finish()
 
-	// 	feedbackCount, err = dbclient.Analytics.GetFeedbackCountGuild(ctx, ctx.GuildId())
-	// 	return
-	// })
+		feedbackCount, err = dbclient.Analytics.GetFeedbackCountGuild(ctx, ctx.GuildId())
+		return
+	})
 
 	// first response times
 	var firstResponseTime analytics.TripleWindow
-	// group.Go(func() (err error) {
-	// 	span := sentry.StartSpan(span.Context(), "GetFirstResponseTimeStats")
-	// 	defer span.Finish()
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetFirstResponseTimeStats")
+		defer span.Finish()
 
-	// 	firstResponseTime, err = dbclient.Analytics.GetFirstResponseTimeStats(ctx, ctx.GuildId())
-	// 	return
-	// })
+		firstResponseTime, err = dbclient.Analytics.GetFirstResponseTimeStats(ctx, ctx.GuildId())
+		return
+	})
 
-	// ticket duration
+	// // ticket duration
 	var ticketDuration analytics.TripleWindow
-	// group.Go(func() (err error) {
-	// 	span := sentry.StartSpan(span.Context(), "GetTicketDurationStats")
-	// 	defer span.Finish()
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetTicketDurationStats")
+		defer span.Finish()
 
-	// 	ticketDuration, err = dbclient.Analytics.GetTicketDurationStats(ctx, ctx.GuildId())
-	// 	return
-	// })
+		ticketDuration, err = dbclient.Analytics.GetTicketDurationStats(ctx, ctx.GuildId())
+		return
+	})
 
 	// tickets per day
-	var ticketVolumeTable string
-	// group.Go(func() error {
-	// 	span := sentry.StartSpan(span.Context(), "GetLastNTicketsPerDayGuild")
-	// 	defer span.Finish()
+	var ticketVolumeData []analytics.CountOnDate
+	group.Go(func() error {
+		span := sentry.StartSpan(span.Context(), "GetLastNTicketsPerDayGuild")
+		defer span.Finish()
 
-	// 	counts, err := dbclient.Analytics.GetLastNTicketsPerDayGuild(ctx, ctx.GuildId(), 7)
-	// 	if err != nil {
-	// 		return err
-	// 	}
+		counts, err := dbclient.Analytics.GetLastNTicketsPerDayGuild(ctx, ctx.GuildId(), 7)
+		if err != nil {
+			return err
+		}
 
-	// 	tw := table.NewWriter()
-	// 	tw.SetStyle(table.StyleLight)
-	// 	tw.Style().Format.Header = text.FormatDefault
+		ticketVolumeData = counts
+		return nil
+	})
 
-	// 	tw.AppendHeader(table.Row{"Date", "Ticket Volume"})
-	// 	for _, count := range counts {
-	// 		tw.AppendRow(table.Row{count.Date.Format("2006-01-02"), count.Count})
-	// 	}
-
-	// 	ticketVolumeTable = tw.Render()
-	// 	return nil
-	// })
-
-	// if err := group.Wait(); err != nil {
-	// 	ctx.HandleError(err)
-	// 	return
-	// }
+	if err := group.Wait(); err != nil {
+		ctx.HandleError(err)
+		return
+	}
 
 	span = sentry.StartSpan(span.Context(), "Send Message")
 
-	embed.NewEmbed().
-		SetTitle("Statistics").
-		SetColor(ctx.GetColour(customisation.Green)).
-		AddField("Total Tickets", strconv.FormatUint(totalTickets, 10), true).
-		AddField("Open Tickets", strconv.FormatUint(openTickets, 10), true).
-		AddBlankField(true).
-		AddField("Feedback Rating", fmt.Sprintf("%.1f / 5 ⭐", feedbackRating), true).
-		AddField("Feedback Count", strconv.FormatUint(feedbackCount, 10), true).
-		AddBlankField(true).
-		AddField("Average First Response Time (Total)", formatNullableTime(firstResponseTime.AllTime), true).
-		AddField("Average First Response Time (Monthly)", formatNullableTime(firstResponseTime.Monthly), true).
-		AddField("Average First Response Time (Weekly)", formatNullableTime(firstResponseTime.Weekly), true).
-		AddField("Average Ticket Duration (Total)", formatNullableTime(ticketDuration.AllTime), true).
-		AddField("Average Ticket Duration (Monthly)", formatNullableTime(ticketDuration.Monthly), true).
-		AddField("Average Ticket Duration (Weekly)", formatNullableTime(ticketDuration.Weekly), true).
-		AddField("Ticket Volume", fmt.Sprintf("```\n%s\n```", ticketVolumeTable), false)
+	guildData, err := ctx.Guild()
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	mainStats := []string{
+		fmt.Sprintf("**Total Tickets**: %d", totalTickets),
+		fmt.Sprintf("**Open Tickets**: %d", openTickets),
+		fmt.Sprintf("**Feedback Rating**: %.1f / 5 ★", feedbackRating),
+		fmt.Sprintf("**Feedback Count**: %d", feedbackCount),
+	}
+
+	responseTimeStats := []string{
+		fmt.Sprintf("**Total**: %s", formatNullableTime(firstResponseTime.AllTime)),
+		fmt.Sprintf("**Monthly**: %s", formatNullableTime(firstResponseTime.Monthly)),
+		fmt.Sprintf("**Weekly**: %s", formatNullableTime(firstResponseTime.Weekly)),
+	}
+
+	ticketDurationStats := []string{
+		fmt.Sprintf("**Total**: %s", formatNullableTime(ticketDuration.AllTime)),
+		fmt.Sprintf("**Monthly**: %s", formatNullableTime(ticketDuration.Monthly)),
+		fmt.Sprintf("**Weekly**: %s", formatNullableTime(ticketDuration.Weekly)),
+	}
+
+	spacers := "\u200e \u200e \u200e \u200e \u200e \u200e \u200e \u200e"
+	last7DaysStats := make([]string, 0, len(ticketVolumeData))
+
+	for _, tv := range ticketVolumeData {
+		date := tv.Date.Format("2006-01-02")
+		count := fmt.Sprintf("%d", tv.Count)
+		extraPadding := ""
+		switch {
+		case tv.Count < 10:
+			extraPadding = " \u200e \u200e"
+		case tv.Count < 100:
+			extraPadding = " \u200e"
+		}
+		last7DaysStats = append(last7DaysStats,
+			fmt.Sprintf("`%s %s %s\u200e \u200e \u200e \u200e \u200e \u200e \u200e%s`", date, spacers, count, extraPadding),
+		)
+	}
 
 	innerComponents := []component.Component{
-		component.BuildTextDisplay(component.TextDisplay{
-			Content: "### Statistics",
+		component.BuildSection(component.Section{
+			Accessory: component.BuildThumbnail(component.Thumbnail{
+				Media: component.UnfurledMediaItem{
+					Url: guildData.IconUrl(),
+				},
+			}),
+			Components: []component.Component{
+				component.BuildTextDisplay(component.TextDisplay{Content: "## Server Ticket Statistics"}),
+				component.BuildTextDisplay(component.TextDisplay{
+					Content: fmt.Sprintf("` ● ` %s", strings.Join(mainStats, "\n` ● ` ")),
+				}),
+			},
 		}),
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("**Average First Response Time**\n%s", formatAlignedStats([]string{"Weekly", "Monthly", "All Time"}, []string{"1h", "1h", "1h"})),
+			Content: fmt.Sprintf("### Average Response Time\n` ● ` %s", strings.Join(responseTimeStats, "\n` ● ` ")),
+		}),
+		component.BuildSeparator(component.Separator{}),
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("### Average Ticket Duration\n` ● ` %s", strings.Join(ticketDurationStats, "\n` ● ` ")),
+		}),
+		component.BuildSeparator(component.Separator{}),
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf(
+				"### Ticket Volume\n__**\u200e \u200e \u200e \u200e \u200e \u200e \u200e Date \u200e \u200e \u200e \u200e \u200e \u200e \u200e | \u200e \u200e \u200e \u200e \u200eTicket Volume\u200e \u200e \u200e \u200e \u200e\u200e**__\n%s",
+				strings.Join(last7DaysStats, "\n"),
+			),
 		}),
 	}
+
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 		Components: innerComponents,
 	}))))
 
-	// _, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
 	span.Finish()
 }
 
 func formatNullableTime(duration *time.Duration) string {
 	return utils.FormatNullableTime(duration)
-}
-
-func formatAlignedStats(header []string, values []string) string {
-	maxWidths := make([]int, len(header))
-	for i := range header {
-		hLen := len(header[i])
-		vLen := len(values[i])
-		maxWidths[i] = max(vLen, hLen)
-	}
-
-	sep := " / "
-
-	// Build header line
-	headerLine := ""
-	for i, h := range header {
-		headerLine += centerText(h, maxWidths[i])
-		if i < len(header)-1 {
-			headerLine += sep
-		}
-	}
-
-	// Build value line
-	valueLine := ""
-	for i, v := range values {
-		valueLine += centerText(v, maxWidths[i])
-		if i < len(values)-1 {
-			valueLine += sep
-		}
-	}
-
-	return headerLine + "\n" + valueLine
-}
-
-func centerText(s string, width int) string {
-	pad := width - len(s)
-	if pad <= 0 {
-		return s
-	}
-	left := pad / 2
-	right := pad - left
-	return spaces(left) + s + spaces(right)
-}
-
-func spaces(count int) string {
-	if count <= 0 {
-		return ""
-	}
-	return fmt.Sprintf("%*s", count, "")
 }
