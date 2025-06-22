@@ -256,11 +256,9 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			},
 		}
 
-		// closeEmbed, closeComponents := BuildCloseEmbed(ctx, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
 		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
 
 		data := rest.CreateMessageData{
-			// Embeds:     utils.Slice(closeEmbed),
 			Flags:      uint(message.FlagComponentsV2),
 			Components: utils.Slice(*closeContainer),
 		}

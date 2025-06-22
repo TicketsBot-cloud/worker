@@ -90,7 +90,6 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 						ctx,
 						customisation.Green,
 						i18n.TitlePremium,
-						ctx.PremiumTier(),
 						[]component.Component{
 							component.BuildTextDisplay(component.TextDisplay{Content: ctx.GetMessage(content)}),
 							component.BuildActionRow(buttons...),

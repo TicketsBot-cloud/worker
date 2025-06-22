@@ -79,7 +79,6 @@ func (c *LanguageCommand) Execute(ctx registry.CommandContext) {
 		ctx,
 		customisation.Green,
 		i18n.TitleLanguage,
-		ctx.PremiumTier(),
 		innerComponents,
 	))))
 }

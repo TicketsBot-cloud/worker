@@ -109,7 +109,6 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 			ctx,
 			customisation.Orange,
 			"Admin - Recache",
-			ctx.PremiumTier(),
 			[]component.Component{
 				component.BuildTextDisplay(component.TextDisplay{
 					Content: fmt.Sprintf("**%s** has been recached successfully.\n\n**Guild ID:** %d\n**Time Taken:** %s", guild.Name, guildId, time.Since(currentTime).Round(time.Millisecond)),

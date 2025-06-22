@@ -95,7 +95,7 @@ func (c VoteCommand) Execute(ctx registry.CommandContext) {
 		}
 
 		if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-			utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleVote, ctx.PremiumTier(), []component.Component{
+			utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleVote, []component.Component{
 				componentBody,
 				component.BuildSeparator(component.Separator{Divider: utils.Ptr(false)}),
 				buildVoteComponent(ctx, true),

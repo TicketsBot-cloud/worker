@@ -62,7 +62,7 @@ func (c AddAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 	// Send confirmation message
 	if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleAddAdmin, ctx.PremiumTier(), []component.Component{
+		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleAddAdmin, []component.Component{
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: ctx.GetMessage(i18n.MessageAddAdminConfirm, mention),
 			}),

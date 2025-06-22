@@ -83,13 +83,6 @@ func (c TagAliasCommand) Execute(ctx registry.CommandContext) {
 		components = append(components, *logic.BuildCustomContainer(ctx, ctx.Worker(), ticket, *c.tag.Embed.CustomEmbed, c.tag.Embed.Fields, false, nil))
 	}
 
-	// var allowedMentions message.AllowedMention
-	// if ticket.Id != 0 {
-	// 	allowedMentions = message.AllowedMention{
-	// 		Users: []uint64{ticket.UserId},
-	// 	}
-	// }
-
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 		return
