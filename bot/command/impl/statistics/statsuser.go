@@ -122,8 +122,8 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		mainStats := []string{
 			fmt.Sprintf("**Username**: %s", userData.Username),
-			fmt.Sprintf("**Permission Level**: Regular"),
-			fmt.Sprintf("**Is Blacklisted**: %d", strconv.FormatBool(isBlacklisted)),
+			"**Permission Level**: Regular",
+			fmt.Sprintf("**Is Blacklisted**: %s", strconv.FormatBool(isBlacklisted)),
 		}
 
 		ticketCountStats := []string{
