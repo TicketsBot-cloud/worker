@@ -16,6 +16,8 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/getsentry/sentry-go"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -44,9 +46,16 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 	span.SetTag("guild", strconv.FormatUint(ctx.GuildId(), 10))
 	defer span.Finish()
 
-	group, _ := errgroup.WithContext(ctx)
+	var (
+		totalTickets, openTickets uint64
+		feedbackRating            float64
+		feedbackCount             uint64
+		firstResponseTime         analytics.TripleWindow
+		ticketDuration            analytics.TripleWindow
+		ticketVolumeData          []analytics.CountOnDate
+	)
 
-	var totalTickets, openTickets uint64
+	group, _ := errgroup.WithContext(ctx)
 
 	group.Go(func() (err error) {
 		span := sentry.StartSpan(span.Context(), "GetTotalTicketCount")
@@ -56,7 +65,7 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 		return
 	})
 
-	// openTickets
+	// open tickets
 	group.Go(func() error {
 		span := sentry.StartSpan(span.Context(), "GetGuildOpenTickets")
 		defer span.Finish()
@@ -69,9 +78,6 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 		openTickets = uint64(len(tickets))
 		return nil
 	})
-
-	var feedbackRating float64
-	var feedbackCount uint64
 
 	group.Go(func() (err error) {
 		span := sentry.StartSpan(span.Context(), "GetAverageFeedbackRating")
@@ -90,7 +96,6 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 	})
 
 	// first response times
-	var firstResponseTime analytics.TripleWindow
 	group.Go(func() (err error) {
 		span := sentry.StartSpan(span.Context(), "GetFirstResponseTimeStats")
 		defer span.Finish()
@@ -99,8 +104,7 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 		return
 	})
 
-	// // ticket duration
-	var ticketDuration analytics.TripleWindow
+	// ticket duration
 	group.Go(func() (err error) {
 		span := sentry.StartSpan(span.Context(), "GetTicketDurationStats")
 		defer span.Finish()
@@ -110,7 +114,6 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 	})
 
 	// tickets per day
-	var ticketVolumeData []analytics.CountOnDate
 	group.Go(func() error {
 		span := sentry.StartSpan(span.Context(), "GetLastNTicketsPerDayGuild")
 		defer span.Finish()
@@ -155,24 +158,16 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 		fmt.Sprintf("**Monthly**: %s", formatNullableTime(ticketDuration.Monthly)),
 		fmt.Sprintf("**Weekly**: %s", formatNullableTime(ticketDuration.Weekly)),
 	}
+	tw := table.NewWriter()
+	tw.SetStyle(table.StyleLight)
+	tw.Style().Format.Header = text.FormatDefault
 
-	spacers := "\u200e \u200e \u200e \u200e \u200e \u200e \u200e \u200e"
-	last7DaysStats := make([]string, 0, len(ticketVolumeData))
-
-	for _, tv := range ticketVolumeData {
-		date := tv.Date.Format("2006-01-02")
-		count := fmt.Sprintf("%d", tv.Count)
-		extraPadding := ""
-		switch {
-		case tv.Count < 10:
-			extraPadding = " \u200e \u200e"
-		case tv.Count < 100:
-			extraPadding = " \u200e"
-		}
-		last7DaysStats = append(last7DaysStats,
-			fmt.Sprintf("`%s %s %s\u200e \u200e \u200e \u200e \u200e \u200e \u200e%s`", date, spacers, count, extraPadding),
-		)
+	tw.AppendHeader(table.Row{"Date", "Ticket Volume"})
+	for _, count := range ticketVolumeData {
+		tw.AppendRow(table.Row{count.Date.Format("2006-01-02"), count.Count})
 	}
+
+	ticketVolumeTable := tw.Render()
 
 	innerComponents := []component.Component{
 		component.BuildSection(component.Section{
@@ -184,23 +179,23 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 			Components: []component.Component{
 				component.BuildTextDisplay(component.TextDisplay{Content: "## Server Ticket Statistics"}),
 				component.BuildTextDisplay(component.TextDisplay{
-					Content: fmt.Sprintf("` ● ` %s", strings.Join(mainStats, "\n` ● ` ")),
+					Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
 				}),
 			},
 		}),
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("### Average Response Time\n` ● ` %s", strings.Join(responseTimeStats, "\n` ● ` ")),
+			Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
 		}),
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("### Average Ticket Duration\n` ● ` %s", strings.Join(ticketDurationStats, "\n` ● ` ")),
+			Content: fmt.Sprintf("### Average Ticket Duration\n● %s", strings.Join(ticketDurationStats, "\n● ")),
 		}),
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: fmt.Sprintf(
-				"### Ticket Volume\n__**\u200e \u200e \u200e \u200e \u200e \u200e \u200e Date \u200e \u200e \u200e \u200e \u200e \u200e \u200e | \u200e \u200e \u200e \u200e \u200eTicket Volume\u200e \u200e \u200e \u200e \u200e\u200e**__\n%s",
-				strings.Join(last7DaysStats, "\n"),
+				"### Ticket Volume\n```\n%s\n```",
+				ticketVolumeTable,
 			),
 		}),
 	}

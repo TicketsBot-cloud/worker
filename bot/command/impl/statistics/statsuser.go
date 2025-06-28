@@ -141,13 +141,13 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				Components: []component.Component{
 					component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
 					component.BuildTextDisplay(component.TextDisplay{
-						Content: fmt.Sprintf("` ● ` %s", strings.Join(mainStats, "\n` ● ` ")),
+						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
 					}),
 				},
 			}),
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("### Ticket Count\n` ● ` %s", strings.Join(ticketCountStats, "\n` ● ` ")),
+				Content: fmt.Sprintf("### Ticket Count\n● %s", strings.Join(ticketCountStats, "\n● ")),
 			}),
 		}
 
@@ -345,26 +345,26 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				Components: []component.Component{
 					component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
 					component.BuildTextDisplay(component.TextDisplay{
-						Content: fmt.Sprintf("` ● ` %s", strings.Join(mainStats, "\n` ● ` ")),
+						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
 					}),
 				},
 			}),
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("### Average Response Time\n` ● ` %s", strings.Join(responseTimeStats, "\n` ● ` ")),
+				Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
 			}),
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: fmt.Sprintf(
-					"### Tickets Answered\n` ● ` %s",
-					strings.Join(ticketsAnsweredStats, "\n` ● ` "),
+					"### Tickets Answered\n● %s",
+					strings.Join(ticketsAnsweredStats, "\n● "),
 				),
 			}),
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: fmt.Sprintf(
-					"### Claimed Tickets\n` ● ` %s",
-					strings.Join(claimedStats, "\n` ● ` "),
+					"### Claimed Tickets\n● %s",
+					strings.Join(claimedStats, "\n● "),
 				),
 			}),
 		}
