@@ -63,15 +63,17 @@ func (h *ClaimHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	res := command.MessageIntoMessageResponse(ctx.Interaction.Message)
-	if len(res.Components) > 0 && res.Components[0].Type == component.ComponentActionRow {
-		row := res.Components[0].ComponentData.(component.ActionRow)
-		if len(row.Components) > 1 {
-			row.Components = row.Components[:len(row.Components)-1]
-		}
-
-		res.Components[0] = component.Component{
-			Type:          component.ComponentActionRow,
-			ComponentData: row,
+	for i, comp := range res.Components {
+		if comp.Type == component.ComponentActionRow {
+			row := comp.ComponentData.(component.ActionRow)
+			if len(row.Components) > 1 {
+				row.Components = row.Components[:len(row.Components)-1]
+			}
+			res.Components[i] = component.Component{
+				Type:          component.ComponentActionRow,
+				ComponentData: row,
+			}
+			break
 		}
 	}
 

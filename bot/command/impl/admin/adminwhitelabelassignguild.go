@@ -7,10 +7,12 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -66,5 +68,12 @@ func (AdminWhitelabelAssignGuildCommand) Execute(ctx registry.CommandContext, bo
 		return
 	}
 
-	ctx.ReplyRaw(customisation.Green, ctx.GetMessage(i18n.Success), fmt.Sprintf("Assigned bot `%d` to guild `%d`", botId, guildId))
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerRaw(
+			ctx.GetColour(customisation.Orange),
+			"Admin - Whitelabel Assign Guild",
+			fmt.Sprintf("This bot is now assigned to the guild\n\n**Bot ID:** `%d`\n**Guild ID:** `%d`", botId, guildId),
+			ctx.PremiumTier(),
+		),
+	}))
 }

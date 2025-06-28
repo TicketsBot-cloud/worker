@@ -6,7 +6,6 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -84,10 +83,21 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 			}, buttons...)
 		}
 
-		ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(
-			utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, content, nil),
-			utils.Slice(component.BuildActionRow(buttons...)),
-		))
+		ctx.ReplyWith(
+			command.NewEphemeralMessageResponseWithComponents(
+				utils.Slice(
+					utils.BuildContainerWithComponents(
+						ctx,
+						customisation.Green,
+						i18n.TitlePremium,
+						[]component.Component{
+							component.BuildTextDisplay(component.TextDisplay{Content: ctx.GetMessage(content)}),
+							component.BuildActionRow(buttons...),
+						},
+					),
+				),
+			),
+		)
 
 	} else {
 		var patreonEmoji, discordEmoji, keyEmoji *emoji.Emoji
@@ -97,51 +107,61 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 			keyEmoji = utils.BuildEmoji("🔑")
 		}
 
-		fields := utils.Slice(embed.EmbedField{
-			Name:   ctx.GetMessage(i18n.MessagePremiumAlreadyPurchasedTitle),
-			Value:  ctx.GetMessage(i18n.MessagePremiumAlreadyPurchasedDescription),
-			Inline: false,
-		})
-
-		ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(
-			utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, i18n.MessagePremiumAbout, fields),
-			utils.Slice(
-				component.BuildActionRow(
-					component.BuildSelectMenu(component.SelectMenu{
-						CustomId: "premium_purchase_method",
-						Options: utils.Slice(
-							component.SelectOption{
-								Label:       "Patreon", // Don't translate
-								Value:       "patreon",
-								Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorPatreon),
-								Emoji:       patreonEmoji,
-							},
-							component.SelectOption{
-								Label:       "Discord",
-								Value:       "discord",
-								Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorDiscord),
-								Emoji:       discordEmoji,
-							},
-							component.SelectOption{
-								Label:       ctx.GetMessage(i18n.MessagePremiumGiveawayKey),
-								Value:       "key",
-								Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorKey),
-								Emoji:       keyEmoji,
-							},
-						),
-						Placeholder: ctx.GetMessage(i18n.MessagePremiumMethodSelector),
-						Disabled:    false,
-					}),
+		components := []component.Component{
+			component.BuildSection(component.Section{
+				Components: utils.Slice(
+					component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("## %s", ctx.GetMessage(i18n.TitlePremium))}),
 				),
-				component.BuildActionRow(
-					component.BuildButton(component.Button{
-						Label: ctx.GetMessage(i18n.Website),
-						Style: component.ButtonStyleLink,
-						Emoji: utils.BuildEmoji("🔗"),
-						Url:   utils.Ptr(fmt.Sprintf("%s/premium", config.Conf.Bot.FrontpageUrl)),
-					}),
-				),
+				Accessory: component.BuildButton(component.Button{
+					Label: "Purchase",
+					Style: component.ButtonStyleLink,
+					Emoji: utils.BuildEmoji("🔗"),
+					Url:   utils.Ptr(fmt.Sprintf("%s/premium", config.Conf.Bot.FrontpageUrl)),
+				}),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{Content: ctx.GetMessage(i18n.MessagePremiumAbout)}),
+			component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("-# **%s** %s", ctx.GetMessage(i18n.MessagePremiumAlreadyPurchasedTitle), ctx.GetMessage(i18n.MessagePremiumAlreadyPurchasedDescription))}),
+			component.BuildActionRow(
+				component.BuildSelectMenu(component.SelectMenu{
+					CustomId: "premium_purchase_method",
+					Options: utils.Slice(
+						component.SelectOption{
+							Label:       "Patreon", // Don't translate
+							Value:       "patreon",
+							Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorPatreon),
+							Emoji:       patreonEmoji,
+						},
+						component.SelectOption{
+							Label:       "Discord",
+							Value:       "discord",
+							Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorDiscord),
+							Emoji:       discordEmoji,
+						},
+						component.SelectOption{
+							Label:       ctx.GetMessage(i18n.MessagePremiumGiveawayKey),
+							Value:       "key",
+							Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorKey),
+							Emoji:       keyEmoji,
+						},
+					),
+					Placeholder: ctx.GetMessage(i18n.MessagePremiumMethodSelector),
+					Disabled:    false,
+				}),
 			),
-		))
+		}
+
+		if ctx.PremiumTier() == premium.None {
+			components = utils.AddPremiumFooter(components)
+		}
+
+		ctx.ReplyWith(
+			command.NewEphemeralMessageResponseWithComponents(
+				utils.Slice(component.BuildContainer(component.Container{
+					Components:  components,
+					AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
+				})),
+			),
+		)
 	}
 }

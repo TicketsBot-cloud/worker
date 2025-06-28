@@ -6,7 +6,6 @@ import (
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -15,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -42,10 +42,9 @@ func (c RemoveSupportCommand) GetExecutor() interface{} {
 
 // TODO: Remove from existing tickets
 func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
-	usageEmbed := embed.EmbedField{
-		Name:   "Usage",
-		Value:  "`/removesupport @User`\n`/removesupport @Role`",
-		Inline: false,
+	usageEmbed := model.Field{
+		Name:  "Usage",
+		Value: "`/removesupport @User`\n`/removesupport @Role`",
 	}
 
 	settings, err := ctx.Settings()
@@ -112,7 +111,9 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	ctx.Reply(customisation.Green, i18n.TitleRemoveSupport, i18n.MessageRemoveSupportSuccess)
+	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(
+		utils.BuildContainerRaw(ctx.GetColour(customisation.Green), ctx.GetMessage(i18n.TitleRemoveSupport), ctx.GetMessage(i18n.MessageRemoveSupportSuccess), ctx.PremiumTier()),
+	)))
 
 	if settings.TicketNotificationChannel != nil {
 		// Remove user / role from thread notification channel

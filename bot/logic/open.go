@@ -1081,10 +1081,12 @@ func buildJoinThreadMessage(
 		title = "Ticket Reopened"
 	}
 
-	e := utils.BuildEmbedRaw(customisation.GetColourOrDefault(ctx, guildId, colour), title, fmt.Sprintf("%s with ID: %d has been opened. Press the button below to join it.", name, ticketId), nil, premiumTier)
-	e.AddField(customisation.PrefixWithEmoji("Opened By", customisation.EmojiOpen, !worker.IsWhitelabel), customisation.PrefixWithEmoji(fmt.Sprintf("<@%d>", openerId), customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
-	e.AddField(customisation.PrefixWithEmoji("Panel", customisation.EmojiPanel, !worker.IsWhitelabel), customisation.PrefixWithEmoji(panelName, customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
-	e.AddField(customisation.PrefixWithEmoji("Staff In Ticket", customisation.EmojiStaff, !worker.IsWhitelabel), customisation.PrefixWithEmoji(strconv.Itoa(len(staffMembers)), customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
+	content := fmt.Sprintf("%s with ID: %d has been opened. Press the button below to join it.\n\n", name, ticketId)
+	content += fmt.Sprintf("**%s**: %s\n", customisation.PrefixWithEmoji("Opened By", customisation.EmojiOpen, !worker.IsWhitelabel), customisation.PrefixWithEmoji(fmt.Sprintf("<@%d>", openerId), customisation.EmojiBulletLine, !worker.IsWhitelabel))
+	content += fmt.Sprintf("**%s**: %s\n", customisation.PrefixWithEmoji("Panel", customisation.EmojiPanel, !worker.IsWhitelabel), customisation.PrefixWithEmoji(panelName, customisation.EmojiBulletLine, !worker.IsWhitelabel))
+	content += fmt.Sprintf("**%s**: %s\n", customisation.PrefixWithEmoji("Staff In Ticket", customisation.EmojiStaff, !worker.IsWhitelabel), customisation.PrefixWithEmoji(strconv.Itoa(len(staffMembers)), customisation.EmojiBulletLine, !worker.IsWhitelabel))
+
+	e := utils.BuildContainerRaw(customisation.GetColourOrDefault(ctx, guildId, colour), title, content, premiumTier)
 
 	if len(staffMembers) > 0 {
 		var mentions []string // dynamic length
@@ -1100,12 +1102,12 @@ func buildJoinThreadMessage(
 			charCount += len(mention) + 1 // +1 for space
 		}
 
-		e.AddField(customisation.PrefixWithEmoji("Staff Members", customisation.EmojiStaff, !worker.IsWhitelabel), customisation.PrefixWithEmoji(strings.Join(mentions, " "), customisation.EmojiBulletLine, !worker.IsWhitelabel), false)
+		content += fmt.Sprintf("**%s**: %s\n", customisation.PrefixWithEmoji("Staff Members", customisation.EmojiStaff, !worker.IsWhitelabel), customisation.PrefixWithEmoji(strings.Join(mentions, " "), customisation.EmojiBulletLine, !worker.IsWhitelabel))
 	}
 
 	return command.MessageResponse{
-		Embeds: utils.Slice(e),
-		Components: utils.Slice(component.BuildActionRow(
+		// Embeds: utils.Slice(e),
+		Components: append(utils.Slice(e), component.BuildActionRow(
 			component.BuildButton(component.Button{
 				Label:    "Join Ticket",
 				CustomId: fmt.Sprintf("join_thread_%d", ticketId),

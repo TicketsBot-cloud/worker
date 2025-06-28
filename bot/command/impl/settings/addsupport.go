@@ -5,13 +5,13 @@ import (
 	"time"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -40,10 +40,9 @@ func (c AddSupportCommand) GetExecutor() interface{} {
 }
 
 func (c AddSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
-	usageEmbed := embed.EmbedField{
-		Name:   "Usage",
-		Value:  "`/addsupport @Role`",
-		Inline: false,
+	usageEmbed := model.Field{
+		Name:  "Usage",
+		Value: "`/addsupport @Role`",
 	}
 
 	mentionableType, valid := context.DetermineMentionableType(ctx, id)
@@ -66,17 +65,20 @@ func (c AddSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 	}
 
 	// Send confirmation message
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddSupport, i18n.MessageAddSupportConfirm, nil, mention)
-	res := command.NewEphemeralEmbedMessageResponseWithComponents(e, utils.Slice(component.BuildActionRow(
-		component.BuildButton(component.Button{
-			Label:    ctx.GetMessage(i18n.Confirm),
-			CustomId: fmt.Sprintf("addsupport-%d-%d", mentionableType, id),
-			Style:    component.ButtonStylePrimary,
-			Emoji:    nil,
-		}),
-	)))
-
-	if _, err := ctx.ReplyWith(res); err != nil {
+	if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleAddSupport, []component.Component{
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: ctx.GetMessage(i18n.MessageAddSupportConfirm, mention),
+			}),
+			component.BuildActionRow(
+				component.BuildButton(component.Button{
+					Label:    ctx.GetMessage(i18n.Confirm),
+					CustomId: fmt.Sprintf("addsupport-%d-%d", mentionableType, id),
+					Style:    component.ButtonStylePrimary,
+					Emoji:    nil,
+				}),
+			),
+		})})); err != nil {
 		ctx.HandleError(err)
 	}
 }

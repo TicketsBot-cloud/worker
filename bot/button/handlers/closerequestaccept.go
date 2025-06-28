@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -57,9 +56,7 @@ func (h *CloseRequestAcceptHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	ctx.Edit(command.MessageResponse{
-		Embeds: utils.Slice(utils.BuildEmbedRaw(customisation.DefaultColours[customisation.Green], "Close Request", "Closing ticket...", nil, premium.Whitelabel)), // TODO: Translations, calculate premium level
-	})
+	ctx.Edit(command.NewMessageResponseWithComponents(utils.Slice(utils.BuildContainerRaw(ctx.GetColour(customisation.Green), "Close Request", "Closing ticket...", ctx.PremiumTier()))))
 
 	// Avoid users cant close issue
 	// Allow members to close too, for context menu tickets

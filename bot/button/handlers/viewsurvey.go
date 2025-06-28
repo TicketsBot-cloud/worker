@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -8,10 +9,10 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
+	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -85,7 +86,7 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	if len(surveyResponse.Responses) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "No survey surveyResponse has been recorded for this ticket.") // TODO: i18n
+		ctx.ReplyRaw(customisation.Red, "Error", "No survey responses have been recorded for this ticket.") // TODO: i18n
 		return
 	}
 
@@ -95,10 +96,7 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	e := embed.NewEmbed().
-		SetTitle("Exit Survey"). // TODO: i18n
-		SetAuthor(opener.Username, "", opener.AvatarUrl(256)).
-		SetColor(ctx.GetColour(customisation.Green))
+	tds := ""
 
 	for _, answer := range surveyResponse.Responses {
 		var title string
@@ -115,16 +113,27 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 			response = "No response"
 		}
 
-		e.AddField(title, response, false)
+		tds += fmt.Sprintf("**%s:** %s\n", title, response)
 	}
 
 	var buttons []component.Component
 	buttons = append(buttons, logic.TranscriptLinkElement(ticket.HasTranscript)(ctx.Worker(), ticket)...)
 	buttons = append(buttons, logic.ThreadLinkElement(ticket.ChannelId != nil && ticket.IsThread)(ctx.Worker(), ticket)...)
 
-	if len(buttons) > 0 {
-		ctx.ReplyWithEmbedAndComponents(e, utils.Slice(component.BuildActionRow(buttons...)))
-	} else {
-		ctx.ReplyWithEmbed(e)
+	comps := []component.Component{
+		component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("## Exit Survey for %s", opener.GlobalName)}),
+		component.BuildSeparator(component.Separator{}),
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: tds,
+		}),
 	}
+
+	if len(buttons) > 0 {
+		comps = append(comps, component.BuildActionRow(buttons...))
+	}
+
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
+		AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
+		Components:  comps,
+	}))))
 }

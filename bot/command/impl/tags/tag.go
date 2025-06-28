@@ -4,18 +4,18 @@ import (
 	"context"
 	"time"
 
-	"github.com/TicketsBot-cloud/common/model"
+	model2 "github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -43,10 +43,9 @@ func (c TagCommand) GetExecutor() interface{} {
 }
 
 func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
-	usageEmbed := embed.EmbedField{
-		Name:   "Usage",
-		Value:  "`/tag [TagID]`",
-		Inline: false,
+	usageEmbed := model.Field{
+		Name:  "Usage",
+		Value: "`/tag [TagID]`",
 	}
 
 	tag, ok, err := dbclient.Client.Tag.Get(ctx, ctx.GuildId(), tagId)
@@ -71,27 +70,24 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 		content = logic.DoPlaceholderSubstitutions(ctx, content, ctx.Worker(), ticket, nil)
 	}
 
-	var embeds []*embed.Embed
-	if tag.Embed != nil {
-		embeds = []*embed.Embed{
-			logic.BuildCustomEmbed(ctx, ctx.Worker(), ticket, *tag.Embed.CustomEmbed, tag.Embed.Fields, false, nil),
+	var components []component.Component
+
+	if content != "" {
+		components = []component.Component{
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: content,
+			}),
 		}
 	}
 
-	var allowedMentions message.AllowedMention
-	if ticket.Id != 0 {
-		allowedMentions = message.AllowedMention{
-			Users: []uint64{ticket.UserId},
+	if tag.Embed != nil && tag.Embed.CustomEmbed != nil {
+		c := logic.BuildCustomContainer(ctx, ctx.Worker(), ticket, *tag.Embed.CustomEmbed, tag.Embed.Fields, false, nil)
+		if c != nil {
+			components = append(components, *c)
 		}
 	}
 
-	data := command.MessageResponse{
-		Content:         content,
-		Embeds:          embeds,
-		AllowedMentions: allowedMentions,
-	}
-
-	if _, err := ctx.ReplyWith(data); err != nil {
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 		return
 	}
@@ -102,12 +98,12 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 			sentry.ErrorWithContext(err, ctx.ToErrorContext())
 		}
 
-		if err := dbclient.Client.Tickets.SetStatus(ctx, ctx.GuildId(), ticket.Id, model.TicketStatusPending); err != nil {
+		if err := dbclient.Client.Tickets.SetStatus(ctx, ctx.GuildId(), ticket.Id, model2.TicketStatusPending); err != nil {
 			sentry.ErrorWithContext(err, ctx.ToErrorContext())
 		}
 
 		if !ticket.IsThread && ctx.PremiumTier() > premium.None {
-			if err := dbclient.Client.CategoryUpdateQueue.Add(ctx, ctx.GuildId(), ticket.Id, model.TicketStatusPending); err != nil {
+			if err := dbclient.Client.CategoryUpdateQueue.Add(ctx, ctx.GuildId(), ticket.Id, model2.TicketStatusPending); err != nil {
 				sentry.ErrorWithContext(err, ctx.ToErrorContext())
 			}
 		}

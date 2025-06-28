@@ -7,9 +7,8 @@ import (
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -70,27 +69,21 @@ func (c TagAliasCommand) Execute(ctx registry.CommandContext) {
 		content = logic.DoPlaceholderSubstitutions(ctx, content, ctx.Worker(), ticket, nil)
 	}
 
-	var embeds []*embed.Embed
+	var components []component.Component
+
+	if content != "" {
+		components = []component.Component{
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: content,
+			}),
+		}
+	}
+
 	if c.tag.Embed != nil {
-		embeds = []*embed.Embed{
-			logic.BuildCustomEmbed(ctx, ctx.Worker(), ticket, *c.tag.Embed.CustomEmbed, c.tag.Embed.Fields, false, nil),
-		}
+		components = append(components, *logic.BuildCustomContainer(ctx, ctx.Worker(), ticket, *c.tag.Embed.CustomEmbed, c.tag.Embed.Fields, false, nil))
 	}
 
-	var allowedMentions message.AllowedMention
-	if ticket.Id != 0 {
-		allowedMentions = message.AllowedMention{
-			Users: []uint64{ticket.UserId},
-		}
-	}
-
-	data := command.MessageResponse{
-		Content:         content,
-		Embeds:          embeds,
-		AllowedMentions: allowedMentions,
-	}
-
-	if _, err := ctx.ReplyWith(data); err != nil {
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 		return
 	}

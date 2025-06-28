@@ -4,10 +4,15 @@ go 1.23.8
 
 toolchain go1.24.2
 
-// replace github.com/TicketsBot-cloud/database => ../database
-// replace github.com/TicketsBot-cloud/gdl => ../gdl
-// replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
-// replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
+replace github.com/TicketsBot-cloud/database => ../database
+
+replace github.com/TicketsBot-cloud/gdl => ../gdl
+
+replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
+
+replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
+
+replace github.com/TicketsBot-cloud/common => ../common
 
 require (
 	cloud.google.com/go/profiler v0.4.2

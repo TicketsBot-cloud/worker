@@ -9,8 +9,6 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -90,7 +88,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		format = []interface{}{ctx.UserId(), strings.ReplaceAll(*reason, "`", "\\`")}
 	}
 
-	msgEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleCloseRequest, messageId, nil, format...)
+	msgContainer := utils.BuildContainer(ctx, customisation.Green, i18n.TitleCloseRequest, messageId, format...)
 	components := component.BuildActionRow(
 		component.BuildButton(component.Button{
 			Label:    ctx.GetMessage(i18n.MessageCloseRequestAccept),
@@ -107,16 +105,13 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		}),
 	)
 
-	data := command.MessageResponse{
-		Content: fmt.Sprintf("<@%d>", ticket.UserId),
-		Embeds:  []*embed.Embed{msgEmbed},
-		AllowedMentions: message.AllowedMention{
-			Users: []uint64{ticket.UserId},
-		},
-		Components: []component.Component{components},
-	}
-
-	if _, err := ctx.ReplyWith(data); err != nil {
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("<@%d>", ticket.UserId),
+		}),
+		msgContainer,
+		components,
+	})); err != nil {
 		ctx.HandleError(err)
 		return
 	}

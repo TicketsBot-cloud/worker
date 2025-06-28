@@ -9,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -66,7 +67,7 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 	messageId := interaction.Interaction.Data.TargetId
 
 	msg, ok := interaction.ResolvedMessage(messageId)
-	if err != nil {
+	if !ok {
 		ctx.HandleError(errors.New("Message missing from resolved data"))
 		return
 	}
@@ -111,12 +112,15 @@ func sendTicketStartedFromMessage(ctx registry.CommandContext, ticket database.T
 	messageLink := fmt.Sprintf("https://discord.com/channels/%d/%d/%d", ctx.GuildId(), ctx.ChannelId(), msg.Id)
 	contentFormatted := strings.ReplaceAll(utils.StringMax(msg.Content, 2048, "..."), "`", "\\`")
 
-	msgEmbed := utils.BuildEmbed(
-		ctx, customisation.Green, i18n.Ticket, i18n.MessageTicketStartedFrom, nil,
+	msgEmbed := utils.BuildContainer(
+		ctx, customisation.Green, i18n.Ticket, i18n.MessageTicketStartedFrom,
 		messageLink, msg.Author.Id, ctx.ChannelId(), contentFormatted,
 	)
 
-	if _, err := ctx.Worker().CreateMessageEmbed(*ticket.ChannelId, msgEmbed); err != nil {
+	if _, err := ctx.Worker().CreateMessageComplex(*ticket.ChannelId, rest.CreateMessageData{
+		Components: utils.Slice(msgEmbed),
+		Flags:      message.SumFlags(message.FlagComponentsV2),
+	}); err != nil {
 		ctx.HandleError(err)
 		return
 	}
@@ -180,9 +184,13 @@ func sendMovedMessage(ctx registry.CommandContext, ticket database.Ticket, msg m
 		FailIfNotExists: false,
 	}
 
-	msgEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.Ticket, i18n.MessageMovedToTicket, nil, *ticket.ChannelId)
+	msgEmbed := utils.BuildContainer(ctx, customisation.Green, i18n.Ticket, i18n.MessageMovedToTicket, *ticket.ChannelId)
 
-	if _, err := ctx.Worker().CreateMessageEmbedReply(msg.ChannelId, msgEmbed, reference); err != nil {
+	if _, err := ctx.Worker().CreateMessageComplex(msg.ChannelId, rest.CreateMessageData{
+		MessageReference: reference,
+		Components:       utils.Slice(msgEmbed),
+		Flags:            message.SumFlags(message.FlagComponentsV2),
+	}); err != nil {
 		ctx.HandleError(err)
 		return
 	}

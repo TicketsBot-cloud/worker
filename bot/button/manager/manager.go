@@ -66,12 +66,15 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.RedeemVoteCreditsHandler),
 		new(handlers.ViewStaffHandler),
 		new(handlers.ViewSurveyHandler),
+		new(handlers.HelpPageHandler),
+		new(handlers.RecacheHandler),
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
 		new(handlers.LanguageSelectorHandler),
 		new(handlers.MultiPanelHandler),
 		new(handlers.PremiumKeyOpenHandler),
+		new(handlers.HelpCategoryHandler),
 	)
 
 	m.modalRegistry = append(m.modalRegistry,

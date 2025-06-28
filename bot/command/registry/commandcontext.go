@@ -5,7 +5,6 @@ import (
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
@@ -16,6 +15,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"golang.org/x/net/context"
 )
@@ -37,11 +37,9 @@ type CommandContext interface {
 
 	Reply(colour customisation.Colour, title, content i18n.MessageId, format ...interface{})
 	ReplyWith(response command.MessageResponse) (message.Message, error)
-	ReplyWithEmbed(embed *embed.Embed)
-	ReplyWithEmbedPermanent(embed *embed.Embed)
 	ReplyPermanent(colour customisation.Colour, title, content i18n.MessageId, format ...interface{})
-	ReplyWithFields(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{})
-	ReplyWithFieldsPermanent(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{})
+	ReplyWithFields(colour customisation.Colour, title, content i18n.MessageId, fields []model.Field, format ...interface{})
+	ReplyWithFieldsPermanent(colour customisation.Colour, title, content i18n.MessageId, fields []model.Field, format ...interface{})
 
 	ReplyRaw(colour customisation.Colour, title, content string)
 	ReplyRawPermanent(colour customisation.Colour, title, content string)

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -48,6 +47,8 @@ func (c VoteCommand) Execute(ctx registry.CommandContext) {
 		return
 	}
 
+	credits = 2
+
 	if credits == 0 {
 		commandIds, err := command.LoadCommandIds(ctx.Worker(), ctx.Worker().BotId)
 		if err != nil {
@@ -62,48 +63,75 @@ func (c VoteCommand) Execute(ctx registry.CommandContext) {
 			commandMention = "`/vote`"
 		}
 
-		embed := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleVote, i18n.MessageVote, nil, commandMention)
+		_, err = ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+			component.BuildContainer(component.Container{
+				Components: []component.Component{
+					component.BuildTextDisplay(component.TextDisplay{
+						Content: fmt.Sprintf("### %s", ctx.GetMessage(i18n.TitleVote)),
+					}),
+					component.BuildSeparator(component.Separator{}),
+					component.BuildTextDisplay(component.TextDisplay{
+						Content: ctx.GetMessage(i18n.MessageVote, commandMention),
+					}),
+					component.BuildSeparator(component.Separator{Divider: utils.Ptr(false)}),
+					buildVoteComponent(ctx, false),
+				},
+			}),
+		}))
 
-		if _, err := ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(embed, buildVoteComponents(ctx, false))); err != nil {
+		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
 	} else {
-		var embed *embed.Embed
-		if credits == 1 {
-			embed = utils.BuildEmbed(ctx, customisation.Green, i18n.TitleVote, i18n.MessageVoteWithCreditsSingular, nil, credits, credits)
-		} else {
-			embed = utils.BuildEmbed(ctx, customisation.Green, i18n.TitleVote, i18n.MessageVoteWithCreditsPlural, nil, credits, credits)
+		componentBody := component.BuildTextDisplay(component.TextDisplay{
+			Content: ctx.GetMessage(i18n.MessageVoteWithCreditsSingular, credits, credits),
+		})
+
+		if credits > 1 {
+			componentBody = component.BuildTextDisplay(component.TextDisplay{
+				Content: ctx.GetMessage(i18n.MessageVoteWithCreditsPlural, credits, credits),
+			})
 		}
 
-		if _, err := ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(embed, buildVoteComponents(ctx, true))); err != nil {
+		if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+			utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleVote, []component.Component{
+				componentBody,
+				component.BuildSeparator(component.Separator{Divider: utils.Ptr(false)}),
+				buildVoteComponent(ctx, true),
+			}),
+		})); err != nil {
 			ctx.HandleError(err)
 			return
 		}
 	}
 }
 
-func buildVoteComponents(ctx registry.CommandContext, allowRedeem bool) []component.Component {
-	voteButton := component.BuildButton(component.Button{
-		Label: ctx.GetMessage(i18n.TitleVote),
+func buildVoteComponent(ctx registry.CommandContext, allowRedeem bool) component.Component {
+	voteButton1 := component.BuildButton(component.Button{
+		Label: fmt.Sprintf("%s (TopGG)", ctx.GetMessage(i18n.TitleVote)),
 		Style: component.ButtonStyleLink,
-		Emoji: utils.BuildEmoji("🔗"),
-		Url:   utils.Ptr(config.Conf.Bot.VoteUrl),
+		Url:   utils.Ptr(config.Conf.Bot.VoteUrl1),
+	})
+
+	voteButton2 := component.BuildButton(component.Button{
+		Label: fmt.Sprintf("%s (DBL)", ctx.GetMessage(i18n.TitleVote)),
+		Style: component.ButtonStyleLink,
+		Url:   utils.Ptr(config.Conf.Bot.VoteUrl2),
 	})
 
 	redeemButton := component.BuildButton(component.Button{
 		Label:    ctx.GetMessage(i18n.MessageVoteRedeemCredits),
 		CustomId: "redeem_vote_credits",
-		Style:    component.ButtonStylePrimary,
-		Emoji:    utils.BuildEmoji("💶"),
+		Style:    component.ButtonStyleSuccess,
 	})
 
 	var actionRow component.Component
 	if allowRedeem {
-		actionRow = component.BuildActionRow(voteButton, redeemButton)
+		actionRow = component.BuildActionRow(voteButton1, voteButton2, redeemButton)
 	} else {
-		actionRow = component.BuildActionRow(voteButton)
+		actionRow = component.BuildActionRow(voteButton1, voteButton2)
 	}
 
-	return []component.Component{actionRow}
+	return actionRow
 }

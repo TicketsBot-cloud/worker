@@ -7,6 +7,7 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -55,5 +56,12 @@ func (AdminCheckPremiumCommand) Execute(ctx registry.CommandContext, raw string)
 		return
 	}
 
-	ctx.ReplyRaw(customisation.Green, ctx.GetMessage(i18n.Admin), fmt.Sprintf("Server Name: `%s`\nOwner: <@%d> `%d`\nPremium Tier: %s\nPremium Source: %s", guild.Name, guild.OwnerId, guild.OwnerId, tier.String(), src))
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerRaw(
+			ctx.GetColour(customisation.Orange),
+			"Admin - Premium Check",
+			fmt.Sprintf("**Server Name:** `%s`\n**Owner:** <@%d> `%d`\n**Premium Tier:** `%s`\n**Premium Source:** `%s`", guild.Name, guild.OwnerId, guild.OwnerId, tier.String(), src),
+			ctx.PremiumTier(),
+		),
+	}))
 }

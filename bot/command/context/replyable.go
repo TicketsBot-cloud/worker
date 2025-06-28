@@ -10,7 +10,6 @@ import (
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/permission"
@@ -19,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -54,59 +54,39 @@ func (r *Replyable) GetColour(colour customisation.Colour) int {
 	return r.colourCodes[colour]
 }
 
-func (r *Replyable) buildEmbed(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{}) *embed.Embed {
-	return utils.BuildEmbed(r.ctx, colour, title, content, fields, format...)
-}
-
-func (r *Replyable) buildEmbedRaw(colour customisation.Colour, title, content string, fields ...embed.EmbedField) *embed.Embed {
-	return utils.BuildEmbedRaw(r.GetColour(colour), title, content, fields, r.ctx.PremiumTier())
-}
-
 func (r *Replyable) Reply(colour customisation.Colour, title, content i18n.MessageId, format ...interface{}) {
-	embed := r.buildEmbed(colour, title, content, nil, format...)
-	_, _ = r.ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
+	container := utils.BuildContainerRaw(r.GetColour(colour), r.GetMessage(title), r.GetMessage(content, format...), r.ctx.PremiumTier())
+	_, _ = r.ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(container)))
 }
 
 func (r *Replyable) ReplyPermanent(colour customisation.Colour, title, content i18n.MessageId, format ...interface{}) {
-	embed := r.buildEmbed(colour, title, content, nil, format...)
-	_, _ = r.ctx.ReplyWith(command.NewEmbedMessageResponse(embed))
+	container := utils.BuildContainerRaw(r.GetColour(colour), r.GetMessage(title), r.GetMessage(content, format...), r.ctx.PremiumTier())
+	_, _ = r.ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(container)))
 }
 
-func (r *Replyable) ReplyWithEmbed(embed *embed.Embed) {
-	_, _ = r.ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
+func (r *Replyable) ReplyWithFields(colour customisation.Colour, title, content i18n.MessageId, fields []model.Field, format ...interface{}) {
+	container := utils.BuildContainerWithFields(r.ctx, colour, title, content, fields, format...)
+	_, _ = r.ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(container)))
 }
 
-func (r *Replyable) ReplyWithEmbedAndComponents(embed *embed.Embed, components []component.Component) {
-	_, _ = r.ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(embed, components))
-}
-
-func (r *Replyable) ReplyWithEmbedPermanent(embed *embed.Embed) {
-	_, _ = r.ctx.ReplyWith(command.NewEmbedMessageResponse(embed))
-}
-
-func (r *Replyable) ReplyWithFields(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{}) {
-	embed := r.buildEmbed(colour, title, content, fields, format...)
-	_, _ = r.ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
-}
-
-func (r *Replyable) ReplyWithFieldsPermanent(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{}) {
-	embed := r.buildEmbed(colour, title, content, fields, format...)
-	_, _ = r.ctx.ReplyWith(command.NewEmbedMessageResponse(embed))
+func (r *Replyable) ReplyWithFieldsPermanent(colour customisation.Colour, title, content i18n.MessageId, fields []model.Field, format ...interface{}) {
+	container := utils.BuildContainerWithFields(r.ctx, colour, title, content, fields, format...)
+	_, _ = r.ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(container)))
 }
 
 func (r *Replyable) ReplyRaw(colour customisation.Colour, title, content string) {
-	embed := r.buildEmbedRaw(colour, title, content)
-	_, _ = r.ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
+	container := utils.BuildContainerRaw(r.GetColour(colour), title, content, r.ctx.PremiumTier())
+	_, _ = r.ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(container)))
 }
 
 func (r *Replyable) ReplyRawWithComponents(colour customisation.Colour, title, content string, components ...component.Component) {
-	embed := r.buildEmbedRaw(colour, title, content)
-	_, _ = r.ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(embed, components))
+	container := utils.BuildContainerRaw(r.GetColour(colour), title, content, r.ctx.PremiumTier())
+	_, _ = r.ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(append(utils.Slice(container), components...)))
 }
 
 func (r *Replyable) ReplyRawPermanent(colour customisation.Colour, title, content string) {
-	embed := r.buildEmbedRaw(colour, title, content)
-	_, _ = r.ctx.ReplyWith(command.NewEmbedMessageResponse(embed))
+	container := utils.BuildContainerRaw(r.GetColour(colour), title, content, r.ctx.PremiumTier())
+	_, _ = r.ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(container)))
 }
 
 func (r *Replyable) ReplyPlain(content string) {
@@ -171,7 +151,7 @@ func (r *Replyable) SelectValidEmoji(customEmoji customisation.CustomEmoji, fall
 
 func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteLink bool) command.MessageResponse {
 	var message string
-	var imageUrl *string
+	// var imageUrl *string
 
 	var restError request.RestError
 	if errors.As(err, &restError) {
@@ -209,15 +189,11 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 		message = fmt.Sprintf("An error occurred while performing this action.\nError ID: `%s`", eventId)
 	}
 
-	embed := r.buildEmbedRaw(customisation.Red, r.GetMessage(i18n.Error), message)
-	if imageUrl != nil {
-		embed.SetImage(*imageUrl)
-	}
-
-	res := command.NewEphemeralEmbedMessageResponse(embed)
+	container := utils.BuildContainerRaw(r.GetColour(customisation.Red), r.GetMessage(i18n.Error), message, r.ctx.PremiumTier())
+	res := command.NewEphemeralMessageResponseWithComponents(utils.Slice(container))
 
 	if includeInviteLink {
-		res.Components = []component.Component{
+		res.Components = append(res.Components,
 			component.BuildActionRow(
 				component.BuildButton(component.Button{
 					Label: r.GetMessage(i18n.MessageJoinSupportServer),
@@ -226,7 +202,7 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 					Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
 				}),
 			),
-		}
+		)
 	}
 
 	return res

@@ -16,7 +16,6 @@ import (
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	cmdregistry "github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -121,8 +120,12 @@ func (h *AddSupportHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddSupport, i18n.MessageAddSupportSuccess, nil)
-	ctx.Edit(command.NewEphemeralEmbedMessageResponse(e))
+	ctx.EditWithComponentsOnly(utils.Slice(utils.BuildContainerRaw(
+		ctx.GetColour(customisation.Green),
+		ctx.GetMessage(i18n.TitleAddSupport),
+		ctx.GetMessage(i18n.MessageAddSupportSuccess),
+		ctx.PremiumTier(),
+	)))
 
 	updateChannelPermissions(ctx, id, mentionableType)
 }
