@@ -127,7 +127,7 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 		tds += fmt.Sprintf("**%s:** %s\n", fields[i].Name, fields[i].Value)
 	}
 
-	comps := []component.Component{
+	innerComponents := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{Content: "## Whitelabel"}),
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
@@ -137,6 +137,6 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 		AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
-		Components:  comps,
+		Components:  innerComponents,
 	}))))
 }

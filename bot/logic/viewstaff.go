@@ -62,7 +62,7 @@ func buildPaginatedField(cmd registry.CommandContext, entries []uint64, page int
 }
 
 func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, page int) (component.Component, int) {
-	comps := []component.Component{}
+	innerComponents := []component.Component{}
 
 	adminUsers, _ := dbclient.Client.Permissions.GetAdmins(ctx, cmd.GuildId())
 	adminRoles, _ := dbclient.Client.RolePermissions.GetAdminRoles(ctx, cmd.GuildId())
@@ -90,8 +90,8 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		viewStaffRoleFormat,
 		"",
 	)
-	comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
-	comps = append(comps, component.BuildSeparator(component.Separator{Divider: utils.Ptr(true), Spacing: utils.Ptr(1)}))
+	innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
+	innerComponents = append(innerComponents, component.BuildSeparator(component.Separator{Divider: utils.Ptr(true), Spacing: utils.Ptr(1)}))
 
 	// Admin users
 	label, value = buildPaginatedField(
@@ -101,9 +101,9 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		viewStaffUserFormat,
 		"",
 	)
-	comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
+	innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 
-	comps = append(comps, component.BuildSeparator(component.Separator{Divider: utils.Ptr(true), Spacing: utils.Ptr(1)}))
+	innerComponents = append(innerComponents, component.BuildSeparator(component.Separator{Divider: utils.Ptr(true), Spacing: utils.Ptr(1)}))
 
 	// Support roles
 	label, value = buildPaginatedField(
@@ -113,7 +113,7 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 		viewStaffRoleFormat,
 		"",
 	)
-	comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
+	innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 
 	// Support users
 	if len(supportUsers) > 0 {
@@ -124,10 +124,10 @@ func BuildViewStaffMessage(ctx context.Context, cmd registry.CommandContext, pag
 			viewStaffUserFormat,
 			cmd.GetMessage(i18n.MessageViewStaffSupportUsersWarn),
 		)
-		comps = append(comps, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
+		innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("**%s**\n%s", label, value)}))
 	}
 
-	container := utils.BuildContainerWithComponents(cmd, customisation.Green, i18n.MessageViewStaffTitle, comps)
+	container := utils.BuildContainerWithComponents(cmd, customisation.Green, i18n.MessageViewStaffTitle, innerComponents)
 
 	return container, totalPages
 }

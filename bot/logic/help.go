@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/elliotchance/orderedmap"
 )
 
 func BuildHelpMessage(category command.Category, page int, ctx registry.CommandContext, cmds map[string]registry.Command) (*component.Component, error) {
-	componentList := []component.Component{}
+	innerComponents := []component.Component{}
 
 	permLevel, _ := ctx.UserPermissionLevel(ctx)
 
@@ -69,7 +67,7 @@ func BuildHelpMessage(category command.Category, page int, ctx registry.CommandC
 			continue
 		}
 
-		componentList = append(componentList,
+		innerComponents = append(innerComponents,
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: registry.FormatHelp2(cmd, ctx.GuildId(), &commandId),
 			}),
@@ -80,38 +78,27 @@ func BuildHelpMessage(category command.Category, page int, ctx registry.CommandC
 
 	// get certain commands for pagination
 	componentsPerPage := 10
-	if len(componentList) > componentsPerPage {
+	if len(innerComponents) > componentsPerPage {
 		startIndex := (page - 1) * componentsPerPage
 		endIndex := startIndex + componentsPerPage
 
-		if startIndex > len(componentList) {
+		if startIndex > len(innerComponents) {
 			return nil, fmt.Errorf("page %d is out of range", page)
 		}
 
-		if endIndex > len(componentList) {
-			endIndex = len(componentList)
+		if endIndex > len(innerComponents) {
+			endIndex = len(innerComponents)
 		}
 
-		componentList = componentList[startIndex:endIndex]
+		innerComponents = innerComponents[startIndex:endIndex]
 	}
 
-	if ctx.PremiumTier() == premium.None {
-		componentList = append(componentList,
-			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy),
-			}),
-		)
-	}
-
-	container := component.BuildContainer(component.Container{
-		Components: append([]component.Component{
-			component.BuildTextDisplay(component.TextDisplay{
-				Content: fmt.Sprintf("## %s\n-# %s", ctx.GetMessage(i18n.TitleHelp), category),
-			}),
-			component.BuildSeparator(component.Separator{}),
-		}, componentList...),
-		AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
-	})
+	container := utils.BuildContainerNoLocale(
+		ctx,
+		customisation.Green,
+		fmt.Sprintf("%s\n-# %s", ctx.GetMessage(i18n.TitleHelp), category),
+		innerComponents,
+	)
 
 	return &container, nil
 }
