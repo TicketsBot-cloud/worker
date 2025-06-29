@@ -107,7 +107,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 			keyEmoji = utils.BuildEmoji("🔑")
 		}
 
-		components := []component.Component{
+		innerComponents := []component.Component{
 			component.BuildSection(component.Section{
 				Components: utils.Slice(
 					component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("## %s", ctx.GetMessage(i18n.TitlePremium))}),
@@ -152,13 +152,13 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 		}
 
 		if ctx.PremiumTier() == premium.None {
-			components = utils.AddPremiumFooter(components)
+			innerComponents = utils.AddPremiumFooter(innerComponents)
 		}
 
 		ctx.ReplyWith(
 			command.NewEphemeralMessageResponseWithComponents(
 				utils.Slice(component.BuildContainer(component.Container{
-					Components:  components,
+					Components:  innerComponents,
 					AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
 				})),
 			),

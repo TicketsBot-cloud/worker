@@ -97,7 +97,7 @@ func (AdminListGuildEntitlementsCommand) Execute(ctx registry.CommandContext, gu
 		return
 	}
 
-	values := []component.Component{}
+	innerComponents := []component.Component{}
 
 	for _, entitlement := range entitlements {
 		value := fmt.Sprintf(
@@ -110,7 +110,7 @@ func (AdminListGuildEntitlementsCommand) Execute(ctx registry.CommandContext, gu
 			entitlement.SkuPriority,
 		)
 
-		values = append(values, component.BuildTextDisplay(component.TextDisplay{Content: value}))
+		innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{Content: value}))
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
@@ -118,7 +118,7 @@ func (AdminListGuildEntitlementsCommand) Execute(ctx registry.CommandContext, gu
 			ctx,
 			customisation.Orange,
 			i18n.Admin,
-			values,
+			innerComponents,
 		),
 	}))
 }

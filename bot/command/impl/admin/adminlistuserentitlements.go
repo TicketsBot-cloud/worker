@@ -50,7 +50,7 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 		return
 	}
 
-	values := []component.Component{}
+	innerComponents := []component.Component{}
 
 	for _, entitlement := range entitlements {
 
@@ -64,7 +64,7 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 			entitlement.SkuPriority,
 		)
 
-		values = append(values, component.BuildTextDisplay(component.TextDisplay{Content: value}))
+		innerComponents = append(innerComponents, component.BuildTextDisplay(component.TextDisplay{Content: value}))
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
@@ -72,7 +72,7 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 			ctx,
 			customisation.Orange,
 			i18n.Admin,
-			values,
+			innerComponents,
 		),
 	}))
 }

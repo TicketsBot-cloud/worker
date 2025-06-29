@@ -265,7 +265,7 @@ func BuildCloseContainer(
 	}
 
 	transcriptLink := fmt.Sprintf("%s/manage/%d/transcripts/view/%d", config.Conf.Bot.DashboardUrl, ticket.GuildId, ticket.Id)
-	cc := []component.Component{
+	innerComponents := []component.Component{
 		component.BuildSection(component.Section{
 			Accessory: component.BuildButton(component.Button{
 				Label: "View Transcript",
@@ -283,12 +283,12 @@ func BuildCloseContainer(
 	}
 
 	if cmd.PremiumTier() == premium.None {
-		cc = utils.AddPremiumFooter(cc)
+		innerComponents = utils.AddPremiumFooter(innerComponents)
 	}
 
 	container := component.BuildContainer(component.Container{
 		AccentColor: utils.Ptr(cmd.GetColour(customisation.Green)),
-		Components:  cc,
+		Components:  innerComponents,
 	})
 
 	return &container

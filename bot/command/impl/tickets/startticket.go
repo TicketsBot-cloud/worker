@@ -9,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -110,12 +111,19 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 func sendTicketStartedFromMessage(ctx registry.CommandContext, ticket database.Ticket, msg message.Message) {
 	// format
 	messageLink := fmt.Sprintf("https://discord.com/channels/%d/%d/%d", ctx.GuildId(), ctx.ChannelId(), msg.Id)
-	contentFormatted := strings.ReplaceAll(utils.StringMax(msg.Content, 2048, "..."), "`", "\\`")
 
-	msgEmbed := utils.BuildContainer(
-		ctx, customisation.Green, i18n.Ticket, i18n.MessageTicketStartedFrom,
-		messageLink, msg.Author.Id, ctx.ChannelId(), contentFormatted,
-	)
+	var msgEmbed component.Component
+	if msg.Content == "" {
+		msgEmbed = utils.BuildContainer(
+			ctx, customisation.Green, i18n.Ticket, i18n.MessageTicketStartedFromNoContent,
+			messageLink,
+		)
+	} else {
+		msgEmbed = utils.BuildContainer(
+			ctx, customisation.Green, i18n.Ticket, i18n.MessageTicketStartedFrom,
+			messageLink, msg.Author.Id, ctx.ChannelId(), strings.ReplaceAll(utils.StringMax(msg.Content, 2048, "..."), "`", "\\`"),
+		)
+	}
 
 	if _, err := ctx.Worker().CreateMessageComplex(*ticket.ChannelId, rest.CreateMessageData{
 		Components: utils.Slice(msgEmbed),

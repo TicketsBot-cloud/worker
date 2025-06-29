@@ -61,19 +61,19 @@ func SendWelcomeMessage(
 			fieldStr += fmt.Sprintf("**%s**\n%s\n", field.Name, utils.EscapeMarkdown(field.Value))
 		}
 
-		components := []component.Component{
+		innerComponents := []component.Component{
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: fieldStr,
 			}),
 		}
 
 		if cmd.PremiumTier() == premium.None {
-			components = utils.AddPremiumFooter(components)
+			innerComponents = utils.AddPremiumFooter(innerComponents)
 		}
 
 		embeds = append(embeds, component.BuildContainer(component.Container{
 			AccentColor: &embedColor,
-			Components:  components,
+			Components:  innerComponents,
 		}))
 	}
 
