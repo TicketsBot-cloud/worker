@@ -112,7 +112,7 @@ func AddPremiumFooter(components []component.Component) []component.Component {
 
 	components = append(components,
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("-# %s Powered by %s", customisation.EmojiLogo, config.Conf.Bot.PoweredBy),
+			Content: fmt.Sprintf("-# %s Powered by [%s](https://%s)", customisation.EmojiLogo, config.Conf.Bot.PoweredBy, config.Conf.Bot.PoweredBy),
 		}),
 	)
 

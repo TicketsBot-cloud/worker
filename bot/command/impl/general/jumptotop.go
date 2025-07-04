@@ -52,7 +52,7 @@ func (JumpToTopCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	messageLink := fmt.Sprintf("https://discord.com/channels/%d/%d/%d", ctx.GuildId(), ctx.ChannelId(), *ticket.WelcomeMessageId)
-	components := []component.Component{
+	innerComponents := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{Content: ctx.GetMessage(i18n.MessageJumpToTopContent)}),
 		component.BuildSeparator(component.Separator{Divider: utils.Ptr(false)}),
 		component.BuildActionRow(component.BuildButton(component.Button{
@@ -64,7 +64,7 @@ func (JumpToTopCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleJumpToTop, components),
+		utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.TitleJumpToTop, innerComponents),
 	})); err != nil {
 		ctx.HandleError(err)
 		return

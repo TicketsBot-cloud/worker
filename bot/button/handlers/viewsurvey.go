@@ -120,7 +120,7 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 	buttons = append(buttons, logic.TranscriptLinkElement(ticket.HasTranscript)(ctx.Worker(), ticket)...)
 	buttons = append(buttons, logic.ThreadLinkElement(ticket.ChannelId != nil && ticket.IsThread)(ctx.Worker(), ticket)...)
 
-	comps := []component.Component{
+	innerComponents := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{Content: fmt.Sprintf("## Exit Survey for %s", opener.GlobalName)}),
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
@@ -129,11 +129,11 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	if len(buttons) > 0 {
-		comps = append(comps, component.BuildActionRow(buttons...))
+		innerComponents = append(innerComponents, component.BuildActionRow(buttons...))
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 		AccentColor: utils.Ptr(ctx.GetColour(customisation.Green)),
-		Components:  comps,
+		Components:  innerComponents,
 	}))))
 }
