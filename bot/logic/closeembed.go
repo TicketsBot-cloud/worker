@@ -209,10 +209,8 @@ func BuildCloseContainer(
 	rating *uint8,
 	components [][]CloseEmbedElement,
 ) *component.Component {
-	var formattedReason string
-	if reason == nil {
-		formattedReason = "No reason specified"
-	} else {
+	var formattedReason = "No reason specified"
+	if reason != nil {
 		formattedReason = *reason
 		if len(formattedReason) > 1024 {
 			formattedReason = formattedReason[:1024]
@@ -225,24 +223,33 @@ func BuildCloseContainer(
 	}
 
 	var claimedBy string
-	{
-		claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	if err != nil {
+		sentry.Error(err)
+	} else if claimUserId > 0 {
+		claimedBy = fmt.Sprintf("<@%d>", claimUserId)
+	}
+
+	var panelName string
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
 		if err != nil {
 			sentry.Error(err)
-		}
-
-		if claimUserId == 0 {
-			claimedBy = ""
-		} else {
-			claimedBy = fmt.Sprintf("<@%d>", claimUserId)
+		} else if p.Title != "" {
+			panelName = p.Title
 		}
 	}
 
 	section1Text := []string{
 		formatRow("Ticket ID", strconv.Itoa(ticket.Id)),
+	}
+	if panelName != "" {
+		section1Text = append(section1Text, formatRow("Panel", panelName))
+	}
+	section1Text = append(section1Text,
 		formatRow("Opened By", fmt.Sprintf("<@%d>", ticket.UserId)),
 		formatRow("Closed By", fmt.Sprintf("<@%d>", closedBy)),
-	}
+	)
 
 	section2Text := []string{
 		formatRow("Open Time", message.BuildTimestamp(ticket.OpenTime, message.TimestampStyleShortDateTime)),
