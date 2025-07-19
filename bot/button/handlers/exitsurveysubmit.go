@@ -182,5 +182,5 @@ func addViewFeedbackButton(ctx context.Context, cmd *cmdcontext.ModalContext, ti
 		return fmt.Errorf("exit survey was completed, but no rating was found (%d:%d)", ticket.GuildId, ticket.Id)
 	}
 
-	return logic.EditGuildArchiveMessageIfExists(ctx, cmd.Worker(), ticket, settings, true, closedBy, reason, &rating)
+	return logic.EditGuildArchiveMessageIfExists(ctx, cmd, cmd.Worker(), ticket, settings, true, closedBy, reason, &rating)
 }

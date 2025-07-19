@@ -12,6 +12,7 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
@@ -231,10 +232,10 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		}
 	}
 
-	sendCloseEmbed(ctx, cmd, errorContext, member, settings, ticket, reason)
+	sendCloseContainer(ctx, cmd, errorContext, member, settings, ticket, reason)
 }
 
-func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
+func sendCloseContainer(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
 	// Send logs to archive channel
 	archiveChannelId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
 	if err != nil {
@@ -249,14 +250,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 	}
 
 	if archiveChannelExists && archiveChannelId != nil {
-		componentBuilders := [][]CloseEmbedElement{
-			{
-				TranscriptLinkElement(settings.StoreTranscripts),
-				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
-			},
-		}
-
-		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
+		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, false)
 
 		data := rest.CreateMessageData{
 			Flags:      uint(message.FlagComponentsV2),
@@ -321,33 +315,32 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 
 		statsd.Client.IncrementKey(statsd.KeyDirectMessage)
 
-		componentBuilders := [][]CloseEmbedElement{
-			{
-				TranscriptLinkElement(settings.StoreTranscripts),
-				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
-			},
-			{
-				FeedbackRowElement(feedbackEnabled && hasSentMessage && permLevel == permission.Everyone),
-			},
-		}
-
-		closeEmbed, closeComponents := BuildCloseEmbed(ctx, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
-		closeEmbed.SetAuthor(guild.Name, "", fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon))
-
 		// Use message content to tell users why they can't rate a ticket
 		var content string
+		var viewFeedbackButton = true
 		if feedbackEnabled {
 			if permLevel > permission.Everyone {
 				content = "-# " + cmd.GetMessage(i18n.MessageCloseCantRateStaff, guild.Name)
+				viewFeedbackButton = false
 			} else if !hasSentMessage {
 				content = "-# " + cmd.GetMessage(i18n.MessageCloseCantRateEmpty)
+				viewFeedbackButton = false
+			}
+		}
+
+		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, viewFeedbackButton)
+
+		components := []component.Component{*closeContainer}
+		if content != "" {
+			components = []component.Component{
+				component.BuildTextDisplay(component.TextDisplay{Content: content}),
+				*closeContainer,
 			}
 		}
 
 		data := rest.CreateMessageData{
-			Content:    content,
-			Embeds:     utils.Slice(closeEmbed),
-			Components: closeComponents,
+			Flags:      uint(message.FlagComponentsV2),
+			Components: components,
 		}
 
 		if _, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
