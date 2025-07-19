@@ -10,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -127,6 +128,7 @@ func BuildCloseContainer(
 	cmd registry.CommandContext,
 	worker *worker.Context,
 	ticket database.Ticket,
+	guild *guild.Guild,
 	closedBy uint64,
 	reason *string,
 	rating *uint8,
@@ -163,9 +165,11 @@ func BuildCloseContainer(
 		}
 	}
 
-	section1Text := []string{
-		formatRow("Ticket ID", strconv.Itoa(ticket.Id)),
+	section1Text := []string{}
+	if guild != nil {
+		section1Text = append(section1Text, formatRow("Server", guild.Name))
 	}
+	section1Text = append(section1Text, formatRow("Ticket ID", strconv.Itoa(ticket.Id)))
 	if panelName != "" {
 		section1Text = append(section1Text, formatRow("Panel", panelName))
 	}
@@ -207,10 +211,26 @@ func BuildCloseContainer(
 				Content: "## Ticket Closed",
 			})),
 		}),
-		component.BuildTextDisplay(component.TextDisplay{Content: strings.Join(section1Text, "\n")}),
+	}
+
+	section := component.Section{
+		Components: utils.Slice(component.BuildTextDisplay(component.TextDisplay{
+			Content: strings.Join(section1Text, "\n"),
+		})),
+	}
+	if guild != nil && guild.Icon != "" {
+		section.Accessory = component.BuildThumbnail(component.Thumbnail{
+			Media: component.UnfurledMediaItem{
+				Url: fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon),
+			},
+		})
+	}
+	innerComponents = append(innerComponents, component.BuildSection(section))
+
+	innerComponents = append(innerComponents,
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{Content: strings.Join(section2Text, "\n")}),
-	}
+	)
 
 	if viewFeedbackButton {
 		innerComponents = append(innerComponents, component.BuildActionRow(
@@ -263,7 +283,7 @@ func EditGuildArchiveMessageIfExists(
 		return nil
 	}
 
-	closeContainer := BuildCloseContainer(ctx, cmd, worker, ticket, closedBy, reason, rating, viewFeedbackButton)
+	closeContainer := BuildCloseContainer(ctx, cmd, worker, ticket, nil, closedBy, reason, rating, viewFeedbackButton)
 
 	_, err = worker.EditMessage(archiveMessage.ChannelId, archiveMessage.MessageId, rest.EditMessageData{
 		Flags:      uint(message.FlagComponentsV2),

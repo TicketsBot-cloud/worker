@@ -250,7 +250,7 @@ func sendCloseContainer(ctx context.Context, cmd registry.CommandContext, errorC
 	}
 
 	if archiveChannelExists && archiveChannelId != nil {
-		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, false)
+		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, nil, member.User.Id, reason, nil, false)
 
 		data := rest.CreateMessageData{
 			Flags:      uint(message.FlagComponentsV2),
@@ -328,7 +328,7 @@ func sendCloseContainer(ctx context.Context, cmd registry.CommandContext, errorC
 			}
 		}
 
-		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, viewFeedbackButton)
+		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, &guild, member.User.Id, reason, nil, viewFeedbackButton)
 
 		components := []component.Component{*closeContainer}
 		if content != "" {
