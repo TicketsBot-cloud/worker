@@ -213,19 +213,23 @@ func BuildCloseContainer(
 		}),
 	}
 
-	section := component.Section{
-		Components: utils.Slice(component.BuildTextDisplay(component.TextDisplay{
-			Content: strings.Join(section1Text, "\n"),
-		})),
-	}
+	sectionContent := component.BuildTextDisplay(component.TextDisplay{
+		Content: strings.Join(section1Text, "\n"),
+	})
+
 	if guild != nil && guild.Icon != "" {
-		section.Accessory = component.BuildThumbnail(component.Thumbnail{
-			Media: component.UnfurledMediaItem{
-				Url: fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon),
-			},
-		})
+		section := component.Section{
+			Components: utils.Slice(sectionContent),
+			Accessory: component.BuildThumbnail(component.Thumbnail{
+				Media: component.UnfurledMediaItem{
+					Url: fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon),
+				},
+			}),
+		}
+		innerComponents = append(innerComponents, component.BuildSection(section))
+	} else {
+		innerComponents = append(innerComponents, sectionContent)
 	}
-	innerComponents = append(innerComponents, component.BuildSection(section))
 
 	innerComponents = append(innerComponents,
 		component.BuildSeparator(component.Separator{}),
