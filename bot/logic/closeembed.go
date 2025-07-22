@@ -9,8 +9,8 @@ import (
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -22,15 +22,15 @@ import (
 	"github.com/TicketsBot-cloud/worker/config"
 )
 
-type CloseEmbedElement func(worker *worker.Context, ticket database.Ticket) []component.Component
+type CloseContainerElement func(worker *worker.Context, ticket database.Ticket) []component.Component
 
-func NoopElement() CloseEmbedElement {
+func NoopElement() CloseContainerElement {
 	return func(worker *worker.Context, ticket database.Ticket) []component.Component {
 		return nil
 	}
 }
 
-func TranscriptLinkElement(condition bool) CloseEmbedElement {
+func TranscriptLinkElement(condition bool) CloseContainerElement {
 	if !condition {
 		return NoopElement()
 	}
@@ -52,7 +52,7 @@ func TranscriptLinkElement(condition bool) CloseEmbedElement {
 	}
 }
 
-func ThreadLinkElement(condition bool) CloseEmbedElement {
+func ThreadLinkElement(condition bool) CloseContainerElement {
 	if !condition {
 		return NoopElement()
 	}
@@ -74,7 +74,7 @@ func ThreadLinkElement(condition bool) CloseEmbedElement {
 	}
 }
 
-func ViewFeedbackElement(condition bool) CloseEmbedElement {
+func ViewFeedbackElement(condition bool) CloseContainerElement {
 	if !condition {
 		return NoopElement()
 	}
@@ -91,7 +91,7 @@ func ViewFeedbackElement(condition bool) CloseEmbedElement {
 	}
 }
 
-func FeedbackRowElement(condition bool) CloseEmbedElement {
+func FeedbackRowElement(condition bool) CloseContainerElement {
 	if !condition {
 		return NoopElement()
 	}
@@ -123,96 +123,19 @@ func FeedbackRowElement(condition bool) CloseEmbedElement {
 	}
 }
 
-func BuildCloseEmbed(
-	ctx context.Context,
-	worker *worker.Context,
-	ticket database.Ticket,
-	closedBy uint64,
-	reason *string,
-	rating *uint8,
-	components [][]CloseEmbedElement,
-) (*embed.Embed, []component.Component) {
-	var formattedReason string
-	if reason == nil {
-		formattedReason = "No reason specified"
-	} else {
-		formattedReason = *reason
-		if len(formattedReason) > 1024 {
-			formattedReason = formattedReason[:1024]
-		}
-	}
-
-	var claimedBy string
-	{
-		claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
-		if err != nil {
-			sentry.Error(err)
-		}
-
-		if claimUserId == 0 {
-			claimedBy = "Not claimed"
-		} else {
-			claimedBy = fmt.Sprintf("<@%d>", claimUserId)
-		}
-	}
-
-	colour, err := utils.GetColourForGuild(ctx, worker, customisation.Green, ticket.GuildId)
-	if err != nil {
-		sentry.Error(err)
-		colour = customisation.Green.Default()
-	}
-
-	// TODO: Translate titles
-	closeEmbed := embed.NewEmbed().
-		SetTitle("Ticket Closed").
-		SetColor(colour).
-		AddField(formatTitle("Ticket ID", customisation.EmojiId, worker.IsWhitelabel), strconv.Itoa(ticket.Id), true).
-		AddField(formatTitle("Opened By", customisation.EmojiOpen, worker.IsWhitelabel), fmt.Sprintf("<@%d>", ticket.UserId), true).
-		AddField(formatTitle("Closed By", customisation.EmojiClose, worker.IsWhitelabel), fmt.Sprintf("<@%d>", closedBy), true).
-		AddField(formatTitle("Open Time", customisation.EmojiOpenTime, worker.IsWhitelabel), message.BuildTimestamp(ticket.OpenTime, message.TimestampStyleShortDateTime), true).
-		AddField(formatTitle("Claimed By", customisation.EmojiClaim, worker.IsWhitelabel), claimedBy, true)
-
-	if ticket.CloseTime != nil {
-		closeEmbed.SetTimestamp(*ticket.CloseTime)
-	}
-
-	if rating == nil {
-		closeEmbed = closeEmbed.AddBlankField(true)
-	} else {
-		closeEmbed = closeEmbed.AddField(formatTitle("Rating", customisation.EmojiRating, worker.IsWhitelabel), fmt.Sprintf("%d ⭐", *rating), true)
-	}
-
-	closeEmbed = closeEmbed.AddField(formatTitle("Reason", customisation.EmojiReason, worker.IsWhitelabel), formattedReason, false)
-
-	var rows []component.Component
-	for _, row := range components {
-		var rowElements []component.Component
-		for _, element := range row {
-			rowElements = append(rowElements, element(worker, ticket)...)
-		}
-
-		if len(rowElements) > 0 {
-			rows = append(rows, component.BuildActionRow(rowElements...))
-		}
-	}
-
-	return closeEmbed, rows
-}
-
 func BuildCloseContainer(
 	ctx context.Context,
 	cmd registry.CommandContext,
 	worker *worker.Context,
 	ticket database.Ticket,
+	guild *guild.Guild,
 	closedBy uint64,
 	reason *string,
 	rating *uint8,
-	components [][]CloseEmbedElement,
+	viewFeedbackButton bool,
 ) *component.Component {
-	var formattedReason string
-	if reason == nil {
-		formattedReason = "No reason specified"
-	} else {
+	var formattedReason = "No reason specified"
+	if reason != nil {
 		formattedReason = *reason
 		if len(formattedReason) > 1024 {
 			formattedReason = formattedReason[:1024]
@@ -225,24 +148,35 @@ func BuildCloseContainer(
 	}
 
 	var claimedBy string
-	{
-		claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	if err != nil {
+		sentry.Error(err)
+	} else if claimUserId > 0 {
+		claimedBy = fmt.Sprintf("<@%d>", claimUserId)
+	}
+
+	var panelName string
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
 		if err != nil {
 			sentry.Error(err)
-		}
-
-		if claimUserId == 0 {
-			claimedBy = ""
-		} else {
-			claimedBy = fmt.Sprintf("<@%d>", claimUserId)
+		} else if p.Title != "" {
+			panelName = p.Title
 		}
 	}
 
-	section1Text := []string{
-		formatRow("Ticket ID", strconv.Itoa(ticket.Id)),
+	section1Text := []string{}
+	if guild != nil {
+		section1Text = append(section1Text, formatRow("Server", guild.Name))
+	}
+	section1Text = append(section1Text, formatRow("Ticket ID", strconv.Itoa(ticket.Id)))
+	if panelName != "" {
+		section1Text = append(section1Text, formatRow("Panel", panelName))
+	}
+	section1Text = append(section1Text,
 		formatRow("Opened By", fmt.Sprintf("<@%d>", ticket.UserId)),
 		formatRow("Closed By", fmt.Sprintf("<@%d>", closedBy)),
-	}
+	)
 
 	section2Text := []string{
 		formatRow("Open Time", message.BuildTimestamp(ticket.OpenTime, message.TimestampStyleShortDateTime)),
@@ -277,12 +211,39 @@ func BuildCloseContainer(
 				Content: "## Ticket Closed",
 			})),
 		}),
-		component.BuildTextDisplay(component.TextDisplay{Content: strings.Join(section1Text, "\n")}),
+	}
+
+	sectionContent := component.BuildTextDisplay(component.TextDisplay{
+		Content: strings.Join(section1Text, "\n"),
+	})
+
+	if guild != nil && guild.Icon != "" {
+		section := component.Section{
+			Components: utils.Slice(sectionContent),
+			Accessory: component.BuildThumbnail(component.Thumbnail{
+				Media: component.UnfurledMediaItem{
+					Url: fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon),
+				},
+			}),
+		}
+		innerComponents = append(innerComponents, component.BuildSection(section))
+	} else {
+		innerComponents = append(innerComponents, sectionContent)
+	}
+
+	innerComponents = append(innerComponents,
 		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{Content: strings.Join(section2Text, "\n")}),
+	)
+
+	if viewFeedbackButton {
+		innerComponents = append(innerComponents, component.BuildActionRow(
+			FeedbackRowElement(viewFeedbackButton)(worker, ticket)...,
+		))
 	}
 
 	if cmd.PremiumTier() == premium.None {
+		innerComponents = append(innerComponents, component.BuildSeparator(component.Separator{}))
 		innerComponents = utils.AddPremiumFooter(innerComponents)
 	}
 
@@ -308,6 +269,7 @@ func formatTitle(s string, emoji customisation.CustomEmoji, isWhitelabel bool) s
 
 func EditGuildArchiveMessageIfExists(
 	ctx context.Context,
+	cmd registry.CommandContext,
 	worker *worker.Context,
 	ticket database.Ticket,
 	settings database.Settings,
@@ -325,18 +287,11 @@ func EditGuildArchiveMessageIfExists(
 		return nil
 	}
 
-	componentBuilders := [][]CloseEmbedElement{
-		{
-			TranscriptLinkElement(settings.StoreTranscripts),
-			ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
-			ViewFeedbackElement(viewFeedbackButton),
-		},
-	}
+	closeContainer := BuildCloseContainer(ctx, cmd, worker, ticket, nil, closedBy, reason, rating, viewFeedbackButton)
 
-	embed, components := BuildCloseEmbed(ctx, worker, ticket, closedBy, reason, rating, componentBuilders)
 	_, err = worker.EditMessage(archiveMessage.ChannelId, archiveMessage.MessageId, rest.EditMessageData{
-		Embeds:     utils.Slice(embed),
-		Components: components,
+		Flags:      uint(message.FlagComponentsV2),
+		Components: utils.Slice(*closeContainer),
 	})
 
 	return err
