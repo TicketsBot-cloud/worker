@@ -102,15 +102,18 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 			maxLength = utils.Ptr(uint32(*input.MaxLength))
 		}
 
-		components[i] = component.BuildActionRow(component.BuildInputText(component.InputText{
-			Style:       component.TextStyleTypes(input.Style),
-			CustomId:    input.CustomId,
+		components[i] = component.BuildLabel(component.Label{
 			Label:       input.Label,
-			Placeholder: input.Placeholder,
-			MinLength:   minLength,
-			MaxLength:   maxLength,
-			Required:    utils.Ptr(input.Required),
-		}))
+			Description: input.Description,
+			Component: component.BuildInputText(component.InputText{
+				Style:       component.TextStyleTypes(input.Style),
+				CustomId:    input.CustomId,
+				Placeholder: input.Placeholder,
+				MinLength:   minLength,
+				MaxLength:   maxLength,
+				Required:    utils.Ptr(input.Required),
+			}),
+		})
 	}
 
 	return button.ResponseModal{

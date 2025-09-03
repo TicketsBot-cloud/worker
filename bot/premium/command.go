@@ -25,14 +25,16 @@ func BuildKeyModal(guildId uint64) interaction.ModalResponseData {
 		CustomId: "premium_key_modal",
 		Title:    i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumActivateKey),
 		Components: []component.Component{
-			component.BuildActionRow(component.BuildInputText(component.InputText{
-				Style:       component.TextStyleShort,
-				CustomId:    "key",
-				Label:       i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumKey),
-				Placeholder: utils.Ptr("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-				MinLength:   utils.Ptr(uint32(36)),
-				MaxLength:   utils.Ptr(uint32(36)),
-			})),
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumKey),
+				Component: component.BuildInputText(component.InputText{
+					Style:       component.TextStyleShort,
+					CustomId:    "key",
+					Placeholder: utils.Ptr("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+					MinLength:   utils.Ptr(uint32(36)),
+					MaxLength:   utils.Ptr(uint32(36)),
+				}),
+			}),
 		},
 	}
 }
