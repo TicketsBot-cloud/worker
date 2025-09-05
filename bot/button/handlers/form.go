@@ -67,9 +67,17 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 
 		formAnswers := make(map[database.FormInput]string)
 		for _, actionRow := range data.Components {
+			if actionRow.Component != nil {
+				questionData, ok := inputs[actionRow.Component.CustomId]
+				if ok { // If form has changed, we can skip
+					formAnswers[questionData] = actionRow.Component.Value
+				}
+				continue
+			}
+
 			for _, input := range actionRow.Components {
 				questionData, ok := inputs[input.CustomId]
-				if ok { // If form has changed, we can skip
+				if ok {
 					formAnswers[questionData] = input.Value
 				}
 			}
