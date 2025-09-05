@@ -6,6 +6,7 @@ toolchain go1.24.2
 
 //replace github.com/TicketsBot-cloud/database => ../database
 //replace github.com/TicketsBot-cloud/gdl => ../gdl
+
 // replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
 // replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
@@ -15,7 +16,7 @@ require (
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
 	github.com/TicketsBot-cloud/database v0.0.0-20250903144933-e8e254858b76
-	github.com/TicketsBot-cloud/gdl v0.0.0-20250903113726-d89a77a99a6a
+	github.com/TicketsBot-cloud/gdl v0.0.0-20250905172434-6d220ca1cc7c
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0
