@@ -26,7 +26,8 @@ func BuildKeyModal(guildId uint64) interaction.ModalResponseData {
 		Title:    i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumActivateKey),
 		Components: []component.Component{
 			component.BuildLabel(component.Label{
-				Label: i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumKey),
+				Label:       i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumKey),
+				Description: utils.Ptr(i18n.GetMessageFromGuild(guildId, i18n.MessagePremiumKey)),
 				Component: component.BuildInputText(component.InputText{
 					Style:       component.TextStyleShort,
 					CustomId:    "key",

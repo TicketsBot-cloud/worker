@@ -53,7 +53,8 @@ func (h *CloseWithReasonModalHandler) Execute(ctx *context.ButtonContext) {
 			Title:    i18n.TitleClose.GetFromGuild(ctx.GuildId()),
 			Components: []component.Component{
 				component.BuildLabel(component.Label{
-					Label: i18n.Reason.GetFromGuild(ctx.GuildId()),
+					Label:       i18n.Reason.GetFromGuild(ctx.GuildId()),
+					Description: utils.Ptr(i18n.Reason.GetFromGuild(ctx.GuildId())),
 					Component: component.BuildInputText(component.InputText{
 						Style:       component.TextStyleParagraph,
 						CustomId:    "reason",
