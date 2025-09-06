@@ -1,16 +1,19 @@
 package admin
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -33,7 +36,7 @@ func (AdminBlacklistCommand) Properties() registry.Properties {
 	}
 }
 
-func (c AdminBlacklistCommand) GetExecutor() interface{} {
+func (c AdminBlacklistCommand) GetExecutor() any {
 	return c.Execute
 }
 
@@ -44,12 +47,32 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, raw string, re
 		return
 	}
 
+	if isBlacklisted, blacklistReason, _ := dbclient.Client.ServerBlacklist.IsBlacklisted(ctx, guildId); isBlacklisted {
+		ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
+			utils.BuildContainerRaw(
+				ctx,
+				customisation.Orange,
+				"Admin - Blacklist",
+				fmt.Sprintf("Guild is already blacklisted.\n\n**Guild ID:** `%d`\n**Reason**: `%s`", guildId, utils.ValueOrDefault(blacklistReason, "No reason provided")),
+			),
+		}))
+
+		return
+	}
+
 	if err := dbclient.Client.ServerBlacklist.Add(ctx, guildId, reason); err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	ctx.ReplyPlainPermanent("🔨")
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerRaw(
+			ctx,
+			customisation.Orange,
+			"Admin - Blacklist",
+			fmt.Sprintf("Guild has been blacklisted successfully.\n\n**Guild ID:** `%d`\n**Reason:** %s", guildId, utils.ValueOrDefault(reason, "No reason provided")),
+		),
+	}))
 
 	// Check if whitelabel
 	botId, ok, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
