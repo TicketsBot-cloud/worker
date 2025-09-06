@@ -1,58 +1,43 @@
-package admin
+package handlers
 
 import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	w "github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
-	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-type AdminRecacheCommand struct {
+type RecacheHandler struct{}
+
+func (h *RecacheHandler) Matcher() matcher.Matcher {
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "admin_debug_recache")
+	})
 }
 
-func (AdminRecacheCommand) Properties() registry.Properties {
+func (h *RecacheHandler) Properties() registry.Properties {
 	return registry.Properties{
-		Name:            "recache",
-		Description:     i18n.HelpAdmin,
-		Type:            interaction.ApplicationCommandTypeChatInput,
-		PermissionLevel: permission.Everyone,
-		Category:        command.Settings,
-		HelperOnly:      true,
-		Arguments: command.Arguments(
-			command.NewOptionalArgument("guildid", "ID of the guild to recache", interaction.OptionTypeString, i18n.MessageInvalidArgument),
-		),
-		Timeout: time.Second * 10,
+		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
+		Timeout:         time.Second * 30,
+		PermissionLevel: permcache.Support,
 	}
 }
 
-func (c AdminRecacheCommand) GetExecutor() interface{} {
-	return c.Execute
-}
-
-func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId *string) {
-	var guildId uint64
-	if providedGuildId != nil {
-		var err error
-		guildId, err = strconv.ParseUint(*providedGuildId, 10, 64)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-	} else {
-		guildId = ctx.GuildId()
-	}
+func (h *RecacheHandler) Execute(ctx *context.ButtonContext) {
+	guildId, err := strconv.ParseUint(strings.Replace(ctx.InteractionData.CustomId, "admin_debug_recache_", "", -1), 10, 64)
 
 	if onCooldown, cooldownTime := redis.GetRecacheCooldown(guildId); onCooldown {
 		ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
@@ -68,7 +53,6 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 			)}))
 		return
 	}
-
 	currentTime := time.Now()
 
 	// purge cache
@@ -76,7 +60,6 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 	ctx.Worker().Cache.DeleteGuildChannels(ctx, guildId)
 	ctx.Worker().Cache.DeleteGuildRoles(ctx, guildId)
 
-	// re-cache
 	botId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
 	if err != nil {
 		ctx.HandleError(err)
@@ -120,6 +103,7 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 		return
 	}
 
+	// Set the recache cooldown
 	if err := redis.SetRecacheCooldown(guildId, time.Second*30); err != nil {
 		ctx.HandleError(err)
 		return

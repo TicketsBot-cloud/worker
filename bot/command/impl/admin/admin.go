@@ -22,6 +22,7 @@ func (AdminCommand) Properties() registry.Properties {
 			AdminBlacklistCommand{},
 			AdminCheckBlacklistCommand{},
 			AdminCheckPremiumCommand{},
+			AdminDebugCommand{},
 			AdminGenPremiumCommand{},
 			AdminGetOwnerCommand{},
 			AdminListGuildEntitlementsCommand{},
@@ -35,7 +36,7 @@ func (AdminCommand) Properties() registry.Properties {
 	}
 }
 
-func (c AdminCommand) GetExecutor() interface{} {
+func (c AdminCommand) GetExecutor() any {
 	return c.Execute
 }
 
