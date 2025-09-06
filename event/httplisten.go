@@ -283,6 +283,7 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 					Embeds:          data.Embeds,
 					AllowedMentions: data.AllowedMentions,
 					Components:      data.Components,
+					Flags:           data.Flags,
 				}
 
 				if _, err := rest.CreateFollowupMessage(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
@@ -297,6 +298,7 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 					Embeds:          data.Embeds,
 					AllowedMentions: data.AllowedMentions,
 					Components:      data.Components,
+					Flags:           data.Flags,
 				}
 
 				if _, err := rest.EditOriginalInteractionResponse(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
