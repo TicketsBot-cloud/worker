@@ -51,7 +51,7 @@ func (AdminGetOwnerCommand) Execute(ctx registry.CommandContext, raw string) {
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(utils.BuildContainerRaw(
 		ctx,
-		customisation.Green,
+		customisation.Orange,
 		"Admin - Get Owner",
 		fmt.Sprintf("**Guild ID:** `%d`\n**Guild Name:** `%s`\n\n**Owner:** <@%[3]d>\n**Owner ID:** `%[3]d`", guild.Id, guild.Name, guild.OwnerId)))))
 }
