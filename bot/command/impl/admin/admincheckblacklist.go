@@ -33,7 +33,7 @@ func (AdminCheckBlacklistCommand) Properties() registry.Properties {
 	}
 }
 
-func (c AdminCheckBlacklistCommand) GetExecutor() interface{} {
+func (c AdminCheckBlacklistCommand) GetExecutor() any {
 	return c.Execute
 }
 
@@ -50,10 +50,18 @@ func (AdminCheckBlacklistCommand) Execute(ctx registry.CommandContext, raw strin
 		return
 	}
 
+	response := fmt.Sprintf("This guild is not blacklisted\n\n**Guild ID:** `%d`", guildId)
+
 	if isBlacklisted {
-		reasonFormatted := utils.ValueOrDefault(reason, "No reason provided")
-		ctx.ReplyRaw(customisation.Orange, "Blacklist Check", fmt.Sprintf("This guild is blacklisted.\n```%s```", reasonFormatted))
-	} else {
-		ctx.ReplyRaw(customisation.Green, "Blacklist Check", "This guild is not blacklisted")
+		response = fmt.Sprintf("This guild is blacklisted.\n\n**Guild ID:** `%d`\n**Reason:** `%s`", guildId, utils.ValueOrDefault(reason, "No reason provided"))
 	}
+
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(
+		utils.BuildContainerRaw(
+			ctx,
+			customisation.Orange,
+			"Admin - Blacklist Check",
+			response,
+		),
+	)))
 }
