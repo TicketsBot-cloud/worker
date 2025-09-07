@@ -37,6 +37,11 @@ func (h *RecacheHandler) Properties() registry.Properties {
 }
 
 func (h *RecacheHandler) Execute(ctx *context.ButtonContext) {
+
+	if !utils.IsBotAdmin(ctx.UserId()) {
+		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
+	}
+
 	guildId, err := strconv.ParseUint(strings.Replace(ctx.InteractionData.CustomId, "admin_debug_recache_", "", -1), 10, 64)
 
 	if onCooldown, cooldownTime := redis.GetRecacheCooldown(guildId); onCooldown {
