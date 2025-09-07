@@ -29,7 +29,7 @@ func (AdminDebugCommand) Properties() registry.Properties {
 		Type:            interaction.ApplicationCommandTypeChatInput,
 		PermissionLevel: permission.Everyone,
 		Category:        command.Settings,
-		AdminOnly:       true,
+		HelperOnly:      true,
 		Arguments: command.Arguments(
 			command.NewRequiredArgument("guild_id", "ID of the guild", interaction.OptionTypeString, i18n.MessageInvalidArgument),
 		),
