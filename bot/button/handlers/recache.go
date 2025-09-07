@@ -38,7 +38,7 @@ func (h *RecacheHandler) Properties() registry.Properties {
 
 func (h *RecacheHandler) Execute(ctx *context.ButtonContext) {
 
-	if !utils.IsBotAdmin(ctx.UserId()) {
+	if !utils.IsBotHelper(ctx.UserId()) {
 		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
 	}
 
