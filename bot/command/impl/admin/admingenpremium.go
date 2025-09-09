@@ -13,6 +13,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/google/uuid"
 )
@@ -108,7 +109,14 @@ func (AdminGenPremiumCommand) Execute(ctx registry.CommandContext, skuIdRaw stri
 		return
 	}
 
-	ctx.ReplyPlainPermanent("Check your DMs")
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(
+		utils.BuildContainerRaw(
+			ctx,
+			customisation.Orange,
+			"Admin - Premium Key Generation",
+			fmt.Sprintf("Keys have been generated successfully and sent to your DMs.\n\n**SKU:** `%s`\n**Length:** `%d` days\n**Amount:** `%d`", sku.Label, length, amount),
+		),
+	)))
 }
 
 func (AdminGenPremiumCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
