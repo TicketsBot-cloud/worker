@@ -102,20 +102,8 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 			maxLength = utils.Ptr(uint32(*input.MaxLength))
 		}
 
-		description := input.Label
-
-		if input.Description != nil && *input.Description != "" {
-			description = *input.Description
-		}
-
-		// Discord requires a description if the label is over 45 characters
-		if len(description) > 45 && (input.Description == nil || *input.Description == "") {
-			description = description[:42] + "..."
-		}
-
-		components[i] = component.BuildLabel(component.Label{
-			Label:       input.Label,
-			Description: utils.Ptr(description),
+		label := component.Label{
+			Label: input.Label,
 			Component: component.BuildInputText(component.InputText{
 				Style:       component.TextStyleTypes(input.Style),
 				CustomId:    input.CustomId,
@@ -124,7 +112,14 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 				MaxLength:   maxLength,
 				Required:    utils.Ptr(input.Required),
 			}),
-		})
+		}
+
+		// Only set Description if it's not nil and not empty
+		if input.Description != nil && *input.Description != "" {
+			label.Description = input.Description
+		}
+
+		components[i] = component.BuildLabel(label)
 	}
 
 	return button.ResponseModal{
