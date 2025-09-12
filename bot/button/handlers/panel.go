@@ -78,10 +78,16 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 				return
 			}
 
+			inputOptions, err := dbclient.Client.FormInputOption.GetOptionsByForm(ctx, form.Id)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
 			if len(inputs) == 0 { // Don't open a blank form
 				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
 			} else {
-				modal := buildForm(panel, form, inputs)
+				modal := buildForm(panel, form, inputs, inputOptions)
 				ctx.Modal(modal)
 			}
 		}
@@ -90,28 +96,88 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 	}
 }
 
-func buildForm(panel database.Panel, form database.Form, inputs []database.FormInput) button.ResponseModal {
+func buildForm(panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) button.ResponseModal {
 	components := make([]component.Component, len(inputs))
 	for i, input := range inputs {
-		var minLength, maxLength *uint32
+		var minLength, maxLength *int
+		var minLength32, maxLength32 *uint32
 		if input.MinLength != nil && *input.MinLength > 0 {
-			minLength = utils.Ptr(uint32(*input.MinLength))
+			minLength = utils.Ptr(int(*input.MinLength))
+			minLength32 = utils.Ptr(uint32(*input.MinLength))
 		}
 
 		if input.MaxLength != nil {
-			maxLength = utils.Ptr(uint32(*input.MaxLength))
+			maxLength = utils.Ptr(int(*input.MaxLength))
+			maxLength32 = utils.Ptr(uint32(*input.MaxLength))
 		}
 
-		label := component.Label{
-			Label: input.Label,
-			Component: component.BuildInputText(component.InputText{
+		var innerComponent component.Component
+
+		options, ok := inputOptions[input.Id]
+		if !ok {
+			options = make([]database.FormInputOption, 0)
+		}
+
+		switch input.Type {
+		// String Select
+		case int(component.ComponentSelectMenu):
+			opts := make([]component.SelectOption, len(options))
+			for j, option := range options {
+				opts[j] = component.SelectOption{
+					Label:       option.Label,
+					Value:       option.Value,
+					Description: option.Description,
+				}
+			}
+			innerComponent = component.BuildSelectMenu(component.SelectMenu{
+				CustomId:  input.CustomId,
+				Options:   opts,
+				MinValues: minLength,
+				MaxValues: maxLength,
+			})
+		// Input Text
+		case 4:
+			innerComponent = component.BuildInputText(component.InputText{
 				Style:       component.TextStyleTypes(input.Style),
 				CustomId:    input.CustomId,
 				Placeholder: input.Placeholder,
-				MinLength:   minLength,
-				MaxLength:   maxLength,
+				MinLength:   minLength32,
+				MaxLength:   maxLength32,
 				Required:    utils.Ptr(input.Required),
-			}),
+			})
+		// User Select
+		case 5:
+			innerComponent = component.BuildUserSelect(component.UserSelect{
+				CustomId:  input.CustomId,
+				MinValues: minLength,
+				MaxValues: maxLength,
+			})
+		// Role Select
+		case 6:
+			innerComponent = component.BuildRoleSelect(component.RoleSelect{
+				CustomId:  input.CustomId,
+				MinValues: minLength,
+				MaxValues: maxLength,
+			})
+		// Mentionable Select
+		case 7:
+			innerComponent = component.BuildMentionableSelect(component.MentionableSelect{
+				CustomId:  input.CustomId,
+				MinValues: minLength,
+				MaxValues: maxLength,
+			})
+		// Channel Select
+		case 8:
+			innerComponent = component.BuildChannelSelect(component.ChannelSelect{
+				CustomId:  input.CustomId,
+				MinValues: minLength,
+				MaxValues: maxLength,
+			})
+		}
+
+		label := component.Label{
+			Label:     input.Label,
+			Component: innerComponent,
 		}
 
 		// Only set Description if it's not nil and not empty

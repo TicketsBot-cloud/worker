@@ -80,10 +80,16 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 				return
 			}
 
+			inputOptions, err := dbclient.Client.FormInputOption.GetOptionsByForm(ctx, form.Id)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
 			if len(inputs) == 0 { // Don't open a blank form
 				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
 			} else {
-				modal := buildForm(panel, form, inputs)
+				modal := buildForm(panel, form, inputs, inputOptions)
 				ctx.Modal(modal)
 			}
 		}
