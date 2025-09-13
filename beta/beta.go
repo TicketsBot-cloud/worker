@@ -10,7 +10,7 @@ import (
 type Feature string
 
 const (
-	FEATURE_COMPONENTS_V2_STATISTICS Feature = "components_v2_statistics"
+	FEATURE_COMPONENTS_V2_STATISTICS Feature = "COMPONENTS_V2_STATISTICS"
 )
 
 var BetaRolloutPercentages = map[Feature]int{
