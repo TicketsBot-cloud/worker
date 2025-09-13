@@ -14,12 +14,37 @@ func SnowflakeToTime(snowflake uint64) time.Time {
 func EscapeMarkdown(s string) string {
 	var builder strings.Builder
 	var inLink bool
+	var inMention bool
 
 	builder.Grow(len(s))
 
 	for i, c := range s {
 		if c == ' ' {
 			inLink = false
+		}
+
+		// Check if we're starting a Discord mention
+		// Mentions are: <@userId>, <@!userId>, <@&roleId>, <#channelId>
+		if c == '<' && i+1 < len(s) {
+			nextChar := rune(s[i+1])
+			if nextChar == '@' || nextChar == '#' {
+				inMention = true
+				builder.WriteRune(c)
+				continue
+			}
+		}
+
+		// Check if we're ending a Discord mention
+		if inMention && c == '>' {
+			inMention = false
+			builder.WriteRune(c)
+			continue
+		}
+
+		// Skip escaping if we're in a mention
+		if inMention {
+			builder.WriteRune(c)
+			continue
 		}
 
 		if !inLink {
