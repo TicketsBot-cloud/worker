@@ -3,12 +3,15 @@ package statistics
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/analytics-client"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/worker/beta"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -143,24 +146,87 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 
 	span = sentry.StartSpan(span.Context(), "Send Message")
 
-	msgEmbed := embed.NewEmbed().
-		SetTitle("Statistics").
-		SetColor(ctx.GetColour(customisation.Green)).
-		AddField("Total Tickets", strconv.FormatUint(totalTickets, 10), true).
-		AddField("Open Tickets", strconv.FormatUint(openTickets, 10), true).
-		AddBlankField(true).
-		AddField("Feedback Rating", fmt.Sprintf("%.1f / 5 ⭐", feedbackRating), true).
-		AddField("Feedback Count", strconv.FormatUint(feedbackCount, 10), true).
-		AddBlankField(true).
-		AddField("Average First Response Time (Total)", formatNullableTime(firstResponseTime.AllTime), true).
-		AddField("Average First Response Time (Monthly)", formatNullableTime(firstResponseTime.Monthly), true).
-		AddField("Average First Response Time (Weekly)", formatNullableTime(firstResponseTime.Weekly), true).
-		AddField("Average Ticket Duration (Total)", formatNullableTime(ticketDuration.AllTime), true).
-		AddField("Average Ticket Duration (Monthly)", formatNullableTime(ticketDuration.Monthly), true).
-		AddField("Average Ticket Duration (Weekly)", formatNullableTime(ticketDuration.Weekly), true).
-		AddField("Ticket Volume", fmt.Sprintf("```\n%s\n```", ticketVolumeTable), false)
+	if isBetaCandidate, err := beta.InBeta(ctx.GuildId(), 0); isBetaCandidate && err == nil {
+		guildData, err := ctx.Guild()
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
 
-	_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
+		mainStats := []string{
+			fmt.Sprintf("**Total Tickets**: %d", totalTickets),
+			fmt.Sprintf("**Open Tickets**: %d", openTickets),
+			fmt.Sprintf("**Feedback Rating**: %.1f / 5 ★", feedbackRating),
+			fmt.Sprintf("**Feedback Count**: %d", feedbackCount),
+		}
+
+		responseTimeStats := []string{
+			fmt.Sprintf("**Total**: %s", formatNullableTime(firstResponseTime.AllTime)),
+			fmt.Sprintf("**Monthly**: %s", formatNullableTime(firstResponseTime.Monthly)),
+			fmt.Sprintf("**Weekly**: %s", formatNullableTime(firstResponseTime.Weekly)),
+		}
+
+		ticketDurationStats := []string{
+			fmt.Sprintf("**Total**: %s", formatNullableTime(ticketDuration.AllTime)),
+			fmt.Sprintf("**Monthly**: %s", formatNullableTime(ticketDuration.Monthly)),
+			fmt.Sprintf("**Weekly**: %s", formatNullableTime(ticketDuration.Weekly)),
+		}
+
+		innerComponents := []component.Component{
+			component.BuildSection(component.Section{
+				Accessory: component.BuildThumbnail(component.Thumbnail{
+					Media: component.UnfurledMediaItem{
+						Url: guildData.IconUrl(),
+					},
+				}),
+				Components: []component.Component{
+					component.BuildTextDisplay(component.TextDisplay{Content: "## Server Ticket Statistics"}),
+					component.BuildTextDisplay(component.TextDisplay{
+						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+					}),
+				},
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Average Ticket Duration\n● %s", strings.Join(ticketDurationStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf(
+					"### Ticket Volume\n```\n%s\n```",
+					ticketVolumeTable,
+				),
+			}),
+		}
+
+		ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
+			Components: innerComponents,
+		}))))
+	} else {
+		msgEmbed := embed.NewEmbed().
+			SetTitle("Statistics").
+			SetColor(ctx.GetColour(customisation.Green)).
+			AddField("Total Tickets", strconv.FormatUint(totalTickets, 10), true).
+			AddField("Open Tickets", strconv.FormatUint(openTickets, 10), true).
+			AddBlankField(true).
+			AddField("Feedback Rating", fmt.Sprintf("%.1f / 5 ⭐", feedbackRating), true).
+			AddField("Feedback Count", strconv.FormatUint(feedbackCount, 10), true).
+			AddBlankField(true).
+			AddField("Average First Response Time (Total)", formatNullableTime(firstResponseTime.AllTime), true).
+			AddField("Average First Response Time (Monthly)", formatNullableTime(firstResponseTime.Monthly), true).
+			AddField("Average First Response Time (Weekly)", formatNullableTime(firstResponseTime.Weekly), true).
+			AddField("Average Ticket Duration (Total)", formatNullableTime(ticketDuration.AllTime), true).
+			AddField("Average Ticket Duration (Monthly)", formatNullableTime(ticketDuration.Monthly), true).
+			AddField("Average Ticket Duration (Weekly)", formatNullableTime(ticketDuration.Weekly), true).
+			AddField("Ticket Volume", fmt.Sprintf("```\n%s\n```", ticketVolumeTable), false)
+
+		_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
+	}
+
 	span.Finish()
 }
 
