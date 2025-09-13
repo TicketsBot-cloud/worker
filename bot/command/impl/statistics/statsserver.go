@@ -146,7 +146,7 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 
 	span = sentry.StartSpan(span.Context(), "Send Message")
 
-	if isBetaCandidate, err := beta.InBeta(ctx.GuildId(), 0); isBetaCandidate && err == nil {
+	if beta.InBeta(ctx.GuildId(), beta.FEATURE_COMPONENTS_V2_STATISTICS) {
 		guildData, err := ctx.Guild()
 		if err != nil {
 			ctx.HandleError(err)

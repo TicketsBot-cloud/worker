@@ -1,36 +1,41 @@
 package beta
 
 import (
-	"errors"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-func InBeta(guildId uint64, percentageRollout int) (bool, error) {
-	if percentageRollout < 0 || percentageRollout > 100 {
-		return false, errors.New("percentage rollout must be between 0 and 100")
-	}
+type Feature string
 
+const (
+	FEATURE_COMPONENTS_V2_STATISTICS Feature = "components_v2_statistics"
+)
+
+var BetaRolloutPercentages = map[Feature]int{
+	FEATURE_COMPONENTS_V2_STATISTICS: 0,
+}
+
+func InBeta(guildId uint64, feature Feature) bool {
 	if os.Getenv("ENABLE_ALL_BETA_FEATURES") == "true" {
-		return true, nil
+		return true
 	}
 
 	betaServers := strings.Split(os.Getenv("BETA_SERVERS"), ",")
 	if slices.Contains(betaServers, strconv.FormatUint(guildId, 10)) {
-		return true, nil
+		return true
 	}
 
 	// If rollout is 100%, everyone is in the beta
-	if percentageRollout == 100 {
-		return true, nil
+	if BetaRolloutPercentages[feature] == 100 {
+		return true
 	}
 
 	// If rollout is 0%, no one is in the beta
-	if percentageRollout == 0 {
-		return false, nil
+	if BetaRolloutPercentages[feature] == 0 {
+		return false
 	}
 
-	return guildId%100 <= uint64(percentageRollout), nil
+	return guildId%100 <= uint64(BetaRolloutPercentages[feature])
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/worker/beta"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -94,6 +95,14 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 	if err != nil {
 		ctx.HandleError(err)
 		return
+	}
+
+	featuresEnabled := []string{}
+
+	for feature := range beta.BetaRolloutPercentages {
+		if beta.InBeta(guild.Id, feature) {
+			featuresEnabled = append(featuresEnabled, string(feature))
+		}
 	}
 
 	var bInf application.Application
@@ -187,9 +196,16 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 	settingsInfo = append(settingsInfo, fmt.Sprintf("Data Imported: `%t`", hasDataRun))
 	settingsInfo = append(settingsInfo, fmt.Sprintf("Transcripts Imported: `%t`", hasTranscriptRun))
 
+	featuresMsg := ""
+
+	if len(featuresEnabled) > 0 {
+		featuresMsg = fmt.Sprintf("**Beta Features Enabled**\n- %s", strings.Join(featuresEnabled, "\n- "))
+	}
+
 	debugResponse := []string{
 		fmt.Sprintf("**Guild Info**\n- %s", strings.Join(guildInfo, "\n- ")),
 		fmt.Sprintf("**Settings**\n- %s", strings.Join(settingsInfo, "\n- ")),
+		featuresMsg,
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
