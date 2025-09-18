@@ -8,9 +8,9 @@ env:
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
     tags:
-      - '*'
+      - "*"
   workflow_dispatch:
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Determine image tag
         id: determine-tag
         run: |
@@ -79,7 +79,7 @@ jobs:
             await github.rest.actions.createWorkflowDispatch({
               owner: 'ticketsbot-cloud',
               repo: 'infra',
-              workflow_id: 'update-deployment.yaml',
+              workflow_id: 'update-deployment.yml',
               ref: 'main',
               inputs: {
                 deployment_name: 'worker',
