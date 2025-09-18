@@ -15,7 +15,7 @@ require (
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
 	github.com/TicketsBot-cloud/database v0.0.0-20250912194903-010a01ef7e90
-	github.com/TicketsBot-cloud/gdl v0.0.0-20250912194323-e3ba3b76ed84
+	github.com/TicketsBot-cloud/gdl v0.0.0-20250917180424-569348f7a55b
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0
