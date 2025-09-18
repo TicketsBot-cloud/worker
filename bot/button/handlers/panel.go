@@ -129,11 +129,13 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 					Description: option.Description,
 				}
 			}
+			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildSelectMenu(component.SelectMenu{
 				CustomId:  input.CustomId,
 				Options:   opts,
 				MinValues: minLength,
 				MaxValues: maxLength,
+				Required:  utils.Ptr(isRequired),
 			})
 		// Input Text
 		case 4:
@@ -147,31 +149,39 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 			})
 		// User Select
 		case 5:
+			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildUserSelect(component.UserSelect{
 				CustomId:  input.CustomId,
 				MinValues: minLength,
 				MaxValues: maxLength,
+				Required:  utils.Ptr(isRequired),
 			})
 		// Role Select
 		case 6:
+			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildRoleSelect(component.RoleSelect{
 				CustomId:  input.CustomId,
 				MinValues: minLength,
 				MaxValues: maxLength,
+				Required:  utils.Ptr(isRequired),
 			})
 		// Mentionable Select
 		case 7:
+			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildMentionableSelect(component.MentionableSelect{
 				CustomId:  input.CustomId,
 				MinValues: minLength,
 				MaxValues: maxLength,
+				Required:  utils.Ptr(isRequired),
 			})
 		// Channel Select
 		case 8:
+			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildChannelSelect(component.ChannelSelect{
 				CustomId:  input.CustomId,
 				MinValues: minLength,
 				MaxValues: maxLength,
+				Required:  utils.Ptr(isRequired),
 			})
 		}
 
