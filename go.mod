@@ -6,11 +6,11 @@ toolchain go1.24.2
 
 // replace github.com/TicketsBot-cloud/database => ../database
 
-replace github.com/TicketsBot-cloud/gdl => ../gdl
+//replace github.com/TicketsBot-cloud/gdl => ../gdl
 
-replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
+//replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
 
-replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
+//replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
 require (
 	cloud.google.com/go/profiler v0.4.2
@@ -52,6 +52,7 @@ require (
 	github.com/ClickHouse/ch-go v0.66.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.36.0 // indirect
 	github.com/TicketsBot-cloud/logarchiver v0.0.0-20250514201320-d5141071a6eb // indirect
+	github.com/TicketsBot/common v0.0.0-20240613013221-1e27eb8bfe37 // indirect
 	github.com/TicketsBot/ttlcache v1.6.1-0.20200405150101-acc18e37b261 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
