@@ -70,3 +70,19 @@ jobs:
       - name: Log image name
         run: |
           echo "Image URI: ${IMAGE_NAME}"
+
+      - name: Trigger deployment update
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.DEPLOYMENT_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'ticketsbot-cloud',
+              repo: 'infra',
+              workflow_id: 'update-deployment.yaml',
+              ref: 'main',
+              inputs: {
+                deployment_name: 'worker',
+                image_sha: '${{ github.sha }}'
+              }
+            })
