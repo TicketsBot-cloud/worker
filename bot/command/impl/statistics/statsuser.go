@@ -10,12 +10,12 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/worker/beta"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/experiments"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/getsentry/sentry-go"
 	"golang.org/x/sync/errgroup"
@@ -278,7 +278,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		span := sentry.StartSpan(span.Context(), "Reply")
 
-		if beta.InBeta(ctx.GuildId(), beta.FEATURE_COMPONENTS_V2_STATISTICS) {
+		if experiments.HasFeature(ctx, ctx.GuildId(), experiments.COMPONENTS_V2_STATISTICS) {
 			userData, err := ctx.Worker().GetUser(userId)
 			if err != nil {
 				ctx.HandleError(err)

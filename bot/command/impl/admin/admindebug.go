@@ -12,12 +12,12 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
-	"github.com/TicketsBot-cloud/worker/beta"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/experiments"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -99,8 +99,9 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 
 	featuresEnabled := []string{}
 
-	for feature := range beta.BetaRolloutPercentages {
-		if beta.InBeta(guild.Id, feature) {
+	for i := range experiments.List {
+		feature := experiments.List[i]
+		if experiments.HasFeature(ctx, guild.Id, feature) {
 			featuresEnabled = append(featuresEnabled, string(feature))
 		}
 	}
@@ -199,7 +200,7 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 	featuresMsg := ""
 
 	if len(featuresEnabled) > 0 {
-		featuresMsg = fmt.Sprintf("**Beta Features Enabled**\n- %s", strings.Join(featuresEnabled, "\n- "))
+		featuresMsg = fmt.Sprintf("**Experiments Enabled**\n- %s", strings.Join(featuresEnabled, "\n- "))
 	}
 
 	debugResponse := []string{
