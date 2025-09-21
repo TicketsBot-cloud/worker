@@ -112,6 +112,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 				if errors.As(err, &restError) && restError.StatusCode == http.StatusTooManyRequests {
 					if retries < 5 {
 						retries++
+						time.Sleep(time.Duration(retries*2) * time.Second)
 						continue
 					}
 				}
