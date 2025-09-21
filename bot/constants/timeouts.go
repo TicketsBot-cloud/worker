@@ -3,6 +3,6 @@ package constants
 import "time"
 
 const (
-	TimeoutCloseTicket = time.Second * 15
+	TimeoutCloseTicket = time.Minute * 1
 	TimeoutOpenTicket  = time.Second * 22
 )
