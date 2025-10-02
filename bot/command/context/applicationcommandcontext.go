@@ -2,7 +2,6 @@ package context
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
@@ -90,7 +89,7 @@ func (c *SlashCommandContext) UserId() uint64 {
 
 func (c *SlashCommandContext) UserPermissionLevel(ctx context.Context) (permcache.PermissionLevel, error) {
 	if c.Interaction.Member == nil {
-		return permcache.Everyone, errors.New("member was nil")
+		return permcache.Everyone, nil
 	}
 
 	return permcache.GetPermissionLevel(ctx, utils.ToRetriever(c.worker), *c.Interaction.Member, c.GuildId())
@@ -111,7 +110,7 @@ func (c *SlashCommandContext) Source() registry.Source {
 func (c *SlashCommandContext) ToErrorContext() errorcontext.WorkerErrorContext {
 	return errorcontext.WorkerErrorContext{
 		Guild:   c.GuildId(),
-		User:    c.Interaction.Member.User.Id,
+		User:    c.UserId(),
 		Channel: c.ChannelId(),
 	}
 }
@@ -166,6 +165,10 @@ func (c *SlashCommandContext) User() (user.User, error) {
 }
 
 func (c *SlashCommandContext) IsBlacklisted(ctx context.Context) (bool, error) {
+	if c.GuildId() == 0 {
+		return false, nil
+	}
+
 	permLevel, err := c.UserPermissionLevel(ctx)
 	if err != nil {
 		return false, err

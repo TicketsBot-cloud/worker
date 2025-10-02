@@ -36,14 +36,6 @@ func executeCommand(
 	data interaction.ApplicationCommandInteraction,
 	responseCh chan interaction.ApplicationCommandCallbackData,
 ) (bool, error) {
-	// data.Member is needed for permission level lookup
-	if data.GuildId.Value == 0 || data.Member == nil {
-		responseCh <- interaction.ApplicationCommandCallbackData{
-			Content: "Commands in DMs are not currently supported. Please run this command in a server.",
-		}
-		return false, nil
-	}
-
 	cmd, ok := registry[data.Data.Name]
 	if !ok {
 		// If a registered command is not found, check for a tag alias
@@ -84,6 +76,46 @@ func executeCommand(
 
 	properties := cmd.Properties()
 
+	// Determine the current interaction context
+	var currentContext interaction.InteractionContextType
+	if data.GuildId.Value == 0 || data.Member == nil {
+		currentContext = interaction.InteractionContextBotDM
+	} else {
+		currentContext = interaction.InteractionContextGuild
+	}
+
+	// Check if command has Contexts specified
+	if len(properties.Contexts) > 0 {
+		// Check if the current context is allowed
+		allowed := false
+		for _, ctx := range properties.Contexts {
+			if ctx == currentContext {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			if currentContext == interaction.InteractionContextBotDM {
+				responseCh <- interaction.ApplicationCommandCallbackData{
+					Content: "This command can only be used in servers.",
+				}
+			} else {
+				responseCh <- interaction.ApplicationCommandCallbackData{
+					Content: "This command can only be used in DMs.",
+				}
+			}
+			return false, nil
+		}
+	} else {
+		if currentContext == interaction.InteractionContextBotDM {
+			responseCh <- interaction.ApplicationCommandCallbackData{
+				Content: "This command can only be used in servers.",
+			}
+			return false, nil
+		}
+	}
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -92,45 +124,46 @@ func executeCommand(
 			}
 		}()
 
+		var premiumLevel = premium.None
+		var permLevel = permission.Everyone
+
 		lookupCtx, cancelLookupCtx := context.WithTimeout(ctx, time.Second*2)
 		defer cancelLookupCtx()
 
-		// Parallelise queries
-		group, _ := errgroup.WithContext(lookupCtx)
+		if data.GuildId.Value != 0 && data.Member != nil {
 
-		// Get premium level
-		var premiumLevel = premium.None
-		group.Go(func() error {
-			tier, err := utils.PremiumClient.GetTierByGuildId(lookupCtx, data.GuildId.Value, true, worker.Token, worker.RateLimiter)
-			if err != nil {
-				// TODO: Better error handling
-				// But do not hard fail, as Patreon / premium proxy may be experiencing some issues
-				sentry.Error(err)
-			} else {
-				premiumLevel = tier
+			group, _ := errgroup.WithContext(lookupCtx)
+
+			group.Go(func() error {
+				tier, err := utils.PremiumClient.GetTierByGuildId(lookupCtx, data.GuildId.Value, true, worker.Token, worker.RateLimiter)
+				if err != nil {
+					// TODO: Better error handling
+					// But do not hard fail, as Patreon / premium proxy may be experiencing some issues
+					sentry.Error(err)
+				} else {
+					premiumLevel = tier
+				}
+
+				return nil
+			})
+
+			group.Go(func() error {
+				res, err := permission.GetPermissionLevel(lookupCtx, utils.ToRetriever(worker), *data.Member, data.GuildId.Value)
+				if err != nil {
+					return err
+				}
+
+				permLevel = res
+				return nil
+			})
+
+			if err := group.Wait(); err != nil {
+				errorId := sentry.Error(err)
+				responseCh <- interaction.ApplicationCommandCallbackData{
+					Content: fmt.Sprintf("An error occurred while processing this request (Error ID `%s`)", errorId),
+				}
+				return
 			}
-
-			return nil
-		})
-
-		// Get permission level
-		var permLevel = permission.Everyone
-		group.Go(func() error {
-			res, err := permission.GetPermissionLevel(lookupCtx, utils.ToRetriever(worker), *data.Member, data.GuildId.Value)
-			if err != nil {
-				return err
-			}
-
-			permLevel = res
-			return nil
-		})
-
-		if err := group.Wait(); err != nil {
-			errorId := sentry.Error(err)
-			responseCh <- interaction.ApplicationCommandCallbackData{
-				Content: fmt.Sprintf("An error occurred while processing this request (Error ID `%s`)", errorId),
-			}
-			return
 		}
 
 		if premiumLevel == premium.None && config.Conf.PremiumOnly {
@@ -143,7 +176,7 @@ func executeCommand(
 		interactionContext := cmdcontext.NewSlashCommandContext(ctx, worker, data, premiumLevel, responseCh)
 
 		// Check if the guild is globally blacklisted
-		if blacklist.IsGuildBlacklisted(data.GuildId.Value) {
+		if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
 			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
 			return
 		}

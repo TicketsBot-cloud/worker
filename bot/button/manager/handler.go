@@ -161,13 +161,8 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 }
 
 func getPremiumTier(ctx context.Context, worker *worker.Context, guildId uint64) (premium.PremiumTier, error) {
-	// Psuedo premium if DM command
 	if guildId == 0 {
-		if worker.IsWhitelabel {
-			return premium.Whitelabel, nil
-		} else {
-			return premium.Premium, nil
-		}
+		return premium.None, nil
 	} else {
 		premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, guildId, true, worker.Token, worker.RateLimiter)
 		if err != nil {

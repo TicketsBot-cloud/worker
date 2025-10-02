@@ -24,6 +24,7 @@ func (AboutCommand) Properties() registry.Properties {
 		MainBotOnly:      true,
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 3,
+		Contexts: 	      []interaction.InteractionContextType{interaction.InteractionContextGuild,interaction.InteractionContextBotDM},
 	}
 }
 
