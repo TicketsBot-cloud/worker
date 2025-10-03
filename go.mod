@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.2
 
-replace github.com/TicketsBot-cloud/database => ../database
+//replace github.com/TicketsBot-cloud/database => ../database
 
 //replace github.com/TicketsBot-cloud/gdl => ../gdl
 
@@ -17,7 +17,7 @@ require (
 	github.com/TicketsBot-cloud/analytics-client v0.0.0-20250604180646-6606dfc8fc8c
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
-	github.com/TicketsBot-cloud/database v0.0.0-20250918212912-4cc263bc1b41
+	github.com/TicketsBot-cloud/database v0.0.0-20251003132259-ad2293c1fd51
 	github.com/TicketsBot-cloud/gdl v0.0.0-20250917180424-569348f7a55b
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
