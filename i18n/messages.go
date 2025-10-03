@@ -93,6 +93,7 @@ var (
 	MessageOpenRatelimited               MessageId = "open.ratelimited"
 	MessageOpenPanelForceDisabled        MessageId = "open.panel_force_disabled"
 	MessageOpenPanelDisabled             MessageId = "open.panel_disabled"
+	MessageOutsideSupportHours           MessageId = "open.outside_support_hours"
 	MessageTicketOpened                  MessageId = "open.success"
 
 	MessageOpenAclNoAllowRules           MessageId = "open.acl.no_allow_rules"

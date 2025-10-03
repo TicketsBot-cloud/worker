@@ -49,6 +49,26 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 			return
 		}
 
+		// Check support hours
+		hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if hasSupportHours {
+			isActive, err := dbclient.Client.PanelSupportHours.IsActiveNow(ctx, panel.PanelId)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			if !isActive {
+				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOutsideSupportHours)
+				return
+			}
+		}
+
 		// blacklist check
 		blacklisted, err := ctx.IsBlacklisted(ctx)
 		if err != nil {
