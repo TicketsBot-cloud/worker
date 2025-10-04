@@ -310,4 +310,5 @@ var (
 	HelpSwitchPanel        MessageId = "help.switch_panel"
 	HelpJumpToTop          MessageId = "help.jump_to_top"
 	HelpOnCall             MessageId = "help.on_call"
+	HelpGdpr               MessageId = "help.gdpr"
 )

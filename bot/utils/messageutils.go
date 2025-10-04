@@ -32,7 +32,7 @@ func BuildEmbed(
 		msgEmbed.AddField(field.Name, field.Value, field.Inline)
 	}
 
-	if ctx.PremiumTier() == premium.None {
+	if ctx.PremiumTier() == premium.None && !ctx.Worker().IsWhitelabel {
 		msgEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 	}
 

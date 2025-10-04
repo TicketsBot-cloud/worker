@@ -260,6 +260,9 @@ func callCommand(
 	case general.AboutCommand:
 
 		v.Execute(ctx)
+	case general.GDPRCommand:
+
+		v.Execute(ctx)
 	case general.HelpCommand:
 
 		v.Execute(ctx)
