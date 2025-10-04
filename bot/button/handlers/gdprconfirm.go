@@ -68,7 +68,7 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 		serverLabel = "Server IDs"
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** %s\n**%s:** %s\n\nYour request has been queued for processing.\nProcessing may take some time depending on the number of transcripts.\n\n-# **Note:** For large requests that take more than 15 minutes, this message may not update automatically. Your request will still be processed.",
+	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** %s\n**%s:** %s\n\nYour request has been queued for processing.\nProcessing may take some time depending on the number of transcripts.",
 		requestTypeText, serverLabel, strings.Join(guildIdStrs, ", "))
 	components := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: content})}
 	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, "GDPR Request Queued", components)
@@ -135,7 +135,7 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 		ticketIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete specific transcripts\n**Server ID:** %d\n**Ticket IDs:** %s\n\nYour request has been queued for processing.\nProcessing may take some time.\n\n-# **Note:** For large requests that take more than 15 minutes, this message may not update automatically. Your request will still be processed.",
+	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete specific transcripts\n**Server ID:** %d\n**Ticket IDs:** %s\n\nYour request has been queued for processing.\nProcessing may take some time.",
 		guildId, strings.Join(ticketIdStrs, ", "))
 	components := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: content})}
 	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, "GDPR Request Queued", components)
@@ -171,7 +171,7 @@ func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		return
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete all messages from your account\n**User ID:** %d\n\nYour request has been queued for processing.\nThis will anonymize your messages in all transcripts where you participated.\nProcessing may take some time depending on the number of tickets.\n\n-# **Note:** For large requests that take more than 15 minutes, this message may not update automatically. Your request will still be processed.",
+	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete all messages from your account\n**User ID:** %d\n\nYour request has been queued for processing.\nThis will anonymize your messages in all transcripts where you participated.\nProcessing may take some time depending on the number of tickets.",
 		userId)
 	components := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
@@ -243,7 +243,7 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		ticketIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete messages in specific tickets\n**Server ID:** %d\n**Ticket IDs:** %s\n\nYour request has been queued for processing.\nThis will anonymize your messages in the specified transcripts.\nProcessing may take some time.\n\n-# **Note:** For large requests that take more than 15 minutes, this message may not update automatically. Your request will still be processed.",
+	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete messages in specific tickets\n**Server ID:** %d\n**Ticket IDs:** %s\n\nYour request has been queued for processing.\nThis will anonymize your messages in the specified transcripts.\nProcessing may take some time.",
 		guildId, strings.Join(ticketIdStrs, ", "))
 	components := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
