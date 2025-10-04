@@ -2,7 +2,11 @@ package gdprrelay
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -26,12 +30,34 @@ type GDPRRequest struct {
 	ApplicationId      uint64      `json:"application_id,omitempty"`
 }
 
-const key = "tickets:gdpr"
+type QueuedRequest struct {
+	Request       GDPRRequest `json:"request"`
+	QueuedAt      time.Time   `json:"queued_at"`
+	RetryCount    int         `json:"retry_count"`
+	LastAttemptAt time.Time   `json:"last_attempt_at,omitempty"`
+	RequestID     string      `json:"request_id"`
+}
+
+const keyPending = "tickets:gdpr:pending"
 
 func Publish(redisClient *redis.Client, data GDPRRequest) error {
-	marshalled, err := json.Marshal(data)
-	if err != nil {
-		return err
+	queued := QueuedRequest{
+		Request:    data,
+		QueuedAt:   time.Now(),
+		RetryCount: 0,
+		RequestID:  generateRequestID(),
 	}
-	return redisClient.RPush(context.Background(), key, string(marshalled)).Err()
+
+	marshalled, err := json.Marshal(queued)
+	if err != nil {
+		return fmt.Errorf("failed to marshal GDPR request: %w", err)
+	}
+
+	return redisClient.LPush(context.Background(), keyPending, string(marshalled)).Err()
+}
+
+func generateRequestID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
 }
