@@ -55,12 +55,16 @@ func (AdminCheckPremiumCommand) Execute(ctx registry.CommandContext, raw string)
 		return
 	}
 
+	sourceFormatted := string(src)
+	if sourceFormatted == "" {
+		sourceFormatted = "None"
+	}
 	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(
 		utils.BuildContainerRaw(
 			ctx,
 			customisation.Orange,
 			"Admin - Premium Check",
-			fmt.Sprintf("**Server Name:** `%s`\n**Owner:** <@%d> `%d`\n**Premium Tier:** `%s`\n**Premium Source:** `%s`", guild.Name, guild.OwnerId, guild.OwnerId, tier.String(), src),
+			fmt.Sprintf("**Server Name:** `%s`\n**Owner:** <@%d> `%d`\n**Premium Tier:** `%s`\n**Premium Source:** `%s`", guild.Name, guild.OwnerId, guild.OwnerId, tier.String(), sourceFormatted),
 		),
 	)))
 }
