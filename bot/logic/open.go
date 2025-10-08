@@ -27,6 +27,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
+	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -321,7 +322,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 	} else {
 		span = sentry.StartSpan(rootSpan.Context(), "Build permission overwrites")
-		overwrites, err := CreateOverwrites(ctx, cmd, cmd.UserId(), panel)
+		overwrites, err := CreateOverwrites(ctx, cmd, cmd.UserId(), panel, category)
 		if err != nil {
 			cmd.HandleError(err)
 			return database.Ticket{}, err
@@ -764,7 +765,7 @@ func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int,
 	return nil
 }
 
-func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, userId uint64, panel *database.Panel, otherUsers ...uint64) ([]channel.PermissionOverwrite, error) {
+func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, userId uint64, panel *database.Panel, categoryId uint64, otherUsers ...uint64) ([]channel.PermissionOverwrite, error) {
 	overwrites := []channel.PermissionOverwrite{ // @everyone
 		{
 			Id:    cmd.GuildId(),
@@ -786,11 +787,31 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	}
 
 	// Add the bot to the overwrites
-	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+1)
+	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+2)
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
-	if permission.HasPermissionRaw(cmd.InteractionMetadata().AppPermissions, permission.ManageWebhooks) {
-		selfAllow = append(selfAllow, permission.ManageWebhooks, permission.ManageChannels)
+	// Check if category or channel
+	var checkChannelId uint64
+	if categoryId != 0 {
+		checkChannelId = categoryId
+	}
+
+	if checkChannelId != 0 {
+		// Check permissions in the category
+		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.ManageChannels) {
+			selfAllow = append(selfAllow, permission.ManageChannels)
+		}
+		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.ManageWebhooks) {
+			selfAllow = append(selfAllow, permission.ManageWebhooks)
+		}
+	} else {
+		// Check guild-wide permissions
+		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageChannels) {
+			selfAllow = append(selfAllow, permission.ManageChannels)
+		}
+		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageWebhooks) {
+			selfAllow = append(selfAllow, permission.ManageWebhooks)
+		}
 	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
