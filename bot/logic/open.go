@@ -790,7 +790,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
 	if permission.HasPermissionRaw(cmd.InteractionMetadata().AppPermissions, permission.ManageWebhooks) {
-		selfAllow = append(selfAllow, permission.ManageWebhooks)
+		selfAllow = append(selfAllow, permission.ManageWebhooks, permission.ManageChannels)
 	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
