@@ -725,9 +725,10 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
-	// TODO: Re-add permission check
-	//if permission.HasPermissionsChannel(ctx.Shard, ctx.GuildId, ctx.Shard.SelfId(), channelId, permission.ManageWebhooks) { // Do we actually need this?
-	root := sentry.StartSpan(ctx, "Create webhook")
+	// Check if bot has ManageWebhooks permission in the channel before attempting to create
+	if !permissionwrapper.HasPermissionsChannel(c.Worker(), guildId, c.Worker().BotId, channelId, permission.ManageWebhooks) {
+		return nil // Silently skip webhook creation if no permission
+	}
 	defer root.Finish()
 
 	span := sentry.StartSpan(root.Context(), "Get bot user")
