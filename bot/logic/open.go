@@ -790,7 +790,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+2)
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
-	// Check if category or channel
+	// Check bot's permissions in the target category (or guild if no category)
 	var checkChannelId uint64
 	if categoryId != 0 {
 		checkChannelId = categoryId
