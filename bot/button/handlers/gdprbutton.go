@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
@@ -9,6 +11,8 @@ import (
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 func gdprProperties() registry.Properties {
@@ -21,7 +25,9 @@ func gdprProperties() registry.Properties {
 type GDPRAllTranscriptsHandler struct{}
 
 func (h *GDPRAllTranscriptsHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_all_transcripts")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_all_transcripts_")
+	})
 }
 
 func (h *GDPRAllTranscriptsHandler) Properties() registry.Properties {
@@ -29,13 +35,16 @@ func (h *GDPRAllTranscriptsHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
-	handleTranscriptRequest(ctx, true)
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
+	handleTranscriptRequest(ctx, locale, true)
 }
 
 type GDPRSpecificTranscriptsHandler struct{}
 
 func (h *GDPRSpecificTranscriptsHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_specific_transcripts")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_specific_transcripts_")
+	})
 }
 
 func (h *GDPRSpecificTranscriptsHandler) Properties() registry.Properties {
@@ -43,13 +52,16 @@ func (h *GDPRSpecificTranscriptsHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
-	handleTranscriptRequest(ctx, false)
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
+	handleTranscriptRequest(ctx, locale, false)
 }
 
 type GDPRAllMessagesHandler struct{}
 
 func (h *GDPRAllMessagesHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_all_messages")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_all_messages_")
+	})
 }
 
 func (h *GDPRAllMessagesHandler) Properties() registry.Properties {
@@ -57,7 +69,8 @@ func (h *GDPRAllMessagesHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
-	components := buildAllMessagesConfirmationComponents(ctx, ctx.UserId())
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
+	components := buildAllMessagesConfirmationComponents(ctx, locale, ctx.UserId())
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 	}
@@ -66,7 +79,9 @@ func (h *GDPRAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 type GDPRSpecificMessagesHandler struct{}
 
 func (h *GDPRSpecificMessagesHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_specific_messages")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_specific_messages_")
+	})
 }
 
 func (h *GDPRSpecificMessagesHandler) Properties() registry.Properties {
@@ -74,10 +89,11 @@ func (h *GDPRSpecificMessagesHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRSpecificMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
-	ctx.Modal(button.ResponseModal{Data: buildSpecificMessagesModal()})
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
+	ctx.Modal(button.ResponseModal{Data: buildSpecificMessagesModal(locale)})
 }
 
-func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, isAllTranscripts bool) {
+func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, isAllTranscripts bool) {
 	guilds, err := getOwnedGuildsWithTranscripts(ctx, ctx.UserId())
 	if err != nil {
 		ctx.HandleError(err)
@@ -85,15 +101,15 @@ func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, isAllTranscripts boo
 	}
 
 	if len(guilds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "No servers found where you are the owner and have transcripts.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNoServers))
 		return
 	}
 
 	var modal interaction.ModalResponseData
 	if isAllTranscripts {
-		modal = buildAllTranscriptsModal(guilds)
+		modal = buildAllTranscriptsModal(locale, guilds)
 	} else {
-		modal = buildSpecificTranscriptsModal(guilds)
+		modal = buildSpecificTranscriptsModal(locale, guilds)
 	}
 
 	ctx.Modal(button.ResponseModal{Data: modal})

@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type guildInfo struct {
@@ -125,7 +126,7 @@ func buildGuildSelectOptions(guilds []guildInfo) []component.SelectOption {
 	return options
 }
 
-func buildAllTranscriptsModal(guilds []guildInfo) interaction.ModalResponseData {
+func buildAllTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
 	options := buildGuildSelectOptions(guilds)
 	minVal, maxVal := 1, len(options)
 	if maxVal > 25 {
@@ -133,14 +134,14 @@ func buildAllTranscriptsModal(guilds []guildInfo) interaction.ModalResponseData 
 	}
 
 	return interaction.ModalResponseData{
-		CustomId: "gdpr_modal_all_transcripts",
-		Title:    "Delete All Transcripts from Servers",
+		CustomId: fmt.Sprintf("gdpr_modal_all_transcripts_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalAllTranscriptsTitle),
 		Components: []component.Component{
 			component.BuildLabel(component.Label{
-				Label: "Select Server(s)",
+				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
 				Component: component.BuildSelectMenu(component.SelectMenu{
 					CustomId:    "server_ids",
-					Placeholder: "Select one or more servers",
+					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
 					MinValues:   &minVal,
 					MaxValues:   &maxVal,
 					Options:     options,
@@ -150,30 +151,30 @@ func buildAllTranscriptsModal(guilds []guildInfo) interaction.ModalResponseData 
 	}
 }
 
-func buildSpecificTranscriptsModal(guilds []guildInfo) interaction.ModalResponseData {
+func buildSpecificTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
 	options := buildGuildSelectOptions(guilds)
 	minVal, maxVal := 1, 1
 
 	return interaction.ModalResponseData{
-		CustomId: "gdpr_modal_specific_transcripts",
-		Title:    "Delete Specific Transcripts",
+		CustomId: fmt.Sprintf("gdpr_modal_specific_transcripts_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificTranscriptsTitle),
 		Components: []component.Component{
 			component.BuildLabel(component.Label{
-				Label: "Select Server",
+				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
 				Component: component.BuildSelectMenu(component.SelectMenu{
 					CustomId:    "server_id",
-					Placeholder: "Select a server",
+					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
 					MinValues:   &minVal,
 					MaxValues:   &maxVal,
 					Options:     options,
 				}),
 			}),
 			component.BuildLabel(component.Label{
-				Label: "Ticket IDs",
+				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
 				Component: component.BuildInputText(component.InputText{
 					CustomId:    "ticket_ids",
 					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr("Enter ticket IDs separated by commas (e.g., 123, 456, 789)"),
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
 					Required:    utils.Ptr(true),
 					MinLength:   utils.Ptr(uint32(1)),
 					MaxLength:   utils.Ptr(uint32(1000)),
@@ -183,28 +184,28 @@ func buildSpecificTranscriptsModal(guilds []guildInfo) interaction.ModalResponse
 	}
 }
 
-func buildSpecificMessagesModal() interaction.ModalResponseData {
+func buildSpecificMessagesModal(locale *i18n.Locale) interaction.ModalResponseData {
 	return interaction.ModalResponseData{
-		CustomId: "gdpr_modal_specific_messages",
-		Title:    "Delete Messages in Specific Tickets",
+		CustomId: fmt.Sprintf("gdpr_modal_specific_messages_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificMessagesTitle),
 		Components: []component.Component{
 			component.BuildLabel(component.Label{
-				Label: "Server ID",
+				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdLabel),
 				Component: component.BuildInputText(component.InputText{
 					CustomId:    "server_id",
 					Style:       component.TextStyleShort,
-					Placeholder: utils.Ptr("Enter the server ID"),
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdPlaceholder)),
 					Required:    utils.Ptr(true),
 					MinLength:   utils.Ptr(uint32(17)),
 					MaxLength:   utils.Ptr(uint32(20)),
 				}),
 			}),
 			component.BuildLabel(component.Label{
-				Label: "Ticket IDs",
+				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
 				Component: component.BuildInputText(component.InputText{
 					CustomId:    "ticket_ids",
 					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr("Enter ticket IDs separated by commas (e.g., 123, 456, 789)"),
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
 					Required:    utils.Ptr(true),
 					MinLength:   utils.Ptr(uint32(1)),
 					MaxLength:   utils.Ptr(uint32(1000)),
@@ -217,7 +218,9 @@ func buildSpecificMessagesModal() interaction.ModalResponseData {
 type GDPRModalAllTranscriptsHandler struct{}
 
 func (h *GDPRModalAllTranscriptsHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_modal_all_transcripts")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_modal_all_transcripts_")
+	})
 }
 
 func (h *GDPRModalAllTranscriptsHandler) Properties() registry.Properties {
@@ -228,6 +231,7 @@ func (h *GDPRModalAllTranscriptsHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
 	var serverIds []string
@@ -253,7 +257,7 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	}
 
 	if len(serverIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "No servers selected.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
@@ -276,7 +280,7 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	}
 
 	if len(validGuildIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "You must be the server owner to delete transcripts.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
 		return
 	}
 
@@ -287,10 +291,11 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 		UserId:          userId,
 		GuildIds:        validGuildIds,
 		GuildNames:      serverNames,
-		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_all_transcripts_%s", guildIdsStr),
+		Locale:          locale,
+		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_all_transcripts_%s_%s", guildIdsStr, locale.IsoShortCode),
 	}
 
-	components := buildGDPRConfirmationView(ctx, data)
+	components := buildGDPRConfirmationView(ctx, locale, data)
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 	}
@@ -299,7 +304,9 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 type GDPRModalSpecificTranscriptsHandler struct{}
 
 func (h *GDPRModalSpecificTranscriptsHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_modal_specific_transcripts")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_modal_specific_transcripts_")
+	})
 }
 
 func (h *GDPRModalSpecificTranscriptsHandler) Properties() registry.Properties {
@@ -310,6 +317,7 @@ func (h *GDPRModalSpecificTranscriptsHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
 	var serverId string
@@ -341,19 +349,19 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 
 	guildId, err := strconv.ParseUint(serverId, 10, 64)
 	if err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid server ID provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
 	ticketIdList := utils.ParseTicketIds(ticketIds)
 	if len(ticketIdList) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid ticket IDs provided. Please enter numeric ticket IDs separated by commas (e.g., 123, 456, 789).")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIds))
 		return
 	}
 
 	guild, err := ctx.Worker().GetGuild(guildId)
 	if err != nil || guild.OwnerId != userId {
-		ctx.ReplyRaw(customisation.Red, "Error", "You must be the server owner to delete transcripts.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
 		return
 	}
 
@@ -369,10 +377,11 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 		GuildNames:      []string{fmt.Sprintf("%s (ID: %d)", guild.Name, guildId)},
 		TicketIds:       ticketIdList,
 		TicketIdsStr:    ticketIds,
-		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_specific_%d_%s", guildId, strings.Join(ticketIdStrs, "_")),
+		Locale:          locale,
+		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_specific_%d_%s_%s", guildId, strings.Join(ticketIdStrs, "_"), locale.IsoShortCode),
 	}
 
-	components := buildGDPRConfirmationView(ctx, data)
+	components := buildGDPRConfirmationView(ctx, locale, data)
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 	}
@@ -381,7 +390,9 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 type GDPRModalSpecificMessagesHandler struct{}
 
 func (h *GDPRModalSpecificMessagesHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_modal_specific_messages")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_modal_specific_messages_")
+	})
 }
 
 func (h *GDPRModalSpecificMessagesHandler) Properties() registry.Properties {
@@ -392,6 +403,7 @@ func (h *GDPRModalSpecificMessagesHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
 	serverId, _ := ctx.GetInput("server_id")
@@ -399,19 +411,19 @@ func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 
 	guildId, err := strconv.ParseUint(serverId, 10, 64)
 	if err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid server ID provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
 	ticketIdList := utils.ParseTicketIds(ticketIds)
 	if len(ticketIdList) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid ticket IDs provided. Please enter numeric ticket IDs separated by commas (e.g., 123, 456, 789).")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIds))
 		return
 	}
 
 	guild, err := ctx.Worker().GetGuild(guildId)
 	if err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Server not found.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorServerNotFound))
 		return
 	}
 
@@ -425,10 +437,11 @@ func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 		GuildNames:      []string{fmt.Sprintf("%s (ID: %d)", guild.Name, guildId)},
 		TicketIds:       ticketIdList,
 		TicketIdsStr:    ticketIds,
-		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_messages_%d_%s", guildId, ticketIdsEncoded),
+		Locale:          locale,
+		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_messages_%d_%s_%s", guildId, ticketIdsEncoded, locale.IsoShortCode),
 	}
 
-	components := buildGDPRConfirmationView(ctx, data)
+	components := buildGDPRConfirmationView(ctx, locale, data)
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
 		ctx.HandleError(err)
 	}

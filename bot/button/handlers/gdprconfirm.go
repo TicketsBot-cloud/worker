@@ -15,6 +15,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type GDPRConfirmAllTranscriptsHandler struct{}
@@ -33,9 +34,10 @@ func (h *GDPRConfirmAllTranscriptsHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 	guildIds := utils.ParseGuildIds(ctx.InteractionData.CustomId)
 	if len(guildIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid server ID provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
@@ -43,13 +45,14 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 		Type:               gdprrelay.RequestTypeAllTranscripts,
 		UserId:             ctx.UserId(),
 		GuildIds:           guildIds,
+		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
 	if err := gdprrelay.Publish(redis.Client, request); err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Failed to queue GDPR request. Please try again later.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
 
@@ -58,20 +61,17 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 		guildIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	var requestTypeText string
-	var serverLabel string
+	var content string
 	if len(guildIds) == 1 {
-		requestTypeText = "Delete all transcripts from server"
-		serverLabel = "Server ID"
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllTranscripts, strings.Join(guildIdStrs, ", "))
 	} else {
-		requestTypeText = "Delete all transcripts from servers"
-		serverLabel = "Server IDs"
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllTranscriptsMulti, strings.Join(guildIdStrs, ", "))
 	}
+	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** %s\n**%s:** %s\n\nYour request has been queued for processing.\nProcessing may take some time depending on the number of transcripts.",
-		requestTypeText, serverLabel, strings.Join(guildIdStrs, ", "))
 	components := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: content})}
-	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, "GDPR Request Queued", components)
+	title := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
+	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, title, components)
 	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 }
 
@@ -91,27 +91,28 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Properties() registry.Properties
 }
 
 func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 	parts := strings.Split(ctx.InteractionData.CustomId, "_")
 	if len(parts) < 5 {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid request format.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
 	guildId, err := strconv.ParseUint(parts[3], 10, 64)
 	if err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid server ID provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
 	var ticketIds []int
-	for i := 4; i < len(parts); i++ {
+	for i := 4; i < len(parts)-1; i++ {
 		if ticketId, err := strconv.Atoi(parts[i]); err == nil {
 			ticketIds = append(ticketIds, ticketId)
 		}
 	}
 
 	if len(ticketIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid ticket IDs provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIds))
 		return
 	}
 
@@ -120,13 +121,14 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 		UserId:             ctx.UserId(),
 		GuildIds:           []uint64{guildId},
 		TicketIds:          ticketIds,
+		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
 	if err := gdprrelay.Publish(redis.Client, request); err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Failed to queue GDPR request. Please try again later.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
 
@@ -135,17 +137,21 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 		ticketIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete specific transcripts\n**Server ID:** %d\n**Ticket IDs:** %s\n\nYour request has been queued for processing.\nProcessing may take some time depending on the number of transcripts.",
-		guildId, strings.Join(ticketIdStrs, ", "))
+	content := i18n.GetMessage(locale, i18n.GdprQueuedSpecificTranscripts, guildId, strings.Join(ticketIdStrs, ", "))
+	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
+
 	components := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: content})}
-	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, "GDPR Request Queued", components)
+	title := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
+	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, title, components)
 	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 }
 
 type GDPRConfirmAllMessagesHandler struct{}
 
 func (h *GDPRConfirmAllMessagesHandler) Matcher() matcher.Matcher {
-	return matcher.NewSimpleMatcher("gdpr_confirm_all_messages")
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_confirm_all_messages_")
+	})
 }
 
 func (h *GDPRConfirmAllMessagesHandler) Properties() registry.Properties {
@@ -156,30 +162,32 @@ func (h *GDPRConfirmAllMessagesHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 	userId := ctx.UserId()
 
 	request := gdprrelay.GDPRRequest{
 		Type:               gdprrelay.RequestTypeAllMessages,
 		UserId:             userId,
+		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
 	if err := gdprrelay.Publish(redis.Client, request); err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Failed to queue GDPR request. Please try again later.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete all messages from your account\n**User ID:** %d\n\nYour request has been queued for processing.\nThis will anonymize your messages in all transcripts where you participated.\nProcessing may take some time depending on the number of transcripts.",
-		userId)
+	content := i18n.GetMessage(locale, i18n.GdprQueuedAllMessages, userId)
 	components := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: content,
 		}),
 	}
 
-	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, "GDPR Request Queued", components)
+	title := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
+	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, title, components)
 	response := command.NewMessageResponseWithComponents([]component.Component{container})
 	ctx.Edit(response)
 }
@@ -200,23 +208,24 @@ func (h *GDPRConfirmMessagesHandler) Properties() registry.Properties {
 }
 
 func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 	userId := ctx.UserId()
 
 	parts := strings.Split(ctx.InteractionData.CustomId, "_")
 	if len(parts) < 4 {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid server ID provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
 	guildId, err := strconv.ParseUint(parts[3], 10, 64)
 	if err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Invalid server ID provided.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
 	var ticketIds []int
 	if len(parts) > 4 {
-		for i := 4; i < len(parts); i++ {
+		for i := 4; i < len(parts)-1; i++ {
 			if id, err := strconv.Atoi(parts[i]); err == nil && id > 0 {
 				ticketIds = append(ticketIds, id)
 			}
@@ -228,13 +237,14 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		UserId:             userId,
 		GuildIds:           []uint64{guildId},
 		TicketIds:          ticketIds,
+		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
 	if err := gdprrelay.Publish(redis.Client, request); err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", "Failed to queue GDPR request. Please try again later.")
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
 
@@ -243,14 +253,16 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		ticketIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	content := fmt.Sprintf("**GDPR Request Submitted**\n**Request Type:** Delete messages in specific tickets\n**Server ID:** %d\n**Ticket IDs:** %s\n\nYour request has been queued for processing.\nThis will anonymize your messages in the specified transcripts.\nProcessing may take some time depending on the number of transcripts.",
-		guildId, strings.Join(ticketIdStrs, ", "))
+	content := i18n.GetMessage(locale, i18n.GdprQueuedSpecificMessages, guildId, strings.Join(ticketIdStrs, ", "))
+	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
+
 	components := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: content,
 		}),
 	}
 
-	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, "GDPR Request Queued", components)
+	title := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
+	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, title, components)
 	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 }

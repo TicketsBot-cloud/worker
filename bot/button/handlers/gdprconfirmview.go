@@ -9,6 +9,7 @@ import (
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type GDPRRequestType int
@@ -27,53 +28,33 @@ type GDPRConfirmationData struct {
 	GuildNames      []string
 	TicketIds       []int
 	TicketIdsStr    string
+	Locale          *i18n.Locale
 	ConfirmButtonId string
 }
 
-func buildGDPRConfirmationView(ctx interface{}, data GDPRConfirmationData) []component.Component {
+func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRConfirmationData) []component.Component {
 	var content string
 
 	switch data.RequestType {
 	case GDPRAllTranscripts:
 		if len(data.GuildIds) == 1 {
-			content = fmt.Sprintf(
-				"**Request Type:** Delete all transcripts from a server you own\n"+
-					"**Server:** %s",
-				data.GuildNames[0],
-			)
+			content = i18n.GetMessage(locale, i18n.GdprConfirmAllTranscripts, data.GuildNames[0])
 		} else {
 			serversList := strings.Join(data.GuildNames, "\n* ")
-			content = fmt.Sprintf(
-				"**Request Type:** Delete all transcripts from servers you own\n"+
-					"**Servers:**\n* %s",
-				serversList,
-			)
+			content = i18n.GetMessage(locale, i18n.GdprConfirmAllTranscriptsMulti, serversList)
 		}
 
 	case GDPRSpecificTranscripts:
-		content = fmt.Sprintf(
-			"**Request Type:** Delete specific transcripts from server\n"+
-				"**Server:** %s\n"+
-				"**Ticket IDs:** %s",
-			data.GuildNames[0], data.TicketIdsStr,
-		)
+		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificTranscripts, data.GuildNames[0], data.TicketIdsStr)
 
 	case GDPRAllMessages:
-		content = fmt.Sprintf(
-			"**Request Type:** Delete all messages from your account across all servers",
-		)
+		content = i18n.GetMessage(locale, i18n.GdprConfirmAllMessages)
 
 	case GDPRSpecificMessages:
-		content = fmt.Sprintf(
-			"**Request Type:** Delete your messages in specific tickets\n"+
-				"**Server:** %s\n"+
-				"**Ticket IDs:** %s",
-			data.GuildNames[0], data.TicketIdsStr,
-		)
+		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificMessages, data.GuildNames[0], data.TicketIdsStr)
 	}
 
-	content += "\n\n⚠️ **Warning:** This action is permanent and cannot be undone." +
-		"\n\nDo you understand and accept that deletion is permanent?"
+	content += i18n.GetMessage(locale, i18n.GdprConfirmWarning)
 
 	innerComponents := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
@@ -82,7 +63,7 @@ func buildGDPRConfirmationView(ctx interface{}, data GDPRConfirmationData) []com
 		component.BuildSeparator(component.Separator{}),
 		component.BuildActionRow(
 			component.BuildButton(component.Button{
-				Label:    "Confirm - I understand",
+				Label:    i18n.GetMessage(locale, i18n.GdprConfirmButton),
 				CustomId: data.ConfirmButtonId,
 				Style:    component.ButtonStyleDanger,
 				Emoji:    utils.BuildEmoji("⚠️"),
@@ -90,12 +71,13 @@ func buildGDPRConfirmationView(ctx interface{}, data GDPRConfirmationData) []com
 		),
 	}
 
+	title := i18n.GetMessage(locale, i18n.GdprConfirmTitle)
 	var container component.Component
 	switch v := ctx.(type) {
 	case *context.ModalContext:
-		container = utils.BuildContainerWithComponents(v, customisation.Orange, "GDPR Confirmation Required", innerComponents)
+		container = utils.BuildContainerWithComponents(v, customisation.Orange, title, innerComponents)
 	case *cmdcontext.ButtonContext:
-		container = utils.BuildContainerWithComponents(v, customisation.Orange, "GDPR Confirmation Required", innerComponents)
+		container = utils.BuildContainerWithComponents(v, customisation.Orange, title, innerComponents)
 	default:
 		return innerComponents
 	}
@@ -103,12 +85,13 @@ func buildGDPRConfirmationView(ctx interface{}, data GDPRConfirmationData) []com
 	return []component.Component{container}
 }
 
-func buildAllMessagesConfirmationComponents(ctx *cmdcontext.ButtonContext, userId uint64) []component.Component {
+func buildAllMessagesConfirmationComponents(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, userId uint64) []component.Component {
 	data := GDPRConfirmationData{
 		RequestType:     GDPRAllMessages,
 		UserId:          userId,
-		ConfirmButtonId: "gdpr_confirm_all_messages",
+		Locale:          locale,
+		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_all_messages_%s", locale.IsoShortCode),
 	}
 
-	return buildGDPRConfirmationView(ctx, data)
+	return buildGDPRConfirmationView(ctx, locale, data)
 }
