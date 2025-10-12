@@ -200,6 +200,7 @@ var (
 	MessageCloseRequestDenied       MessageId = "commands.close_request.denied"
 	MessageCloseRequestAccept       MessageId = "commands.close_request.accept"
 	MessageCloseRequestDeny         MessageId = "commands.close_request.deny"
+	MessageCloseRequested			MessageId = "commands.close_request.success"
 
 	MessageSwitchPanelInvalidPanel MessageId = "commands.switch_panel.invalid_panel"
 	MessageSwitchPanelSuccess      MessageId = "commands.switch_panel.success"

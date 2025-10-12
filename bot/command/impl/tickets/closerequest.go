@@ -13,6 +13,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -107,7 +108,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		}),
 	)
 
-	data := command.MessageResponse{
+	data := rest.CreateMessageData{
 		Content: fmt.Sprintf("<@%d>", ticket.UserId),
 		Embeds:  []*embed.Embed{msgEmbed},
 		AllowedMentions: message.AllowedMention{
@@ -116,7 +117,12 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		Components: []component.Component{components},
 	}
 
-	if _, err := ctx.ReplyWith(data); err != nil {
+	if _, err := ctx.Worker().CreateMessageComplex(*ticket.ChannelId, data); err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if _, err := ctx.Reply(customisation.Green, i18n.TitleCloseRequest, i18n.MessageCloseRequested); err != nil {
 		ctx.HandleError(err)
 		return
 	}
