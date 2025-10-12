@@ -194,6 +194,7 @@ var (
 	MessageOpenCantSeeParentChannel MessageId = "commands.open.threads.cant_see_parent_channel"
 	MessageOpenCantMessageInThreads MessageId = "commands.open.threads.cant_message_in_threads"
 
+	MessageCloseRequested           MessageId = "commands.close_request.success"
 	MessageCloseRequestNoReason     MessageId = "commands.close_request.no_reason"
 	MessageCloseRequestWithReason   MessageId = "commands.close_request.with_reason"
 	MessageCloseRequestNoPermission MessageId = "commands.close_request.no_permission"
