@@ -48,7 +48,12 @@ func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRCo
 		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificTranscripts, data.GuildNames[0], data.TicketIdsStr)
 
 	case GDPRAllMessages:
-		content = i18n.GetMessage(locale, i18n.GdprConfirmAllMessages)
+		if len(data.GuildIds) == 1 {
+			content = i18n.GetMessage(locale, i18n.GdprConfirmAllMessages, data.GuildNames[0])
+		} else {
+			serversList := strings.Join(data.GuildNames, "\n* ")
+			content = i18n.GetMessage(locale, i18n.GdprConfirmAllMessagesMulti, serversList)
+		}
 
 	case GDPRSpecificMessages:
 		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificMessages, data.GuildNames[0], data.TicketIdsStr)

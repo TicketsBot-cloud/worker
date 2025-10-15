@@ -89,6 +89,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.ExitSurveySubmitHandler),
 		new(handlers.GDPRModalAllTranscriptsHandler),
 		new(handlers.GDPRModalSpecificTranscriptsHandler),
+		new(handlers.GDPRModalAllMessagesHandler),
 		new(handlers.GDPRModalSpecificMessagesHandler),
 		new(handlers.PremiumKeySubmitHandler),
 	)

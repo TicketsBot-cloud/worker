@@ -7,7 +7,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -70,10 +69,7 @@ func (h *GDPRAllMessagesHandler) Properties() registry.Properties {
 
 func (h *GDPRAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
-	components := buildAllMessagesConfirmationComponents(ctx, locale, ctx.UserId())
-	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
-		ctx.HandleError(err)
-	}
+	handleMessageRequest(ctx, locale, true)
 }
 
 type GDPRSpecificMessagesHandler struct{}
@@ -90,7 +86,7 @@ func (h *GDPRSpecificMessagesHandler) Properties() registry.Properties {
 
 func (h *GDPRSpecificMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
-	ctx.Modal(button.ResponseModal{Data: buildSpecificMessagesModal(locale)})
+	handleMessageRequest(ctx, locale, false)
 }
 
 func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, isAllTranscripts bool) {
@@ -110,6 +106,28 @@ func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale,
 		modal = buildAllTranscriptsModal(locale, guilds)
 	} else {
 		modal = buildSpecificTranscriptsModal(locale, guilds)
+	}
+
+	ctx.Modal(button.ResponseModal{Data: modal})
+}
+
+func handleMessageRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, isAllMessages bool) {
+	guilds, err := getGuildsWithUserMessages(ctx, ctx.UserId())
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if len(guilds) == 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNoServers))
+		return
+	}
+
+	var modal interaction.ModalResponseData
+	if isAllMessages {
+		modal = buildAllMessagesModal(locale, guilds)
+	} else {
+		modal = buildSpecificMessagesModal(locale, guilds)
 	}
 
 	ctx.Modal(button.ResponseModal{Data: modal})
