@@ -331,6 +331,8 @@ var (
 	GdprModalSelectServers            MessageId = "gdpr.modal.select_servers"
 	GdprModalServerIdLabel            MessageId = "gdpr.modal.server_id.label"
 	GdprModalServerIdPlaceholder      MessageId = "gdpr.modal.server_id.placeholder"
+	GdprModalServerIdsLabel           MessageId = "gdpr.modal.server_ids.label"
+	GdprModalServerIdsPlaceholder     MessageId = "gdpr.modal.server_ids.placeholder"
 	GdprModalTicketIdsLabel           MessageId = "gdpr.modal.ticket_ids.label"
 	GdprModalTicketIdsPlaceholder     MessageId = "gdpr.modal.ticket_ids.placeholder"
 

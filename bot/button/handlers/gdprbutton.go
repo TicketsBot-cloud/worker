@@ -102,10 +102,20 @@ func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale,
 	}
 
 	var modal interaction.ModalResponseData
-	if isAllTranscripts {
-		modal = buildAllTranscriptsModal(locale, guilds)
+	if len(guilds) > 25 {
+		// Use text input fallback when there are more than 25 servers
+		if isAllTranscripts {
+			modal = buildAllTranscriptsTextModal(locale)
+		} else {
+			modal = buildSpecificTranscriptsTextModal(locale)
+		}
 	} else {
-		modal = buildSpecificTranscriptsModal(locale, guilds)
+		// Use select menu when there are 25 or fewer servers
+		if isAllTranscripts {
+			modal = buildAllTranscriptsModal(locale, guilds)
+		} else {
+			modal = buildSpecificTranscriptsModal(locale, guilds)
+		}
 	}
 
 	ctx.Modal(button.ResponseModal{Data: modal})
@@ -124,10 +134,20 @@ func handleMessageRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, is
 	}
 
 	var modal interaction.ModalResponseData
-	if isAllMessages {
-		modal = buildAllMessagesModal(locale, guilds)
+	if len(guilds) > 25 {
+		// Use text input fallback when there are more than 25 servers
+		if isAllMessages {
+			modal = buildAllMessagesTextModal(locale)
+		} else {
+			modal = buildSpecificMessagesTextModal(locale)
+		}
 	} else {
-		modal = buildSpecificMessagesModal(locale, guilds)
+		// Use select menu when there are 25 or fewer servers
+		if isAllMessages {
+			modal = buildAllMessagesModal(locale, guilds)
+		} else {
+			modal = buildSpecificMessagesModal(locale, guilds)
+		}
 	}
 
 	ctx.Modal(button.ResponseModal{Data: modal})

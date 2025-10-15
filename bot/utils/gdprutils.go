@@ -72,6 +72,33 @@ func ParseTicketIds(input string) []int {
 	return ticketIds
 }
 
+func ParseGuildIdsFromInput(input string) []uint64 {
+	input = strings.ReplaceAll(input, ";", ",")
+	input = strings.ReplaceAll(input, "\n", ",")
+	input = strings.ReplaceAll(input, "\t", ",")
+	input = strings.ReplaceAll(input, " ", ",")
+
+	parts := strings.Split(input, ",")
+	seen := make(map[uint64]bool)
+	var guildIds []uint64
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		if id, err := strconv.ParseUint(part, 10, 64); err == nil {
+			if !seen[id] {
+				guildIds = append(guildIds, id)
+				seen[id] = true
+			}
+		}
+	}
+
+	return guildIds
+}
+
 func ExtractLanguageFromCustomId(customId string) *i18n.Locale {
 	parts := strings.Split(customId, "_")
 	if len(parts) > 0 {
