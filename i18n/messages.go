@@ -355,15 +355,6 @@ var (
 	GdprQueuedSpecificMessages    MessageId = "gdpr.queued.specific_messages"
 	GdprQueuedFooter              MessageId = "gdpr.queued.footer"
 
-	GdprCompletedTitle               MessageId = "gdpr.completed.title"
-	GdprCompletedAllTranscripts      MessageId = "gdpr.completed.all_transcripts"
-	GdprCompletedAllTranscriptsMulti MessageId = "gdpr.completed.all_transcripts_multi"
-	GdprCompletedSpecificTranscripts MessageId = "gdpr.completed.specific_transcripts"
-	GdprCompletedAllMessages         MessageId = "gdpr.completed.all_messages"
-	GdprCompletedSpecificMessages    MessageId = "gdpr.completed.specific_messages"
-	GdprCompletedNoData              MessageId = "gdpr.completed.no_data"
-	GdprCompletedError               MessageId = "gdpr.completed.error"
-
 	GdprErrorNoServers        MessageId = "gdpr.error.no_servers"
 	GdprErrorInvalidServerId  MessageId = "gdpr.error.invalid_server_id"
 	GdprErrorInvalidTicketIds MessageId = "gdpr.error.invalid_ticket_ids"
