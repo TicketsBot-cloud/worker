@@ -119,7 +119,14 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddAdmin, i18n.MessageAddAdminSuccess, nil)
+	var mention string
+	if mentionableType == context.MentionableTypeUser {
+		mention = fmt.Sprintf("<@%d>", id)
+	} else {
+		mention = fmt.Sprintf("<@&%d>", id)
+	}
+
+	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddAdmin, i18n.MessageAddAdminSuccess, nil, mention)
 	ctx.Edit(command.NewEphemeralEmbedMessageResponse(e))
 
 	settings, err := ctx.Settings()
