@@ -2,8 +2,6 @@ package gdprrelay
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -36,17 +34,17 @@ type QueuedRequest struct {
 	QueuedAt      time.Time   `json:"queued_at"`
 	RetryCount    int         `json:"retry_count"`
 	LastAttemptAt time.Time   `json:"last_attempt_at,omitempty"`
-	RequestID     string      `json:"request_id"`
+	RequestID     int         `json:"request_id"`
 }
 
 const keyPending = "tickets:gdpr:pending"
 
-func Publish(redisClient *redis.Client, data GDPRRequest) error {
+func Publish(redisClient *redis.Client, data GDPRRequest, logId int) error {
 	queued := QueuedRequest{
 		Request:    data,
 		QueuedAt:   time.Now(),
 		RetryCount: 0,
-		RequestID:  generateRequestID(),
+		RequestID:  logId,
 	}
 
 	marshalled, err := json.Marshal(queued)
@@ -55,10 +53,4 @@ func Publish(redisClient *redis.Client, data GDPRRequest) error {
 	}
 
 	return redisClient.LPush(context.Background(), keyPending, string(marshalled)).Err()
-}
-
-func generateRequestID() string {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
 }

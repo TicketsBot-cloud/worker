@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
@@ -51,7 +53,15 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
-	if err := gdprrelay.Publish(redis.Client, request); err != nil {
+	scrambledId := sha256.New()
+	fmt.Fprintf(scrambledId, "%d", ctx.UserId())
+	id, err := dbclient.Client.GdprLogs.InsertLog(string(scrambledId.Sum(nil)), "AllTranscripts", "Queued")
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
@@ -127,7 +137,15 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
-	if err := gdprrelay.Publish(redis.Client, request); err != nil {
+	scrambledId := sha256.New()
+	fmt.Fprintf(scrambledId, "%d", ctx.UserId())
+	id, err := dbclient.Client.GdprLogs.InsertLog(fmt.Sprintf("%x", scrambledId.Sum(nil)), "SpecificTranscripts", "Queued")
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
@@ -174,7 +192,15 @@ func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
-	if err := gdprrelay.Publish(redis.Client, request); err != nil {
+	scrambledId := sha256.New()
+	fmt.Fprintf(scrambledId, "%d", ctx.UserId())
+	id, err := dbclient.Client.GdprLogs.InsertLog(string(scrambledId.Sum(nil)), "AllMessages", "Queued")
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
@@ -243,7 +269,15 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
-	if err := gdprrelay.Publish(redis.Client, request); err != nil {
+	scrambledId := sha256.New()
+	fmt.Fprintf(scrambledId, "%d", ctx.UserId())
+	id, err := dbclient.Client.GdprLogs.InsertLog(string(scrambledId.Sum(nil)), "SpecificMessages", "Queued")
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
