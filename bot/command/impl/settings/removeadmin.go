@@ -101,7 +101,16 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	ctx.Reply(customisation.Green, i18n.TitleRemoveAdmin, i18n.MessageRemoveAdminSuccess)
+	var mention string
+	if mentionableType == context.MentionableTypeUser {
+		mention = fmt.Sprintf("<@%d>", id)
+	} else {
+		mention = fmt.Sprintf("<@&%d>", id)
+	}
+
+	ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(
+		utils.BuildEmbed(ctx, customisation.Green, i18n.TitleRemoveAdmin, i18n.MessageRemoveAdminSuccess, nil, mention),
+	))
 
 	// Remove user / role from thread notification channel
 	if settings.TicketNotificationChannel != nil {
