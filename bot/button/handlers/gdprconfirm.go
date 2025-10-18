@@ -182,10 +182,12 @@ func (h *GDPRConfirmAllMessagesHandler) Properties() registry.Properties {
 func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 	userId := ctx.UserId()
+	guildIds := utils.ParseGuildIds(ctx.InteractionData.CustomId)
 
 	request := gdprrelay.GDPRRequest{
 		Type:               gdprrelay.RequestTypeAllMessages,
 		UserId:             userId,
+		GuildIds:           guildIds,
 		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
@@ -205,7 +207,19 @@ func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		return
 	}
 
-	content := i18n.GetMessage(locale, i18n.GdprQueuedAllMessages, userId)
+	guildIdStrs := make([]string, len(guildIds))
+	for i, id := range guildIds {
+		guildIdStrs[i] = fmt.Sprintf("%d", id)
+	}
+
+	var content string
+	if len(guildIds) == 1 {
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllMessages, guildIds[0])
+	} else {
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllMessagesMulti, strings.Join(guildIdStrs, ", "))
+	}
+	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
+
 	components := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: content,

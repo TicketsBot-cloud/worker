@@ -46,6 +46,31 @@ func getOwnedGuildsWithTranscripts(ctx *cmdcontext.ButtonContext, userId uint64)
 	return batchFetchOwnedGuilds(ctx, guildIds, userId)
 }
 
+func getGuildsWithUserMessages(ctx *cmdcontext.ButtonContext, userId uint64) ([]guildInfo, error) {
+	query := `
+		SELECT DISTINCT guild_id
+		FROM tickets
+		WHERE has_transcript = true AND user_id = $1
+		GROUP BY guild_id`
+
+	rows, err := dbclient.Client.Tickets.Query(ctx, query, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var guildIds []uint64
+	for rows.Next() {
+		var guildId uint64
+		if err := rows.Scan(&guildId); err != nil {
+			continue
+		}
+		guildIds = append(guildIds, guildId)
+	}
+
+	return batchFetchGuildsInfo(ctx, guildIds)
+}
+
 func batchFetchOwnedGuilds(ctx *cmdcontext.ButtonContext, guildIds []uint64, userId uint64) ([]guildInfo, error) {
 	retriever := utils.ToRetriever(ctx.Worker())
 
@@ -76,6 +101,55 @@ func batchFetchOwnedGuilds(ctx *cmdcontext.ButtonContext, guildIds []uint64, use
 				resultChan <- result{ok: false}
 				return
 			}
+
+			guild, err := ctx.Worker().GetGuild(gId)
+			if err != nil {
+				resultChan <- result{ok: false}
+				return
+			}
+
+			resultChan <- result{
+				info: guildInfo{
+					GuildID: gId,
+					Name:    guild.Name,
+				},
+				ok: true,
+			}
+		}(guildId)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	var guilds []guildInfo
+	for res := range resultChan {
+		if res.ok {
+			guilds = append(guilds, res.info)
+		}
+	}
+
+	return guilds, nil
+}
+
+func batchFetchGuildsInfo(ctx *cmdcontext.ButtonContext, guildIds []uint64) ([]guildInfo, error) {
+	type result struct {
+		info guildInfo
+		ok   bool
+	}
+
+	resultChan := make(chan result, len(guildIds))
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 10)
+
+	for _, guildId := range guildIds {
+		wg.Add(1)
+		go func(gId uint64) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
 
 			guild, err := ctx.Worker().GetGuild(gId)
 			if err != nil {
@@ -151,6 +225,26 @@ func buildAllTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) interacti
 	}
 }
 
+func buildAllTranscriptsTextModal(locale *i18n.Locale) interaction.ModalResponseData {
+	return interaction.ModalResponseData{
+		CustomId: fmt.Sprintf("gdpr_modal_all_transcripts_text_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalAllTranscriptsTitle),
+		Components: []component.Component{
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdsLabel),
+				Component: component.BuildInputText(component.InputText{
+					CustomId:    "server_ids",
+					Style:       component.TextStyleParagraph,
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdsPlaceholder)),
+					Required:    utils.Ptr(true),
+					MinLength:   utils.Ptr(uint32(17)),
+					MaxLength:   utils.Ptr(uint32(2000)),
+				}),
+			}),
+		},
+	}
+}
+
 func buildSpecificTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
 	options := buildGuildSelectOptions(guilds)
 	minVal, maxVal := 1, 1
@@ -184,9 +278,118 @@ func buildSpecificTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) inte
 	}
 }
 
-func buildSpecificMessagesModal(locale *i18n.Locale) interaction.ModalResponseData {
+func buildSpecificTranscriptsTextModal(locale *i18n.Locale) interaction.ModalResponseData {
+	return interaction.ModalResponseData{
+		CustomId: fmt.Sprintf("gdpr_modal_specific_transcripts_text_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificTranscriptsTitle),
+		Components: []component.Component{
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdLabel),
+				Component: component.BuildInputText(component.InputText{
+					CustomId:    "server_id",
+					Style:       component.TextStyleShort,
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdPlaceholder)),
+					Required:    utils.Ptr(true),
+					MinLength:   utils.Ptr(uint32(17)),
+					MaxLength:   utils.Ptr(uint32(20)),
+				}),
+			}),
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
+				Component: component.BuildInputText(component.InputText{
+					CustomId:    "ticket_ids",
+					Style:       component.TextStyleParagraph,
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
+					Required:    utils.Ptr(true),
+					MinLength:   utils.Ptr(uint32(1)),
+					MaxLength:   utils.Ptr(uint32(1000)),
+				}),
+			}),
+		},
+	}
+}
+
+func buildAllMessagesModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
+	options := buildGuildSelectOptions(guilds)
+	minVal, maxVal := 1, len(options)
+	if maxVal > 25 {
+		maxVal = 25
+	}
+
+	return interaction.ModalResponseData{
+		CustomId: fmt.Sprintf("gdpr_modal_all_messages_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalAllMessagesTitle),
+		Components: []component.Component{
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
+				Component: component.BuildSelectMenu(component.SelectMenu{
+					CustomId:    "server_ids",
+					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
+					MinValues:   &minVal,
+					MaxValues:   &maxVal,
+					Options:     options,
+				}),
+			}),
+		},
+	}
+}
+
+func buildAllMessagesTextModal(locale *i18n.Locale) interaction.ModalResponseData {
+	return interaction.ModalResponseData{
+		CustomId: fmt.Sprintf("gdpr_modal_all_messages_text_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalAllMessagesTitle),
+		Components: []component.Component{
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdsLabel),
+				Component: component.BuildInputText(component.InputText{
+					CustomId:    "server_ids",
+					Style:       component.TextStyleParagraph,
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdsPlaceholder)),
+					Required:    utils.Ptr(true),
+					MinLength:   utils.Ptr(uint32(17)),
+					MaxLength:   utils.Ptr(uint32(2000)),
+				}),
+			}),
+		},
+	}
+}
+
+func buildSpecificMessagesModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
+	options := buildGuildSelectOptions(guilds)
+	minVal, maxVal := 1, 1
+
 	return interaction.ModalResponseData{
 		CustomId: fmt.Sprintf("gdpr_modal_specific_messages_%s", locale.IsoShortCode),
+		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificMessagesTitle),
+		Components: []component.Component{
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
+				Component: component.BuildSelectMenu(component.SelectMenu{
+					CustomId:    "server_id",
+					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
+					MinValues:   &minVal,
+					MaxValues:   &maxVal,
+					Options:     options,
+				}),
+			}),
+			component.BuildLabel(component.Label{
+				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
+				Component: component.BuildInputText(component.InputText{
+					CustomId:    "ticket_ids",
+					Style:       component.TextStyleParagraph,
+					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
+					Required:    utils.Ptr(true),
+					MinLength:   utils.Ptr(uint32(1)),
+					MaxLength:   utils.Ptr(uint32(1000)),
+				}),
+			}),
+		},
+	}
+}
+
+func buildSpecificMessagesTextModal(locale *i18n.Locale) interaction.ModalResponseData {
+	return interaction.ModalResponseData{
+		CustomId: fmt.Sprintf("gdpr_modal_specific_messages_text_%s", locale.IsoShortCode),
 		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificMessagesTitle),
 		Components: []component.Component{
 			component.BuildLabel(component.Label{
@@ -234,14 +437,20 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
-	var serverIds []string
+	var guildIds []uint64
 
 	for _, actionRow := range ctx.Interaction.Data.Components {
 		if actionRow.Component != nil {
 			switch actionRow.Component.CustomId {
 			case "server_ids":
 				if actionRow.Component.Values != nil {
-					serverIds = actionRow.Component.Values
+					for _, val := range actionRow.Component.Values {
+						if id, err := strconv.ParseUint(val, 10, 64); err == nil {
+							guildIds = append(guildIds, id)
+						}
+					}
+				} else if actionRow.Component.Value != "" {
+					guildIds = utils.ParseGuildIdsFromInput(actionRow.Component.Value)
 				}
 			}
 		} else {
@@ -249,14 +458,20 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 				switch component.CustomId {
 				case "server_ids":
 					if component.Values != nil {
-						serverIds = component.Values
+						for _, val := range component.Values {
+							if id, err := strconv.ParseUint(val, 10, 64); err == nil {
+								guildIds = append(guildIds, id)
+							}
+						}
+					} else if component.Value != "" {
+						guildIds = utils.ParseGuildIdsFromInput(component.Value)
 					}
 				}
 			}
 		}
 	}
 
-	if len(serverIds) == 0 {
+	if len(guildIds) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
@@ -264,12 +479,7 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	var serverNames []string
 	var validGuildIds []uint64
 
-	for _, serverId := range serverIds {
-		guildId, err := strconv.ParseUint(serverId, 10, 64)
-		if err != nil {
-			continue
-		}
-
+	for _, guildId := range guildIds {
 		guild, err := ctx.Worker().GetGuild(guildId)
 		if err != nil || guild.OwnerId != userId {
 			continue
@@ -329,6 +539,8 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 			case "server_id":
 				if actionRow.Component.Values != nil && len(actionRow.Component.Values) > 0 {
 					serverId = actionRow.Component.Values[0]
+				} else if actionRow.Component.Value != "" {
+					serverId = actionRow.Component.Value
 				}
 			case "ticket_ids":
 				ticketIds = actionRow.Component.Value
@@ -339,6 +551,8 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 				case "server_id":
 					if component.Values != nil && len(component.Values) > 0 {
 						serverId = component.Values[0]
+					} else if component.Value != "" {
+						serverId = component.Value
 					}
 				case "ticket_ids":
 					ticketIds = component.Value
@@ -387,6 +601,99 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 	}
 }
 
+type GDPRModalAllMessagesHandler struct{}
+
+func (h *GDPRModalAllMessagesHandler) Matcher() matcher.Matcher {
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_modal_all_messages_")
+	})
+}
+
+func (h *GDPRModalAllMessagesHandler) Properties() registry.Properties {
+	return registry.Properties{
+		Flags:   registry.SumFlags(registry.DMsAllowed),
+		Timeout: constants.TimeoutGDPR,
+	}
+}
+
+func (h *GDPRModalAllMessagesHandler) Execute(ctx *context.ModalContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
+	userId := ctx.UserId()
+
+	var guildIds []uint64
+
+	for _, actionRow := range ctx.Interaction.Data.Components {
+		if actionRow.Component != nil {
+			switch actionRow.Component.CustomId {
+			case "server_ids":
+				if actionRow.Component.Values != nil {
+					for _, val := range actionRow.Component.Values {
+						if id, err := strconv.ParseUint(val, 10, 64); err == nil {
+							guildIds = append(guildIds, id)
+						}
+					}
+				} else if actionRow.Component.Value != "" {
+					guildIds = utils.ParseGuildIdsFromInput(actionRow.Component.Value)
+				}
+			}
+		} else {
+			for _, component := range actionRow.Components {
+				switch component.CustomId {
+				case "server_ids":
+					if component.Values != nil {
+						for _, val := range component.Values {
+							if id, err := strconv.ParseUint(val, 10, 64); err == nil {
+								guildIds = append(guildIds, id)
+							}
+						}
+					} else if component.Value != "" {
+						guildIds = utils.ParseGuildIdsFromInput(component.Value)
+					}
+				}
+			}
+		}
+	}
+
+	if len(guildIds) == 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
+		return
+	}
+
+	var serverNames []string
+	var validGuildIds []uint64
+
+	for _, guildId := range guildIds {
+		guild, err := ctx.Worker().GetGuild(guildId)
+		if err != nil {
+			continue
+		}
+
+		serverNames = append(serverNames, fmt.Sprintf("%s (ID: %d)", guild.Name, guildId))
+		validGuildIds = append(validGuildIds, guildId)
+	}
+
+	if len(validGuildIds) == 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorServerNotFound))
+		return
+	}
+
+	guildIdsStr := strings.Trim(strings.ReplaceAll(fmt.Sprint(validGuildIds), " ", ","), "[]")
+
+	data := GDPRConfirmationData{
+		RequestType:     GDPRAllMessages,
+		UserId:          userId,
+		GuildIds:        validGuildIds,
+		GuildNames:      serverNames,
+		Locale:          locale,
+		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_all_messages_%s_%s", guildIdsStr, locale.IsoShortCode),
+	}
+
+	components := buildGDPRConfirmationView(ctx, locale, data)
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
+		ctx.HandleError(err)
+	}
+}
+
 type GDPRModalSpecificMessagesHandler struct{}
 
 func (h *GDPRModalSpecificMessagesHandler) Matcher() matcher.Matcher {
@@ -406,8 +713,36 @@ func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
-	serverId, _ := ctx.GetInput("server_id")
-	ticketIds, _ := ctx.GetInput("ticket_ids")
+	var serverId string
+	var ticketIds string
+
+	for _, actionRow := range ctx.Interaction.Data.Components {
+		if actionRow.Component != nil {
+			switch actionRow.Component.CustomId {
+			case "server_id":
+				if actionRow.Component.Values != nil && len(actionRow.Component.Values) > 0 {
+					serverId = actionRow.Component.Values[0]
+				} else if actionRow.Component.Value != "" {
+					serverId = actionRow.Component.Value
+				}
+			case "ticket_ids":
+				ticketIds = actionRow.Component.Value
+			}
+		} else {
+			for _, component := range actionRow.Components {
+				switch component.CustomId {
+				case "server_id":
+					if component.Values != nil && len(component.Values) > 0 {
+						serverId = component.Values[0]
+					} else if component.Value != "" {
+						serverId = component.Value
+					}
+				case "ticket_ids":
+					ticketIds = component.Value
+				}
+			}
+		}
+	}
 
 	guildId, err := strconv.ParseUint(serverId, 10, 64)
 	if err != nil {

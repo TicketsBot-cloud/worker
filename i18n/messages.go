@@ -325,11 +325,14 @@ var (
 
 	GdprModalAllTranscriptsTitle      MessageId = "gdpr.modal.all_transcripts"
 	GdprModalSpecificTranscriptsTitle MessageId = "gdpr.modal.specific_transcripts"
+	GdprModalAllMessagesTitle         MessageId = "gdpr.modal.all_messages"
 	GdprModalSpecificMessagesTitle    MessageId = "gdpr.modal.specific_messages"
 	GdprModalSelectServer             MessageId = "gdpr.modal.select_server"
 	GdprModalSelectServers            MessageId = "gdpr.modal.select_servers"
 	GdprModalServerIdLabel            MessageId = "gdpr.modal.server_id.label"
 	GdprModalServerIdPlaceholder      MessageId = "gdpr.modal.server_id.placeholder"
+	GdprModalServerIdsLabel           MessageId = "gdpr.modal.server_ids.label"
+	GdprModalServerIdsPlaceholder     MessageId = "gdpr.modal.server_ids.placeholder"
 	GdprModalTicketIdsLabel           MessageId = "gdpr.modal.ticket_ids.label"
 	GdprModalTicketIdsPlaceholder     MessageId = "gdpr.modal.ticket_ids.placeholder"
 
@@ -338,6 +341,7 @@ var (
 	GdprConfirmAllTranscriptsMulti MessageId = "gdpr.confirm.all_transcripts_multi"
 	GdprConfirmSpecificTranscripts MessageId = "gdpr.confirm.specific_transcripts"
 	GdprConfirmAllMessages         MessageId = "gdpr.confirm.all_messages"
+	GdprConfirmAllMessagesMulti    MessageId = "gdpr.confirm.all_messages_multi"
 	GdprConfirmSpecificMessages    MessageId = "gdpr.confirm.specific_messages"
 	GdprConfirmWarning             MessageId = "gdpr.confirm.warning"
 	GdprConfirmButton              MessageId = "gdpr.confirm.button"
@@ -347,6 +351,7 @@ var (
 	GdprQueuedAllTranscriptsMulti MessageId = "gdpr.queued.all_transcripts_multi"
 	GdprQueuedSpecificTranscripts MessageId = "gdpr.queued.specific_transcripts"
 	GdprQueuedAllMessages         MessageId = "gdpr.queued.all_messages"
+	GdprQueuedAllMessagesMulti    MessageId = "gdpr.queued.all_messages_multi"
 	GdprQueuedSpecificMessages    MessageId = "gdpr.queued.specific_messages"
 	GdprQueuedFooter              MessageId = "gdpr.queued.footer"
 
