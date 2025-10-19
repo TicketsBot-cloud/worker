@@ -104,7 +104,13 @@ func batchFetchOwnedGuilds(ctx *cmdcontext.ButtonContext, guildIds []uint64, use
 
 			guild, err := ctx.Worker().GetGuild(gId)
 			if err != nil {
-				resultChan <- result{ok: false}
+				resultChan <- result{
+					info: guildInfo{
+						GuildID: gId,
+						Name:    strconv.FormatUint(gId, 10),
+					},
+					ok: true,
+				}
 				return
 			}
 
@@ -153,7 +159,13 @@ func batchFetchGuildsInfo(ctx *cmdcontext.ButtonContext, guildIds []uint64) ([]g
 
 			guild, err := ctx.Worker().GetGuild(gId)
 			if err != nil {
-				resultChan <- result{ok: false}
+				resultChan <- result{
+					info: guildInfo{
+						GuildID: gId,
+						Name:    strconv.FormatUint(gId, 10),
+					},
+					ok: true,
+				}
 				return
 			}
 
