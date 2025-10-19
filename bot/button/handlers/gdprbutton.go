@@ -8,13 +8,13 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
+	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -41,15 +41,8 @@ func (h *GDPRAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
@@ -72,15 +65,8 @@ func (h *GDPRSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) 
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
@@ -103,15 +89,8 @@ func (h *GDPRAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
@@ -134,15 +113,8 @@ func (h *GDPRSpecificMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 

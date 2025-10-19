@@ -5,7 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -141,4 +145,23 @@ func FormatGuildDisplay(guildId uint64, guildNames map[uint64]string) string {
 		return name + " (" + strconv.FormatUint(guildId, 10) + ")"
 	}
 	return strconv.FormatUint(guildId, 10)
+}
+
+func BuildGDPRWorkerOfflineView(ctx registry.CommandContext, locale *i18n.Locale) component.Component {
+	innerComponents := []component.Component{
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline),
+		}),
+		component.BuildSeparator(component.Separator{}),
+		component.BuildActionRow(
+			component.BuildButton(component.Button{
+				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
+				Style: component.ButtonStyleLink,
+				Emoji: BuildEmoji("❓"),
+				Url:   Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
+			}),
+		),
+	}
+
+	return BuildContainerWithComponents(ctx, customisation.Red, "GDPR Worker Unavailable", innerComponents)
 }

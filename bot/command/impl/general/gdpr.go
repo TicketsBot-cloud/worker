@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -14,7 +13,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -65,22 +63,8 @@ func (GDPRCommand) Execute(ctx registry.CommandContext, language *string) {
 	}
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		errorEmbed := embed.NewEmbed().
-			SetTitle("GDPR Worker Unavailable").
-			SetDescription(i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline)).
-			SetColor(ctx.GetColour(customisation.Red))
-
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-
-		response := command.NewEphemeralEmbedMessageResponseWithComponents(errorEmbed, []component.Component{supportButton})
-		ctx.ReplyWith(response)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 

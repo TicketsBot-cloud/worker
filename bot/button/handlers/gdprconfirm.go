@@ -17,7 +17,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -40,15 +39,8 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
@@ -122,15 +114,8 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
@@ -219,15 +204,8 @@ func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
@@ -304,15 +282,8 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
 	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		supportButton := component.BuildActionRow(
-			component.BuildButton(component.Button{
-				Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
-				Style: component.ButtonStyleLink,
-				Emoji: utils.BuildEmoji("❓"),
-				Url:   utils.Ptr(strings.ReplaceAll(config.Conf.Bot.SupportServerInvite, "\n", "")),
-			}),
-		)
-		ctx.ReplyRawWithComponents(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline), supportButton)
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 		return
 	}
 
