@@ -43,10 +43,13 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 		return
 	}
 
+	guildNames := utils.FetchGuildNames(ctx, guildIds)
+
 	request := gdprrelay.GDPRRequest{
 		Type:               gdprrelay.RequestTypeAllTranscripts,
 		UserId:             ctx.UserId(),
 		GuildIds:           guildIds,
+		GuildNames:         guildNames,
 		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
@@ -66,16 +69,16 @@ func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext
 		return
 	}
 
-	guildIdStrs := make([]string, len(guildIds))
-	for i, id := range guildIds {
-		guildIdStrs[i] = fmt.Sprintf("%d", id)
+	guildDisplays := make([]string, len(guildIds))
+	for i, guildId := range guildIds {
+		guildDisplays[i] = utils.FormatGuildDisplay(guildId, guildNames)
 	}
 
 	var content string
 	if len(guildIds) == 1 {
-		content = i18n.GetMessage(locale, i18n.GdprQueuedAllTranscripts, strings.Join(guildIdStrs, ", "))
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllTranscripts, guildDisplays[0])
 	} else {
-		content = i18n.GetMessage(locale, i18n.GdprQueuedAllTranscriptsMulti, strings.Join(guildIdStrs, ", "))
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllTranscriptsMulti, strings.Join(guildDisplays, "\n* "))
 	}
 	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
 
@@ -126,10 +129,13 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 		return
 	}
 
+	guildNames := utils.FetchGuildNames(ctx, []uint64{guildId})
+
 	request := gdprrelay.GDPRRequest{
 		Type:               gdprrelay.RequestTypeSpecificTranscripts,
 		UserId:             ctx.UserId(),
 		GuildIds:           []uint64{guildId},
+		GuildNames:         guildNames,
 		TicketIds:          ticketIds,
 		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
@@ -155,7 +161,8 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonCo
 		ticketIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	content := i18n.GetMessage(locale, i18n.GdprQueuedSpecificTranscripts, guildId, strings.Join(ticketIdStrs, ", "))
+	guildDisplay := utils.FormatGuildDisplay(guildId, guildNames)
+	content := i18n.GetMessage(locale, i18n.GdprQueuedSpecificTranscripts, guildDisplay, strings.Join(ticketIdStrs, ", "))
 	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
 
 	components := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: content})}
@@ -184,10 +191,13 @@ func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	userId := ctx.UserId()
 	guildIds := utils.ParseGuildIds(ctx.InteractionData.CustomId)
 
+	guildNames := utils.FetchGuildNames(ctx, guildIds)
+
 	request := gdprrelay.GDPRRequest{
 		Type:               gdprrelay.RequestTypeAllMessages,
 		UserId:             userId,
 		GuildIds:           guildIds,
+		GuildNames:         guildNames,
 		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
@@ -207,16 +217,16 @@ func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		return
 	}
 
-	guildIdStrs := make([]string, len(guildIds))
-	for i, id := range guildIds {
-		guildIdStrs[i] = fmt.Sprintf("%d", id)
+	guildDisplays := make([]string, len(guildIds))
+	for i, guildId := range guildIds {
+		guildDisplays[i] = utils.FormatGuildDisplay(guildId, guildNames)
 	}
 
 	var content string
 	if len(guildIds) == 1 {
-		content = i18n.GetMessage(locale, i18n.GdprQueuedAllMessages, guildIds[0])
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllMessages, guildDisplays[0])
 	} else {
-		content = i18n.GetMessage(locale, i18n.GdprQueuedAllMessagesMulti, strings.Join(guildIdStrs, ", "))
+		content = i18n.GetMessage(locale, i18n.GdprQueuedAllMessagesMulti, strings.Join(guildDisplays, "\n* "))
 	}
 	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
 
@@ -272,10 +282,13 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		}
 	}
 
+	guildNames := utils.FetchGuildNames(ctx, []uint64{guildId})
+
 	request := gdprrelay.GDPRRequest{
 		Type:               gdprrelay.RequestTypeSpecificMessages,
 		UserId:             userId,
 		GuildIds:           []uint64{guildId},
+		GuildNames:         guildNames,
 		TicketIds:          ticketIds,
 		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
@@ -301,7 +314,8 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		ticketIdStrs[i] = fmt.Sprintf("%d", id)
 	}
 
-	content := i18n.GetMessage(locale, i18n.GdprQueuedSpecificMessages, guildId, strings.Join(ticketIdStrs, ", "))
+	guildDisplay := utils.FormatGuildDisplay(guildId, guildNames)
+	content := i18n.GetMessage(locale, i18n.GdprQueuedSpecificMessages, guildDisplay, strings.Join(ticketIdStrs, ", "))
 	content += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
 
 	components := []component.Component{

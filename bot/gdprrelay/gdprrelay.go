@@ -19,14 +19,15 @@ const (
 )
 
 type GDPRRequest struct {
-	Type               RequestType `json:"type"`
-	UserId             uint64      `json:"user_id"`
-	GuildIds           []uint64    `json:"guild_ids,omitempty"`
-	TicketIds          []int       `json:"ticket_ids,omitempty"`
-	Language           string      `json:"language,omitempty"`
-	InteractionToken   string      `json:"interaction_token,omitempty"`
-	InteractionGuildId uint64      `json:"interaction_guild_id,omitempty"`
-	ApplicationId      uint64      `json:"application_id,omitempty"`
+	Type               RequestType       `json:"type"`
+	UserId             uint64            `json:"user_id"`
+	GuildIds           []uint64          `json:"guild_ids,omitempty"`
+	GuildNames         map[uint64]string `json:"guild_names,omitempty"`
+	TicketIds          []int             `json:"ticket_ids,omitempty"`
+	Language           string            `json:"language,omitempty"`
+	InteractionToken   string            `json:"interaction_token,omitempty"`
+	InteractionGuildId uint64            `json:"interaction_guild_id,omitempty"`
+	ApplicationId      uint64            `json:"application_id,omitempty"`
 }
 
 type QueuedRequest struct {

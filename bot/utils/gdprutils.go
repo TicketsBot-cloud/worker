@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
+	"github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -108,4 +110,35 @@ func ExtractLanguageFromCustomId(customId string) *i18n.Locale {
 		}
 	}
 	return i18n.LocaleEnglish
+}
+
+func FetchGuildNames(ctx context.Context, guildIds []uint64) map[uint64]string {
+	if len(guildIds) == 0 {
+		return make(map[uint64]string)
+	}
+
+	query := `SELECT guild_id, data->>'name' as guild_name FROM guilds WHERE guild_id = ANY($1)`
+	rows, err := cache.Client.Query(ctx, query, guildIds)
+	if err != nil {
+		return make(map[uint64]string)
+	}
+	defer rows.Close()
+
+	guildNames := make(map[uint64]string)
+	for rows.Next() {
+		var guildId uint64
+		var guildName *string
+		if err := rows.Scan(&guildId, &guildName); err == nil && guildName != nil {
+			guildNames[guildId] = *guildName
+		}
+	}
+
+	return guildNames
+}
+
+func FormatGuildDisplay(guildId uint64, guildNames map[uint64]string) string {
+	if name, ok := guildNames[guildId]; ok && name != "" {
+		return name + " (" + strconv.FormatUint(guildId, 10) + ")"
+	}
+	return strconv.FormatUint(guildId, 10)
 }
