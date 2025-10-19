@@ -361,4 +361,5 @@ var (
 	GdprErrorNotOwner         MessageId = "gdpr.error.not_owner"
 	GdprErrorServerNotFound   MessageId = "gdpr.error.server_not_found"
 	GdprErrorQueueFailed      MessageId = "gdpr.error.queue_failed"
+	GdprErrorWorkerOffline    MessageId = "gdpr.error.worker_offline"
 )

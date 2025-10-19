@@ -10,6 +10,8 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
+	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -58,6 +60,11 @@ func (GDPRCommand) Execute(ctx registry.CommandContext, language *string) {
 	}
 	if locale == nil {
 		locale = i18n.LocaleEnglish
+	}
+
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		ctx.ReplyRaw(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline))
+		return
 	}
 
 	// Store language in custom_id for button handlers

@@ -38,7 +38,22 @@ type QueuedRequest struct {
 	RequestID     int         `json:"request_id"`
 }
 
-const keyPending = "tickets:gdpr:pending"
+const (
+	keyPending         = "tickets:gdpr:pending"
+	keyWorkerHeartbeat = "tickets:gdpr:worker:heartbeat"
+)
+
+// Heartbeat check if the GDPR worker is alive
+func IsWorkerAlive(redisClient *redis.Client) bool {
+	val, err := redisClient.Get(context.Background(), keyWorkerHeartbeat).Result()
+	if err == redis.Nil {
+		return false
+	}
+	if err != nil {
+		return false
+	}
+	return val != ""
+}
 
 func Publish(redisClient *redis.Client, data GDPRRequest, logId int) error {
 	queued := QueuedRequest{

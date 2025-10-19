@@ -16,6 +16,8 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
+	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -449,6 +451,11 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		ctx.ReplyRaw(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline))
+		return
+	}
+
 	var guildIds []uint64
 
 	for _, actionRow := range ctx.Interaction.Data.Components {
@@ -542,6 +549,11 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
 
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		ctx.ReplyRaw(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline))
+		return
+	}
+
 	var serverId string
 	var ticketIds string
 
@@ -631,6 +643,11 @@ func (h *GDPRModalAllMessagesHandler) Properties() registry.Properties {
 func (h *GDPRModalAllMessagesHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
+
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		ctx.ReplyRaw(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline))
+		return
+	}
 
 	var guildIds []uint64
 
@@ -724,6 +741,11 @@ func (h *GDPRModalSpecificMessagesHandler) Properties() registry.Properties {
 func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
 	userId := ctx.UserId()
+
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		ctx.ReplyRaw(customisation.Red, "GDPR Worker Unavailable", i18n.GetMessage(locale, i18n.GdprErrorWorkerOffline))
+		return
+	}
 
 	var serverId string
 	var ticketIds string
