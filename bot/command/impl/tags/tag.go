@@ -118,7 +118,7 @@ func (TagCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCom
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3) // TODO: Propagate context
 	defer cancel()
 
-	tagIds, err := dbclient.Client.Tag.GetStartingWith(ctx, data.GuildId.Value, value, 25)
+	tagIds, err := dbclient.Client.Tag.GetContaining(ctx, data.GuildId.Value, value, 25)
 	if err != nil {
 		sentry.Error(err) // TODO: Error context
 		return nil

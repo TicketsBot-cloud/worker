@@ -93,6 +93,8 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 
 		lastId := uint64(0)
 		lastChunkSize := limit
+
+		retries := 0
 		for lastChunkSize == limit {
 			chunk, err := cmd.Worker().GetChannelMessages(cmd.ChannelId(), rest.GetChannelMessagesData{
 				Before: lastId,
@@ -100,11 +102,18 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			})
 
 			if err != nil {
-				// First rest interaction, check for 403
 				var restError request.RestError
-				if errors.As(restError, &restError) && restError.StatusCode == 403 {
+				if errors.As(err, &restError) && restError.StatusCode == 403 {
 					if err := dbclient.Client.AutoCloseExclude.ExcludeAll(ctx, cmd.GuildId()); err != nil {
 						sentry.ErrorWithContext(err, errorContext)
+					}
+				}
+
+				if errors.As(err, &restError) && restError.StatusCode == http.StatusTooManyRequests {
+					if retries < 5 {
+						retries++
+						time.Sleep(time.Duration(retries*2) * time.Second)
+						continue
 					}
 				}
 
@@ -112,6 +121,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 				return
 			}
 
+			retries = 0 // reset retries after a successful call
 			lastChunkSize = len(chunk)
 
 			if lastChunkSize > 0 {
@@ -237,9 +247,22 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 
 func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
 	// Send logs to archive channel
-	archiveChannelId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
-	if err != nil {
-		sentry.ErrorWithContext(err, errorContext)
+	var archiveChannelId *uint64
+
+	if ticket.PanelId != nil {
+		acId, err := dbclient.Client.ArchiveChannel.GetByPanel(ctx, ticket.GuildId, *ticket.PanelId)
+		if err != nil {
+			sentry.ErrorWithContext(err, errorContext)
+			return
+		}
+		archiveChannelId = acId
+	} else {
+		acId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
+		if err != nil {
+			sentry.ErrorWithContext(err, errorContext)
+			return
+		}
+		archiveChannelId = acId
 	}
 
 	var archiveChannelExists bool

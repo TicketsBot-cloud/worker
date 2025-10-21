@@ -71,11 +71,16 @@ func (c *ModalContext) Defer() {
 
 func (c *ModalContext) GetInput(customId string) (string, bool) {
 	for _, c := range c.Interaction.Data.Components {
-		if c.Type != component.ComponentActionRow || len(c.Components) != 1 {
+		if (c.Type != component.ComponentActionRow && c.Type != component.ComponentLabel) || (len(c.Components) != 1 && c.Component == nil) {
 			continue
 		}
 
-		input := c.Components[0]
+		input := c.Component
+
+		if input == nil && len(c.Components) > 0 {
+			input = &c.Components[0]
+		}
+
 		if input.Type != component.ComponentInputText {
 			continue
 		}

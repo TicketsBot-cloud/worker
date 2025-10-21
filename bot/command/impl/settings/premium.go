@@ -113,19 +113,19 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 							component.SelectOption{
 								Label:       "Patreon", // Don't translate
 								Value:       "patreon",
-								Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorPatreon),
+								Description: utils.Ptr(ctx.GetMessage(i18n.MessagePremiumMethodSelectorPatreon)),
 								Emoji:       patreonEmoji,
 							},
 							component.SelectOption{
 								Label:       "Discord",
 								Value:       "discord",
-								Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorDiscord),
+								Description: utils.Ptr(ctx.GetMessage(i18n.MessagePremiumMethodSelectorDiscord)),
 								Emoji:       discordEmoji,
 							},
 							component.SelectOption{
 								Label:       ctx.GetMessage(i18n.MessagePremiumGiveawayKey),
 								Value:       "key",
-								Description: ctx.GetMessage(i18n.MessagePremiumMethodSelectorKey),
+								Description: utils.Ptr(ctx.GetMessage(i18n.MessagePremiumMethodSelectorKey)),
 								Emoji:       keyEmoji,
 							},
 						),

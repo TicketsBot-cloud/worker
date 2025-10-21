@@ -138,16 +138,18 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 			maxLength = utils.Ptr(uint32(*input.MaxLength))
 		}
 
-		components[i] = component.BuildActionRow(component.BuildInputText(component.InputText{
-			Style:       component.TextStyleTypes(input.Style),
-			CustomId:    input.CustomId,
-			Label:       input.Label,
-			Placeholder: input.Placeholder,
-			MinLength:   minLength,
-			MaxLength:   maxLength,
-			Required:    utils.Ptr(input.Required),
-			Value:       nil,
-		}))
+		components[i] = component.BuildLabel(component.Label{
+			Label: input.Label,
+			Component: component.BuildInputText(component.InputText{
+				Style:       component.TextStyleTypes(input.Style),
+				CustomId:    input.CustomId,
+				Placeholder: input.Placeholder,
+				MinLength:   minLength,
+				MaxLength:   maxLength,
+				Required:    utils.Ptr(input.Required),
+				Value:       nil,
+			}),
+		})
 	}
 
 	ctx.Modal(button.ResponseModal{

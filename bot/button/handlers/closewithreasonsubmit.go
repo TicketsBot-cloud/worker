@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -33,12 +34,19 @@ func (h *CloseWithReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 	}
 
 	actionRow := data.Components[0]
-	if len(actionRow.Components) == 0 { // Text input missing
+	if len(actionRow.Components) == 0 && actionRow.Component == nil { // Text input missing
 		ctx.HandleError(fmt.Errorf("Modal missing text input"))
 		return
 	}
 
-	textInput := actionRow.Components[0]
+	var textInput interaction.ModalSubmitInteractionComponentData
+
+	if actionRow.Component != nil {
+		textInput = *actionRow.Component
+	} else {
+		textInput = actionRow.Components[0]
+	}
+
 	if textInput.CustomId != "reason" {
 		ctx.HandleError(fmt.Errorf("Text input custom ID mismatch"))
 		return

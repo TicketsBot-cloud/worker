@@ -52,14 +52,17 @@ func (h *CloseWithReasonModalHandler) Execute(ctx *context.ButtonContext) {
 			CustomId: "close_with_reason_submit",
 			Title:    i18n.TitleClose.GetFromGuild(ctx.GuildId()),
 			Components: []component.Component{
-				component.BuildActionRow(component.BuildInputText(component.InputText{
-					Style:       component.TextStyleParagraph,
-					CustomId:    "reason",
+				component.BuildLabel(component.Label{
 					Label:       i18n.Reason.GetFromGuild(ctx.GuildId()),
-					Placeholder: utils.Ptr(i18n.MessageCloseReasonPlaceholder.GetFromGuild(ctx.GuildId())),
-					MinLength:   nil,
-					MaxLength:   utils.Ptr(uint32(1024)),
-				})),
+					Description: utils.Ptr(i18n.Reason.GetFromGuild(ctx.GuildId())),
+					Component: component.BuildInputText(component.InputText{
+						Style:       component.TextStyleParagraph,
+						CustomId:    "reason",
+						Placeholder: utils.Ptr(i18n.MessageCloseReasonPlaceholder.GetFromGuild(ctx.GuildId())),
+						MinLength:   nil,
+						MaxLength:   utils.Ptr(uint32(1024)),
+					}),
+				}),
 			},
 		},
 	})

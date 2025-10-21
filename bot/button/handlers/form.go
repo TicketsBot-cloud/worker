@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -47,6 +49,26 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 			return
 		}
 
+		// Check support hours
+		hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if hasSupportHours {
+			isActive, err := dbclient.Client.PanelSupportHours.IsActiveNow(ctx, panel.PanelId)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			if !isActive {
+				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOutsideSupportHours)
+				return
+			}
+		}
+
 		// blacklist check
 		blacklisted, err := ctx.IsBlacklisted(ctx)
 		if err != nil {
@@ -67,9 +89,34 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 
 		formAnswers := make(map[database.FormInput]string)
 		for _, actionRow := range data.Components {
+			if actionRow.Component != nil {
+				answer := ""
+
+				switch actionRow.Component.Type {
+				case component.ComponentSelectMenu:
+					answer = strings.Join(actionRow.Component.Values, ", ")
+				case component.ComponentInputText:
+					answer = actionRow.Component.Value
+				case component.ComponentUserSelect:
+					answer = joinMentions(actionRow.Component.Values, "user")
+				case component.ComponentRoleSelect:
+					answer = joinMentions(actionRow.Component.Values, "role")
+				case component.ComponentMentionableSelect:
+					answer = strings.Trim(strings.Join(actionRow.Component.Values, ", "), "<@&!>")
+				case component.ComponentChannelSelect:
+					answer = joinMentions(actionRow.Component.Values, "channel")
+				}
+
+				questionData, ok := inputs[actionRow.Component.CustomId]
+				if ok { // If form has changed, we can skip
+					formAnswers[questionData] = answer
+				}
+				continue
+			}
+
 			for _, input := range actionRow.Components {
 				questionData, ok := inputs[input.CustomId]
-				if ok { // If form has changed, we can skip
+				if ok {
 					formAnswers[questionData] = input.Value
 				}
 			}
@@ -101,4 +148,27 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 
 		return
 	}
+}
+
+func joinMentions(mentions []string, mentionType string) string {
+	val := ""
+
+	for i, mention := range mentions {
+		if i != 0 {
+			val += ", "
+		}
+
+		switch mentionType {
+		case "user":
+			val += fmt.Sprintf("<@%s>", mention)
+		case "role":
+			val += fmt.Sprintf("<@&%s>", mention)
+		case "channel":
+			val += fmt.Sprintf("<#%s>", mention)
+		default:
+			val += mention
+		}
+	}
+
+	return val
 }

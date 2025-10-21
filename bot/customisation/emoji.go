@@ -3,6 +3,7 @@ package customisation
 import (
 	"fmt"
 
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/gdl/objects"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 )
@@ -37,22 +38,22 @@ func (e CustomEmoji) BuildEmoji() *emoji.Emoji {
 }
 
 var (
-	EmojiId         = NewCustomEmoji("id", 1327350136170479638, false)
-	EmojiOpen       = NewCustomEmoji("open", 1327350149684400268, false)
-	EmojiOpenTime   = NewCustomEmoji("opentime", 1327350161206153227, false)
-	EmojiClose      = NewCustomEmoji("close", 1327350171121614870, false)
-	EmojiCloseTime  = NewCustomEmoji("closetime", 1327350182806949948, false)
-	EmojiReason     = NewCustomEmoji("reason", 1327350192801972224, false)
-	EmojiSubject    = NewCustomEmoji("subject", 1327350205896458251, false)
-	EmojiTranscript = NewCustomEmoji("transcript", 1327350249450111068, false)
-	EmojiClaim      = NewCustomEmoji("claim", 1327350259965235233, false)
-	EmojiPanel      = NewCustomEmoji("panel", 1327350268974600263, false)
-	EmojiRating     = NewCustomEmoji("rating", 1327350278973952045, false)
-	EmojiStaff      = NewCustomEmoji("staff", 1327350290558746674, false)
-	EmojiThread     = NewCustomEmoji("thread", 1327350300717355079, false)
-	EmojiBulletLine = NewCustomEmoji("bulletline", 1327350311110574201, false)
-	EmojiPatreon    = NewCustomEmoji("patreon", 1327350319612690563, false)
-	EmojiDiscord    = NewCustomEmoji("discord", 1327350329381228544, false)
+	EmojiId         = NewCustomEmoji("id", config.Conf.Emojis.Id, false)
+	EmojiOpen       = NewCustomEmoji("open", config.Conf.Emojis.Open, false)
+	EmojiOpenTime   = NewCustomEmoji("opentime", config.Conf.Emojis.OpenTime, false)
+	EmojiClose      = NewCustomEmoji("close", config.Conf.Emojis.Close, false)
+	EmojiCloseTime  = NewCustomEmoji("closetime", config.Conf.Emojis.CloseTime, false)
+	EmojiReason     = NewCustomEmoji("reason", config.Conf.Emojis.Reason, false)
+	EmojiSubject    = NewCustomEmoji("subject", config.Conf.Emojis.Subject, false)
+	EmojiTranscript = NewCustomEmoji("transcript", config.Conf.Emojis.Transcript, false)
+	EmojiClaim      = NewCustomEmoji("claim", config.Conf.Emojis.Claim, false)
+	EmojiPanel      = NewCustomEmoji("panel", config.Conf.Emojis.Panel, false)
+	EmojiRating     = NewCustomEmoji("rating", config.Conf.Emojis.Rating, false)
+	EmojiStaff      = NewCustomEmoji("staff", config.Conf.Emojis.Staff, false)
+	EmojiThread     = NewCustomEmoji("thread", config.Conf.Emojis.Thread, false)
+	EmojiBulletLine = NewCustomEmoji("bulletline", config.Conf.Emojis.BulletLine, false)
+	EmojiPatreon    = NewCustomEmoji("patreon", config.Conf.Emojis.Patreon, false)
+	EmojiDiscord    = NewCustomEmoji("discord", config.Conf.Emojis.Discord, false)
 	//EmojiTime       = NewCustomEmoji("time", 974006684622159952, false)
 )
 

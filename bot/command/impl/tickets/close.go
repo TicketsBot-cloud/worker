@@ -71,7 +71,7 @@ func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoC
 			panelId = ticket.PanelId
 		}
 
-		reasons, err = dbclient.Analytics.GetTopCloseReasonsWithPrefix(ctx, data.GuildId.Value, panelId, value)
+		reasons, err = dbclient.Analytics.GetTopCloseReasonsContaining(ctx, data.GuildId.Value, panelId, value)
 	}
 
 	if err != nil {

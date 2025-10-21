@@ -30,11 +30,11 @@ type (
 
 		Bot struct {
 			HttpAddress         string   `env:"HTTP_ADDR"`
-			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.ticketsbot.cloud"`
-			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://ticketsbot.cloud"`
-			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.ticketsbot.cloud"`
-			PoweredBy           string   `env:"POWEREDBY" envDefault:"ticketsbot.cloud"`
-			IconUrl             string   `env:"ICON_URL" envDefault:"https://ticketsbot.cloud/assets/img/logo.png"`
+			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.tickets.bot"`
+			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://tickets.bot"`
+			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.tickets.bot"`
+			PoweredBy           string   `env:"POWEREDBY" envDefault:"tickets.bot"`
+			IconUrl             string   `env:"ICON_URL" envDefault:"https://tickets.bot/assets/img/logo.png"`
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
@@ -118,6 +118,25 @@ type (
 			ProjectId string `env:"PROJECT_ID"`
 		} `envPrefix:"WORKER_CLOUD_PROFILER_"`
 
+		Emojis struct {
+			Id         uint64 `env:"ID" envDefault:"1327350136170479638"`
+			Open       uint64 `env:"OPEN" envDefault:"1327350149684400268"`
+			OpenTime   uint64 `env:"OPENTIME" envDefault:"1327350161206153227"`
+			Close      uint64 `env:"CLOSE" envDefault:"1327350171121614870"`
+			CloseTime  uint64 `env:"CLOSETIME" envDefault:"1327350182806949948"`
+			Reason     uint64 `env:"REASON" envDefault:"1327350192801972224"`
+			Subject    uint64 `env:"SUBJECT" envDefault:"1327350205896458251"`
+			Transcript uint64 `env:"TRANSCRIPT" envDefault:"1327350249450111068"`
+			Claim      uint64 `env:"CLAIM" envDefault:"1327350259965235233"`
+			Panel      uint64 `env:"PANEL" envDefault:"1327350268974600263"`
+			Rating     uint64 `env:"RATING" envDefault:"1327350278973952045"`
+			Staff      uint64 `env:"STAFF" envDefault:"1327350290558746674"`
+			Thread     uint64 `env:"THREAD" envDefault:"1327350300717355079"`
+			BulletLine uint64 `env:"BULLETLINE" envDefault:"1327350311110574201"`
+			Patreon    uint64 `env:"PATREON" envDefault:"1327350319612690563"`
+			Discord    uint64 `env:"DISCORD" envDefault:"1327350329381228544"`
+		} `envPrefix:"EMOJI_"`
+
 		VoteSkuId uuid.UUID `env:"VOTE_SKU_ID"`
 	}
 )
@@ -133,4 +152,8 @@ func Parse() {
 	if err := env.Parse(&Conf); err != nil {
 		panic(err)
 	}
+}
+
+func init() {
+	Parse()
 }

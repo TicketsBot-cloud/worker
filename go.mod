@@ -1,21 +1,24 @@
 module github.com/TicketsBot-cloud/worker
 
-go 1.23.8
+go 1.24.0
 
 toolchain go1.24.2
 
-// replace github.com/TicketsBot-cloud/database => ../database
-// replace github.com/TicketsBot-cloud/gdl => ../gdl
-// replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
-// replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
+//replace github.com/TicketsBot-cloud/database => ../database
+
+//replace github.com/TicketsBot-cloud/gdl => ../gdl
+
+//replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
+
+//replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
 require (
 	cloud.google.com/go/profiler v0.4.2
+	github.com/TicketsBot-cloud/analytics-client v0.0.0-20250604180646-6606dfc8fc8c
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
-	github.com/TicketsBot-cloud/database v0.0.0-20250320215455-17762cd7d39a
-	github.com/TicketsBot-cloud/gdl v0.0.0-20250509054940-2045fbe19c06
-	github.com/TicketsBot/analytics-client v0.0.0-20240724103359-30f5dac821e6
+	github.com/TicketsBot-cloud/database v0.0.0-20251005195038-fd63a423fcb7
+	github.com/TicketsBot-cloud/gdl v0.0.0-20251007163257-7e59b92d02dd
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0
@@ -35,9 +38,9 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
-	golang.org/x/net v0.40.0
-	golang.org/x/sync v0.14.0
-	golang.org/x/tools v0.33.0
+	golang.org/x/net v0.43.0
+	golang.org/x/sync v0.17.0
+	golang.org/x/tools v0.36.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 )
 
@@ -46,10 +49,10 @@ require (
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	github.com/ClickHouse/ch-go v0.65.1 // indirect
-	github.com/ClickHouse/clickhouse-go/v2 v2.34.0 // indirect
+	github.com/ClickHouse/ch-go v0.66.0 // indirect
+	github.com/ClickHouse/clickhouse-go/v2 v2.36.0 // indirect
 	github.com/TicketsBot-cloud/logarchiver v0.0.0-20250514201320-d5141071a6eb // indirect
-	github.com/TicketsBot/common v0.0.0-20241117150316-ff54c97b45c1 // indirect
+	github.com/TicketsBot/common v0.0.0-20240613013221-1e27eb8bfe37 // indirect
 	github.com/TicketsBot/ttlcache v1.6.1-0.20200405150101-acc18e37b261 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -127,17 +130,17 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
-	go.opentelemetry.io/otel v1.35.0 // indirect
-	go.opentelemetry.io/otel/metric v1.35.0 // indirect
-	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.opentelemetry.io/otel v1.36.0 // indirect
+	go.opentelemetry.io/otel/metric v1.36.0 // indirect
+	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.17.0 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
-	golang.org/x/mod v0.24.0 // indirect
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/term v0.35.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.232.0 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect

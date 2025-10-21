@@ -7,13 +7,14 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -111,14 +112,39 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 		guildsFormatted = strings.TrimSuffix(guildsFormatted, "\n")
 	}
 
-	fields := []embed.EmbedField{
-		utils.EmbedFieldRaw("Subscription Tier", tier.String(), true),
-		utils.EmbedFieldRaw("Bot ID", botIdFormatted, true),
-		utils.EmbedFieldRaw("Public Key", publicKeyFormatted, true),
-		utils.EmbedFieldRaw("Guilds", guildsFormatted, true),
-		utils.EmbedFieldRaw("Last 3 Errors", errorsFormatted, true),
-		utils.EmbedFieldRaw("Invite Link", fmt.Sprintf("[Click Here](https://discord.com/oauth2/authorize?client_id=%d&scope=bot+applications.commands&permissions=395942816984)", data.BotId), true),
+	tds := ""
+
+	fields := []model.Field{
+		{Name: "Subscription Tier", Value: tier.String()},
+		{Name: "Bot ID", Value: botIdFormatted},
 	}
 
-	ctx.ReplyWithEmbed(utils.BuildEmbedRaw(ctx.GetColour(customisation.Green), "Whitelabel", "", fields, ctx.PremiumTier()))
+	if data.BotId != 0 {
+		fields = append(fields, model.Field{Name: "Public Key", Value: publicKeyFormatted})
+		fields = append(fields, model.Field{Name: "Guilds", Value: guildsFormatted})
+		fields = append(fields, model.Field{Name: "Last 3 Errors", Value: errorsFormatted})
+		fields = append(fields, model.Field{
+			Name:  "Invite Link",
+			Value: fmt.Sprintf("[Click Here](https://discord.com/oauth2/authorize?client_id=%d&scope=bot+applications.commands&permissions=395942816984)", data.BotId),
+		})
+	}
+
+	for i := range fields {
+		tds += fmt.Sprintf("**%s:** %s\n", fields[i].Name, fields[i].Value)
+	}
+
+	innerComponents := []component.Component{
+		component.BuildTextDisplay(component.TextDisplay{Content: "## Whitelabel"}),
+		component.BuildSeparator(component.Separator{}),
+		component.BuildTextDisplay(component.TextDisplay{
+			Content: tds,
+		}),
+	}
+
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(utils.BuildContainerWithComponents(
+		ctx,
+		customisation.Green,
+		"Admin - Whitelabel Data",
+		innerComponents,
+	))))
 }

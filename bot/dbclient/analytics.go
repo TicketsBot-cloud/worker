@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/TicketsBot-cloud/analytics-client"
 	"github.com/TicketsBot-cloud/worker/config"
-	"github.com/TicketsBot/analytics-client"
 	"go.uber.org/zap"
 )
 
