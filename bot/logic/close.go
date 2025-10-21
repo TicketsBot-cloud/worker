@@ -247,9 +247,22 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 
 func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
 	// Send logs to archive channel
-	archiveChannelId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
-	if err != nil {
-		sentry.ErrorWithContext(err, errorContext)
+	var archiveChannelId *uint64
+
+	if ticket.PanelId != nil {
+		acId, err := dbclient.Client.ArchiveChannel.GetByPanel(ctx, ticket.GuildId, *ticket.PanelId)
+		if err != nil {
+			sentry.ErrorWithContext(err, errorContext)
+			return
+		}
+		archiveChannelId = acId
+	} else {
+		acId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
+		if err != nil {
+			sentry.ErrorWithContext(err, errorContext)
+			return
+		}
+		archiveChannelId = acId
 	}
 
 	var archiveChannelExists bool

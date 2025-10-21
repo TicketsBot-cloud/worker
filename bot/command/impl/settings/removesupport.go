@@ -112,7 +112,16 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	ctx.Reply(customisation.Green, i18n.TitleRemoveSupport, i18n.MessageRemoveSupportSuccess)
+	var mention string
+	if mentionableType == context.MentionableTypeUser {
+		mention = fmt.Sprintf("<@%d>", id)
+	} else {
+		mention = fmt.Sprintf("<@&%d>", id)
+	}
+
+	ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(
+		utils.BuildEmbed(ctx, customisation.Green, i18n.TitleRemoveSupport, i18n.MessageRemoveSupportSuccess, nil, mention),
+	))
 
 	if settings.TicketNotificationChannel != nil {
 		// Remove user / role from thread notification channel

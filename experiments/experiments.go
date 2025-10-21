@@ -43,12 +43,12 @@ func HasFeature(ctx context.Context, guildId uint64, experiment Experiment) bool
 			if dbErr != nil || dbExperiment == nil {
 				// If we can't find it in the database, default to 0%
 				rolloutPercentage = 0
+			} else {
+				rolloutPercentage = dbExperiment.RolloutPercentage
+
+				// Cache in Redis for future use
+				_ = redis.SetExperimentRolloutPercentage(ctx, strings.ToLower(string(experiment)), rolloutPercentage)
 			}
-
-			rolloutPercentage = dbExperiment.RolloutPercentage
-
-			// Cache in Redis for future use
-			_ = redis.SetExperimentRolloutPercentage(ctx, strings.ToLower(string(experiment)), rolloutPercentage)
 		} else {
 			rolloutPercentage = 0
 		}

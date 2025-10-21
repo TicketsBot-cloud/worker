@@ -93,6 +93,7 @@ var (
 	MessageOpenRatelimited               MessageId = "open.ratelimited"
 	MessageOpenPanelForceDisabled        MessageId = "open.panel_force_disabled"
 	MessageOpenPanelDisabled             MessageId = "open.panel_disabled"
+	MessageOutsideSupportHours           MessageId = "open.outside_support_hours"
 	MessageTicketOpened                  MessageId = "open.success"
 
 	MessageOpenAclNoAllowRules           MessageId = "open.acl.no_allow_rules"
@@ -193,6 +194,7 @@ var (
 	MessageOpenCantSeeParentChannel MessageId = "commands.open.threads.cant_see_parent_channel"
 	MessageOpenCantMessageInThreads MessageId = "commands.open.threads.cant_message_in_threads"
 
+	MessageCloseRequested           MessageId = "commands.close_request.success"
 	MessageCloseRequestNoReason     MessageId = "commands.close_request.no_reason"
 	MessageCloseRequestWithReason   MessageId = "commands.close_request.with_reason"
 	MessageCloseRequestNoPermission MessageId = "commands.close_request.no_permission"

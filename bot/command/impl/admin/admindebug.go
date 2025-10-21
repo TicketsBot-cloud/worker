@@ -197,16 +197,13 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 	settingsInfo = append(settingsInfo, fmt.Sprintf("Data Imported: `%t`", hasDataRun))
 	settingsInfo = append(settingsInfo, fmt.Sprintf("Transcripts Imported: `%t`", hasTranscriptRun))
 
-	featuresMsg := ""
-
-	if len(featuresEnabled) > 0 {
-		featuresMsg = fmt.Sprintf("**Experiments Enabled**\n- %s", strings.Join(featuresEnabled, "\n- "))
-	}
-
 	debugResponse := []string{
 		fmt.Sprintf("**Guild Info**\n- %s", strings.Join(guildInfo, "\n- ")),
 		fmt.Sprintf("**Settings**\n- %s", strings.Join(settingsInfo, "\n- ")),
-		featuresMsg,
+	}
+
+	if len(featuresEnabled) > 0 {
+		debugResponse = append(debugResponse, fmt.Sprintf("**Experiments Enabled**\n- %s", strings.Join(featuresEnabled, "\n- ")))
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{

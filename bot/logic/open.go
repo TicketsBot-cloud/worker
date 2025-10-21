@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/objects/user"
@@ -27,6 +28,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
+	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -557,10 +559,14 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Create webhook
 	// TODO: Create webhook on use, rather than on ticket creation.
-	// TODO: Webhooks for threads should be created on the parent channel.
-	if cmd.PremiumTier() > premium.None && !ticket.IsThread {
+	if cmd.PremiumTier() > premium.None {
 		group.Go(func() error {
-			return createWebhook(rootSpan.Context(), cmd, ticketId, cmd.GuildId(), ch.Id)
+			// For threads, create webhook on the parent channel since threads can't have their own webhooks
+			webhookChannelId := ch.Id
+			if ticket.IsThread {
+				webhookChannelId = cmd.ChannelId() // Parent channel
+			}
+			return createWebhook(rootSpan.Context(), cmd, ticketId, cmd.GuildId(), webhookChannelId)
 		})
 	}
 
@@ -725,9 +731,12 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
-	// TODO: Re-add permission check
-	//if permission.HasPermissionsChannel(ctx.Shard, ctx.GuildId, ctx.Shard.SelfId(), channelId, permission.ManageWebhooks) { // Do we actually need this?
-	root := sentry.StartSpan(ctx, "Create webhook")
+	// Check if bot has ManageWebhooks permission in the channel before attempting to create
+	if !permissionwrapper.HasPermissionsChannel(c.Worker(), guildId, c.Worker().BotId, channelId, permission.ManageWebhooks) {
+		return nil // Silently skip webhook creation if no permission
+	}
+
+	root := sentry.StartSpan(ctx, "Create or reuse webhook")
 	defer root.Finish()
 
 	span := sentry.StartSpan(root.Context(), "Get bot user")
@@ -737,17 +746,47 @@ func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int,
 		return err
 	}
 
-	data := rest.WebhookData{
-		Username: self.Username,
-		Avatar:   self.AvatarUrl(256),
+	// Check if a webhook already exists for this channel (to reuse for thread tickets)
+	span = sentry.StartSpan(root.Context(), "Get existing channel webhooks")
+	existingWebhooks, err := c.Worker().GetChannelWebhooks(channelId)
+	span.Finish()
+
+	var webhook guild.Webhook
+	foundExisting := false
+
+	if err == nil {
+		// Look for an existing webhook owned by the bot
+		for _, wh := range existingWebhooks {
+			if wh.User.Id == c.Worker().BotId {
+				// Verify the webhook still exists and is valid by fetching it
+				span = sentry.StartSpan(root.Context(), "Verify webhook exists")
+				verifiedWebhook, verifyErr := c.Worker().GetWebhook(wh.Id)
+				span.Finish()
+
+				if verifyErr == nil && verifiedWebhook.Id != 0 {
+					webhook = verifiedWebhook
+					foundExisting = true
+					break
+				}
+				// If verification failed, the webhook was deleted, so we'll create a new one
+			}
+		}
 	}
 
-	span = sentry.StartSpan(root.Context(), "Get bot user")
-	webhook, err := c.Worker().CreateWebhook(channelId, data)
-	span.Finish()
-	if err != nil {
-		sentry.ErrorWithContext(err, c.ToErrorContext())
-		return nil // Silently fail
+	// If no existing webhook found, create a new one
+	if !foundExisting {
+		data := rest.WebhookData{
+			Username: self.Username,
+			Avatar:   self.AvatarUrl(256),
+		}
+
+		span = sentry.StartSpan(root.Context(), "Create new webhook")
+		webhook, err = c.Worker().CreateWebhook(channelId, data)
+		span.Finish()
+		if err != nil {
+			sentry.ErrorWithContext(err, c.ToErrorContext())
+			return nil // Silently fail
+		}
 	}
 
 	dbWebhook := database.Webhook{
@@ -758,7 +797,8 @@ func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int,
 	span = sentry.StartSpan(root.Context(), "Store webhook in database")
 	defer span.Finish()
 	if err := dbclient.Client.Webhooks.Create(ctx, guildId, ticketId, dbWebhook); err != nil {
-		return err
+		sentry.ErrorWithContext(err, c.ToErrorContext())
+		return nil // Silently fail
 	}
 
 	return nil

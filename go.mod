@@ -16,9 +16,9 @@ require (
 	cloud.google.com/go/profiler v0.4.2
 	github.com/TicketsBot-cloud/analytics-client v0.0.0-20250604180646-6606dfc8fc8c
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20251015181023-f0b66a074704
-	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
-	github.com/TicketsBot-cloud/database v0.0.0-20251018202538-7f9567e1aeab
-	github.com/TicketsBot-cloud/gdl v0.0.0-20251015182325-d1b5eac653f4
+	github.com/TicketsBot-cloud/common v0.0.0-20251018211322-28f838700959
+	github.com/TicketsBot-cloud/database v0.0.0-20251018211325-3d2b9b4ad642
+	github.com/TicketsBot-cloud/gdl v0.0.0-20251018211314-75f1c9bf22f6
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0

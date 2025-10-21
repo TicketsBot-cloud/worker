@@ -117,10 +117,16 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 	fields := []model.Field{
 		{Name: "Subscription Tier", Value: tier.String()},
 		{Name: "Bot ID", Value: botIdFormatted},
-		{Name: "Public Key", Value: publicKeyFormatted},
-		{Name: "Guilds", Value: guildsFormatted},
-		{Name: "Last 3 Errors", Value: errorsFormatted},
-		{Name: "Invite Link", Value: fmt.Sprintf("[Click Here](https://discord.com/oauth2/authorize?client_id=%d&scope=bot+applications.commands&permissions=395942816984)", data.BotId)},
+	}
+
+	if data.BotId != 0 {
+		fields = append(fields, model.Field{Name: "Public Key", Value: publicKeyFormatted})
+		fields = append(fields, model.Field{Name: "Guilds", Value: guildsFormatted})
+		fields = append(fields, model.Field{Name: "Last 3 Errors", Value: errorsFormatted})
+		fields = append(fields, model.Field{
+			Name:  "Invite Link",
+			Value: fmt.Sprintf("[Click Here](https://discord.com/oauth2/authorize?client_id=%d&scope=bot+applications.commands&permissions=395942816984)", data.BotId),
+		})
 	}
 
 	for i := range fields {

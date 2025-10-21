@@ -53,12 +53,15 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 	innerComponents := []component.Component{}
 
 	for _, entitlement := range entitlements {
-
+		sourceFormatted := string(entitlement.Source)
+		if sourceFormatted == "" {
+			sourceFormatted = "None"
+		}
 		value := fmt.Sprintf(
 			"#### %s\n\n**Tier:** %s\n**Source:** %s\n**Expires:** <t:%d>\n**SKU ID:** %s\n**SKU Priority:** %d\n\n",
 			entitlement.SkuLabel,
 			entitlement.Tier,
-			entitlement.Source,
+			sourceFormatted,
 			entitlement.ExpiresAt.Unix(),
 			entitlement.SkuId.String(),
 			entitlement.SkuPriority,
