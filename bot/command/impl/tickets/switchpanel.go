@@ -105,11 +105,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		return
 	}
 
-	// Generate old and new channel names
-	var oldChannelName string
-	if oldPanel != nil {
-		oldChannelName, _ = logic.GenerateChannelName(ctx.Context, ctx.Worker(), oldPanel, ticket.GuildId, ticket.Id, ticket.UserId, utils.NilIfZero(claimer))
-	}
+	// Generate new channel name
 	newChannelName, err := logic.GenerateChannelName(ctx.Context, ctx.Worker(), &newPanel, ticket.GuildId, ticket.Id, ticket.UserId, utils.NilIfZero(claimer))
 	if err != nil {
 		ctx.HandleError(err)
@@ -123,10 +119,14 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		return
 	}
 
-	// Only update channel name if it matches the old panel's generated name (or if no old panel)
-	shouldUpdateName := false
-	if oldPanel == nil || currentChannel.Name == oldChannelName {
-		shouldUpdateName = true
+	// Always update the name to match the new panel's naming scheme
+	shouldUpdateName := true
+	if oldPanel != nil {
+		// But skip if the user has manually renamed the channel (doesn't match old panel's generated name)
+		oldChannelName, _ := logic.GenerateChannelName(ctx.Context, ctx.Worker(), oldPanel, ticket.GuildId, ticket.Id, ticket.UserId, utils.NilIfZero(claimer))
+		if currentChannel.Name != oldChannelName {
+			shouldUpdateName = false
+		}
 	}
 
 	// Update panel assigned to ticket in database
