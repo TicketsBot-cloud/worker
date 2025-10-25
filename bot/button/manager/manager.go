@@ -67,6 +67,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.RedeemVoteCreditsHandler),
 		new(handlers.ViewStaffHandler),
 		new(handlers.ViewSurveyHandler),
+		new(handlers.CheckPermissionsHandler),
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
