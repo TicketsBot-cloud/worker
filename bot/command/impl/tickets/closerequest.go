@@ -19,6 +19,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -63,6 +64,11 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		return
 	}
 
+	if closeDelay != nil && *closeDelay <= 0 {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseRequestCloseDelayZero)
+		return
+	}
+
 	var closeAt *time.Time = nil
 	if closeDelay != nil {
 		tmp := time.Now().Add(time.Hour * time.Duration(*closeDelay))
@@ -82,17 +88,27 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		return
 	}
 
-	var messageId i18n.MessageId
-	var format []interface{}
-	if reason == nil {
-		messageId = i18n.MessageCloseRequestNoReason
-		format = []interface{}{ctx.UserId()}
-	} else {
-		messageId = i18n.MessageCloseRequestWithReason
-		format = []interface{}{ctx.UserId(), strings.ReplaceAll(*reason, "`", "\\`")}
+	msgEmbed := embed.NewEmbed().
+		SetColor(ctx.GetColour(customisation.Green)).
+		SetTitle(ctx.GetMessage(i18n.TitleCloseRequest))
+
+	msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestHeader, ctx.UserId()), false)
+
+	if reason != nil {
+		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestReason, strings.ReplaceAll(*reason, "`", "\\`")), false)
 	}
 
-	msgEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleCloseRequest, messageId, nil, format...)
+	if closeAt != nil {
+		CloseAtUnix := (*closeAt).Unix()
+		msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestCloseDelay, CloseAtUnix, CloseAtUnix), false)
+	}
+
+	msgEmbed.AddField("", ctx.GetMessage(i18n.MessageCloseRequestFooter), false)
+
+	if ctx.PremiumTier() == premium.None {
+		msgEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
+	}
+
 	components := component.BuildActionRow(
 		component.BuildButton(component.Button{
 			Label:    ctx.GetMessage(i18n.MessageCloseRequestAccept),
