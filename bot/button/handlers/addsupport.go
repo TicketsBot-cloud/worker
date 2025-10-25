@@ -121,7 +121,9 @@ func (h *AddSupportHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddSupport, i18n.MessageAddSupportSuccess, nil)
+	mention := fmt.Sprintf("<@&%d>", id)
+
+	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddSupport, i18n.MessageAddSupportSuccess, nil, mention)
 	ctx.Edit(command.NewEphemeralEmbedMessageResponse(e))
 
 	updateChannelPermissions(ctx, id, mentionableType)
