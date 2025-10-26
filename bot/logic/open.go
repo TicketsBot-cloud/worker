@@ -787,18 +787,18 @@ func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int,
 			sentry.ErrorWithContext(err, c.ToErrorContext())
 			return nil // Silently fail
 		}
-	}
 
-	dbWebhook := database.Webhook{
-		Id:    webhook.Id,
-		Token: webhook.Token,
-	}
+		dbWebhook := database.Webhook{
+			Id:    webhook.Id,
+			Token: webhook.Token,
+		}
 
-	span = sentry.StartSpan(root.Context(), "Store webhook in database")
-	defer span.Finish()
-	if err := dbclient.Client.Webhooks.Create(ctx, guildId, ticketId, dbWebhook); err != nil {
-		sentry.ErrorWithContext(err, c.ToErrorContext())
-		return nil // Silently fail
+		span = sentry.StartSpan(root.Context(), "Store webhook in database")
+		defer span.Finish()
+		if err := dbclient.Client.Webhooks.Create(ctx, guildId, ticketId, dbWebhook); err != nil {
+			sentry.ErrorWithContext(err, c.ToErrorContext())
+			return nil // Silently fail
+		}
 	}
 
 	return nil
