@@ -184,6 +184,10 @@ func buildForm(userId uint64, panel database.Panel, form database.Form, inputs [
 				}
 			}
 
+			if maxLength != nil && *maxLength > len(opts) {
+				*maxLength = len(opts)
+			}
+
 			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildSelectMenu(component.SelectMenu{
 				CustomId:  input.CustomId,
@@ -192,6 +196,7 @@ func buildForm(userId uint64, panel database.Panel, form database.Form, inputs [
 				MaxValues: maxLength,
 				Required:  utils.Ptr(isRequired),
 			})
+
 		// Input Text
 		case 4:
 			innerComponent = component.BuildInputText(component.InputText{

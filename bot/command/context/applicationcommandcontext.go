@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/common/experiments"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -174,6 +175,14 @@ func (c *SlashCommandContext) IsBlacklisted(ctx context.Context) (bool, error) {
 	// if interaction.Member is nil, it does not matter, as the member's roles are not checked
 	// if the command is not executed in a guild
 	return utils.IsBlacklisted(ctx, c.GuildId(), c.UserId(), utils.ValueOrZero(c.Interaction.Member), permLevel)
+}
+
+func (c *SlashCommandContext) HasFeature(feature experiments.Experiment) bool {
+	manager := experiments.GetGlobalManager()
+	if manager == nil {
+		return false
+	}
+	return manager.HasFeature(c, c.GuildId(), feature)
 }
 
 /// InteractionContext functions
