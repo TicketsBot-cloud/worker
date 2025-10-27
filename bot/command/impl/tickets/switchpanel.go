@@ -223,7 +223,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	// Calculate new channel permissions
 	var overwrites []channel.PermissionOverwrite
 	if claimer == 0 {
-		overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, members...)
+		overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, members...)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -238,7 +238,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		// GenerateClaimedOverwrites returns nil if the permissions are the same as an unclaimed ticket
 		// so if this is the case, we still need to calculate permissions
 		if overwrites == nil {
-			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, members...)
+			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, members...)
 		}
 	}
 
