@@ -60,7 +60,6 @@ func OnMemberLeave(worker *worker.Context, e events.GuildMemberRemove) {
 					premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, ticket.GuildId, true, worker.Token, worker.RateLimiter)
 					if err != nil {
 						sentry.Error(err)
-						return
 					}
 
 					ctx, cancel := context.WithTimeout(context.Background(), constants.TimeoutCloseTicket)
