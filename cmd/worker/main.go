@@ -154,8 +154,8 @@ func main() {
 	integrations.InitIntegrations()
 
 	go messagequeue.ListenTicketClose()
-	go messagequeue.ListenAutoClose()
-	go messagequeue.ListenCloseRequestTimer()
+	go messagequeue.ListenAutoClose(logger.With(zap.String("service", "autoclose")))
+	go messagequeue.ListenCloseRequestTimer(logger.With(zap.String("service", "close-request-timer")))
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
 
