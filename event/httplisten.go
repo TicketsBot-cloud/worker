@@ -169,6 +169,23 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 				ctx.JSON(200, res)
 				ctx.Writer.Flush()
 			case data := <-responseCh:
+				if data.Type() == button.ResponseTypeModal {
+					if resp, ok := data.(button.ResponseModal); ok {
+						modalJSON, _ := json.Marshal(data.Build())
+						logrus.Infof("responding with modal to message component interaction (custom_id: %s, title: %s, components: %d, json: %s)",
+							resp.Data.CustomId, resp.Data.Title, len(resp.Data.Components), string(modalJSON))
+
+						if resp.Data.CustomId == "" {
+							sentry.Error(fmt.Errorf("modal response has empty custom_id"))
+						}
+						if resp.Data.Title == "" {
+							sentry.Error(fmt.Errorf("modal response has empty title"))
+						}
+						if len(resp.Data.Components) == 0 {
+							sentry.Error(fmt.Errorf("modal response has no components"))
+						}
+					}
+				}
 				ctx.JSON(200, data.Build())
 				ctx.Writer.Flush()
 			}

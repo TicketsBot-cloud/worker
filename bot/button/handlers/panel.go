@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	ct "context"
+
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
@@ -15,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/integrations"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -44,26 +47,6 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		// TODO: Log this
 		if panel.GuildId != ctx.GuildId() {
 			return
-		}
-
-		// Check support hours
-		hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if hasSupportHours {
-			isActive, err := dbclient.Client.PanelSupportHours.IsActiveNow(ctx, panel.PanelId)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			if !isActive {
-				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOutsideSupportHours)
-				return
-			}
 		}
 
 		// blacklist check
@@ -104,10 +87,22 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 				return
 			}
 
+			inputApiConfigs, err := dbclient.Client.FormInputApiConfig.GetByFormId(ctx, form.Id)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			inputApiHeaders, err := dbclient.Client.FormInputApiHeaders.GetAllByGuild(ctx, ctx.GuildId())
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
 			if len(inputs) == 0 { // Don't open a blank form
 				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
 			} else {
-				modal := buildForm(panel, form, inputs, inputOptions)
+				modal := buildForm(ctx.UserId(), panel, form, inputs, inputOptions, inputApiConfigs, inputApiHeaders)
 				ctx.Modal(modal)
 			}
 		}
@@ -116,7 +111,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 	}
 }
 
-func buildForm(panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) button.ResponseModal {
+func buildForm(userId uint64, panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption, inputApiConfigs []database.FormInputApiConfig, inputApiHeaders map[int][]database.FormInputApiHeader) button.ResponseModal {
 	components := make([]component.Component, len(inputs))
 	for i, input := range inputs {
 		var minLength, maxLength *int
@@ -132,6 +127,21 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 		}
 
 		var innerComponent component.Component
+		var apiConfig *database.FormInputApiConfig
+		var apiHeaders []database.FormInputApiHeader
+
+		for _, conf := range inputApiConfigs {
+			if conf.FormInputId == input.Id {
+				apiConfig = &conf
+				break
+			}
+		}
+
+		if apiConfig != nil {
+			if headers, ok := inputApiHeaders[apiConfig.Id]; ok {
+				apiHeaders = headers
+			}
+		}
 
 		options, ok := inputOptions[input.Id]
 		if !ok {
@@ -141,14 +151,43 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 		switch input.Type {
 		// String Select
 		case int(component.ComponentSelectMenu):
-			opts := make([]component.SelectOption, len(options))
-			for j, option := range options {
-				opts[j] = component.SelectOption{
-					Label:       option.Label,
-					Value:       option.Value,
-					Description: option.Description,
+			ctx := ct.Background()
+
+			opts := make([]component.SelectOption, 0)
+
+			if apiConfig != nil {
+				apiOpts, err := integrations.FetchInputOptions(ctx, userId, *apiConfig, apiHeaders)
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				opts = make([]component.SelectOption, len(apiOpts))
+
+				for j, option := range apiOpts {
+					if j >= 25 { // Discord max
+						break
+					}
+					opts[j] = component.SelectOption{
+						Label:       option.Label,
+						Value:       option.Value,
+						Description: option.Description,
+					}
+				}
+			} else {
+				opts = make([]component.SelectOption, len(options))
+				for j, option := range options {
+					opts[j] = component.SelectOption{
+						Label:       option.Label,
+						Value:       option.Value,
+						Description: option.Description,
+					}
 				}
 			}
+
+			if maxLength != nil && *maxLength > len(opts) {
+				*maxLength = len(opts)
+			}
+
 			isRequired := input.MinLength != nil && *input.MinLength > 0
 			innerComponent = component.BuildSelectMenu(component.SelectMenu{
 				CustomId:  input.CustomId,
@@ -157,6 +196,7 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 				MaxValues: maxLength,
 				Required:  utils.Ptr(isRequired),
 			})
+
 		// Input Text
 		case 4:
 			innerComponent = component.BuildInputText(component.InputText{

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/experiments"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/gdl/objects/application"
@@ -17,7 +18,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/experiments"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -101,7 +101,7 @@ func (AdminDebugCommand) Execute(ctx registry.CommandContext, raw string) {
 
 	for i := range experiments.List {
 		feature := experiments.List[i]
-		if experiments.HasFeature(ctx, guild.Id, feature) {
+		if ctx.HasFeature(feature) {
 			featuresEnabled = append(featuresEnabled, string(feature))
 		}
 	}

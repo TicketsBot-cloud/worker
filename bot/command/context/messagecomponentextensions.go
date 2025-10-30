@@ -2,6 +2,8 @@ package context
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
@@ -13,6 +15,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
 
@@ -38,6 +41,20 @@ func NewMessageComponentExtensions(
 }
 
 func (e *MessageComponentExtensions) Modal(res button.ResponseModal) {
+	if res.Data.CustomId == "" {
+		sentry.ErrorWithContext(fmt.Errorf("modal has empty custom_id"), e.ctx.ToErrorContext())
+	}
+	if res.Data.Title == "" {
+		sentry.ErrorWithContext(fmt.Errorf("modal has empty title"), e.ctx.ToErrorContext())
+	}
+	if len(res.Data.Components) == 0 {
+		sentry.ErrorWithContext(fmt.Errorf("modal has no components"), e.ctx.ToErrorContext())
+	}
+
+	modalJSON, _ := json.Marshal(res.Build())
+	logrus.Infof("sending modal - custom_id: %s, title: %s, components: %d, json: %s",
+		res.Data.CustomId, res.Data.Title, len(res.Data.Components), string(modalJSON))
+
 	e.hasReplied.Store(true)
 	e.responseChannel <- res
 }

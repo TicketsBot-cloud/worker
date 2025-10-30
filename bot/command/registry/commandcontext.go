@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"github.com/TicketsBot-cloud/common/experiments"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/database"
@@ -65,6 +66,7 @@ type CommandContext interface {
 	Settings() (database.Settings, error)
 
 	IsBlacklisted(ctx context.Context) (bool, error)
+	HasFeature(feature experiments.Experiment) bool
 }
 
 type InteractionContext interface {

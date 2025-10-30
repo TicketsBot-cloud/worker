@@ -130,7 +130,6 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 							},
 						),
 						Placeholder: ctx.GetMessage(i18n.MessagePremiumMethodSelector),
-						Disabled:    false,
 					}),
 				),
 				component.BuildActionRow(
