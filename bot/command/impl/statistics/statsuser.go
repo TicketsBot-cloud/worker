@@ -409,8 +409,19 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				fmt.Sprintf("**Weekly**: %d", weeklyClaimedTickets),
 			}
 
-			innerComponents := []component.Component{
-				component.BuildSection(component.Section{
+			var topSection component.Component
+
+			if userData.AvatarUrl(1) == "" {
+				topSection = component.BuildSection(component.Section{
+					Components: []component.Component{
+						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+						component.BuildTextDisplay(component.TextDisplay{
+							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+						}),
+					},
+				})
+			} else {
+				topSection = component.BuildSection(component.Section{
 					Accessory: component.BuildThumbnail(component.Thumbnail{
 						Media: component.UnfurledMediaItem{
 							Url: userData.AvatarUrl(256),
@@ -422,7 +433,11 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
 						}),
 					},
-				}),
+				})
+			}
+
+			innerComponents := []component.Component{
+				topSection,
 				component.BuildSeparator(component.Separator{}),
 				component.BuildTextDisplay(component.TextDisplay{
 					Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
