@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"time"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
@@ -8,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -27,7 +29,7 @@ func (RemoveCommand) Properties() registry.Properties {
 		PermissionLevel: permcache.Everyone,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user", "User to remove from the current ticket", interaction.OptionTypeUser, i18n.MessageRemoveAdminNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to remove from the current ticket", interaction.OptionTypeMentionable, i18n.MessageRemoveAdminNoMembers),
 		),
 		Timeout: time.Second * 8,
 	}
@@ -37,7 +39,7 @@ func (c RemoveCommand) GetExecutor() interface{} {
 	return c.Execute
 }
 
-func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
+func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 	// Get ticket struct
 	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, ctx.ChannelId(), ctx.GuildId())
 	if err != nil {
@@ -63,40 +65,65 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		return
 	}
 
-	// verify that the user isn't trying to remove staff
-	member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), userId)
-	if err != nil {
-		ctx.HandleError(err)
+	mentionableType, valid := context.DetermineMentionableType(ctx, id)
+	if !valid {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveAdminNoMembers)
 		return
 	}
 
-	permissionLevel, err := permcache.GetPermissionLevel(ctx, utils.ToRetriever(ctx.Worker()), member, ctx.GuildId())
-	if err != nil {
-		ctx.HandleError(err)
+	if mentionableType == context.MentionableTypeRole && ticket.IsThread {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveRoleThread)
 		return
 	}
 
-	if permissionLevel > permcache.Everyone {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
-		return
-	}
-
-	// Remove user from ticket in DB
-	if err := dbclient.Client.TicketMembers.Delete(ctx, ctx.GuildId(), ticket.Id, userId); err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	// Remove user from ticket
-	if ticket.IsThread {
-		if err := ctx.Worker().RemoveThreadMember(ctx.ChannelId(), userId); err != nil {
+	if mentionableType == context.MentionableTypeUser {
+		// verify that the user isn't trying to remove staff
+		member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id)
+		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+
+		permissionLevel, err := permcache.GetPermissionLevel(ctx, utils.ToRetriever(ctx.Worker()), member, ctx.GuildId())
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if permissionLevel > permcache.Everyone {
+			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+			return
+		}
+
+		// Remove user from ticket in DB
+		if err := dbclient.Client.TicketMembers.Delete(ctx, ctx.GuildId(), ticket.Id, id); err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if ticket.IsThread {
+			if err := ctx.Worker().RemoveThreadMember(ctx.ChannelId(), id); err != nil {
+				ctx.HandleError(err)
+				return
+			}
+		} else {
+			data := channel.PermissionOverwrite{
+				Id:    id,
+				Type:  channel.PermissionTypeMember,
+				Allow: 0,
+				Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
+			}
+
+			if err := ctx.Worker().EditChannelPermissions(ctx.ChannelId(), data); err != nil {
+				ctx.HandleError(err)
+				return
+			}
+		}
+	} else if mentionableType == context.MentionableTypeRole {
+		// Handle role removal
 		data := channel.PermissionOverwrite{
-			Id:    userId,
-			Type:  channel.PermissionTypeMember,
+			Id:    id,
+			Type:  channel.PermissionTypeRole,
 			Allow: 0,
 			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 		}
@@ -105,7 +132,18 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			ctx.HandleError(err)
 			return
 		}
+	} else {
+		ctx.HandleError(fmt.Errorf("unknown mentionable type: %d", mentionableType))
+		return
 	}
 
-	ctx.ReplyPermanent(customisation.Green, i18n.TitleRemove, i18n.MessageRemoveSuccess, userId, ctx.ChannelId())
+	// Build mention
+	var mention string
+	if mentionableType == context.MentionableTypeRole {
+		mention = fmt.Sprintf("&%d", id)
+	} else {
+		mention = fmt.Sprintf("%d", id)
+	}
+
+	ctx.ReplyPermanent(customisation.Green, i18n.TitleRemove, i18n.MessageRemoveSuccess, mention, ctx.ChannelId())
 }
