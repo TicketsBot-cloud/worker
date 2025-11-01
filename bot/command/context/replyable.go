@@ -218,8 +218,25 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 				message = r.formatDiscordError(restError, eventId)
 			}
 		} else if restError.ApiError.Code == 50035 { // Invalid Form Body
-			message = r.GetMessage(i18n.MessageErrorInvalidForm) + "\n\n" +
-				r.formatDiscordError(restError, eventId)
+			// Check for specific form validation errors
+			if restError.ApiError.FirstErrorCode() == "BASE_TYPE_BAD_LENGTH" {
+				message = r.GetMessage(i18n.MessageErrorInvalidLength, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "BASE_TYPE_REQUIRED" {
+				message = r.GetMessage(i18n.MessageErrorRequiredField, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "CHANNEL_INVALID_TYPE" {
+				message = r.GetMessage(i18n.MessageErrorInvalidChannelType, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "CHANNEL_PARENT_INVALID" {
+				message = r.GetMessage(i18n.MessageErrorInvalidCategory, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "NUMBER_TYPE_COERCE" {
+				message = r.GetMessage(i18n.MessageErrorInvalidId, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "STRING_TYPE_REGEX" {
+				message = r.GetMessage(i18n.MessageErrorInvalidCharacters)
+			} else if restError.ApiError.FirstErrorCode() == "UNION_TYPE_CHOICES" {
+				message = r.GetMessage(i18n.MessageErrorInvalidChoice, config.Conf.Bot.DashboardUrl)
+			} else {
+				message = r.GetMessage(i18n.MessageErrorInvalidForm) + "\n\n" +
+					r.formatDiscordError(restError, eventId)
+			}
 		} else {
 			message = r.formatDiscordError(restError, eventId)
 		}
