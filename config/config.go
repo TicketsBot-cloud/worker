@@ -32,6 +32,7 @@ type (
 			HttpAddress         string   `env:"HTTP_ADDR"`
 			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.tickets.bot"`
 			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://tickets.bot"`
+			DocsUrl             string   `env:"DOCS_URL" envDefault:"https://docs.tickets.bot"`
 			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.tickets.bot"`
 			PoweredBy           string   `env:"POWEREDBY" envDefault:"tickets.bot"`
 			IconUrl             string   `env:"ICON_URL" envDefault:"https://tickets.bot/assets/img/logo.png"`
