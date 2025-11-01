@@ -54,6 +54,7 @@ var (
 	EmojiBulletLine = NewCustomEmoji("bulletline", config.Conf.Emojis.BulletLine, false)
 	EmojiPatreon    = NewCustomEmoji("patreon", config.Conf.Emojis.Patreon, false)
 	EmojiDiscord    = NewCustomEmoji("discord", config.Conf.Emojis.Discord, false)
+	EmojiLogo       = NewCustomEmoji("TicketsLogo", config.Conf.Emojis.Logo, false)
 	//EmojiTime       = NewCustomEmoji("time", 974006684622159952, false)
 )
 
