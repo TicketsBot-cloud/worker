@@ -409,35 +409,26 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				fmt.Sprintf("**Weekly**: %d", weeklyClaimedTickets),
 			}
 
-			var topSection component.Component
+			var topSection []component.Component
 
 			if userData.AvatarUrl(1) == "" {
-				topSection = component.BuildSection(component.Section{
+				topSection = append(topSection, component.BuildSection(component.Section{
 					Components: []component.Component{
 						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
 						component.BuildTextDisplay(component.TextDisplay{
 							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
 						}),
 					},
-				})
+				}))
 			} else {
-				topSection = component.BuildSection(component.Section{
-					Accessory: component.BuildThumbnail(component.Thumbnail{
-						Media: component.UnfurledMediaItem{
-							Url: userData.AvatarUrl(256),
-						},
-					}),
-					Components: []component.Component{
-						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
-						component.BuildTextDisplay(component.TextDisplay{
-							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-						}),
-					},
-				})
+				topSection = append(topSection,
+					component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+					component.BuildTextDisplay(component.TextDisplay{
+						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+					}))
 			}
 
-			innerComponents := []component.Component{
-				topSection,
+			innerComponents := append(topSection, []component.Component{
 				component.BuildSeparator(component.Separator{}),
 				component.BuildTextDisplay(component.TextDisplay{
 					Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
@@ -456,7 +447,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 						strings.Join(claimedStats, "\n● "),
 					),
 				}),
-			}
+			}...)
 
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 				Components: innerComponents,
