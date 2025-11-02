@@ -109,7 +109,10 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		}),
 	)
 
-	_, err = ctx.Worker().CreateMessageComplex(ctx.ChannelId(), rest.CreateMessageData{
+	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
+	ticketChannelId := *ticket.ChannelId
+
+	_, err = ctx.Worker().CreateMessageComplex(ticketChannelId, rest.CreateMessageData{
 		Content: fmt.Sprintf("<@%d>", ticket.UserId),
 		Embeds:  []*embed.Embed{msgEmbed},
 		AllowedMentions: message.AllowedMention{

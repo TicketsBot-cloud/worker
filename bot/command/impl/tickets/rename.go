@@ -62,7 +62,10 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		return
 	}
 
-	allowed, err := redis.TakeRenameRatelimit(ctx, ctx.ChannelId())
+	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
+	ticketChannelId := *ticket.ChannelId
+
+	allowed, err := redis.TakeRenameRatelimit(ctx, ticketChannelId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
@@ -77,10 +80,10 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		Name: name,
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ctx.ChannelId(), data); err != nil {
+	if _, err := ctx.Worker().ModifyChannel(ticketChannelId, data); err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	ctx.Reply(customisation.Green, i18n.TitleRename, i18n.MessageRenamed, ctx.ChannelId())
+	ctx.Reply(customisation.Green, i18n.TitleRename, i18n.MessageRenamed, ticketChannelId)
 }

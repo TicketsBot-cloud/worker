@@ -94,9 +94,12 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		lastId := uint64(0)
 		lastChunkSize := limit
 
+		// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
+		archiveChannelId := *ticket.ChannelId
+
 		retries := 0
 		for lastChunkSize == limit {
-			chunk, err := cmd.Worker().GetChannelMessages(cmd.ChannelId(), rest.GetChannelMessagesData{
+			chunk, err := cmd.Worker().GetChannelMessages(archiveChannelId, rest.GetChannelMessagesData{
 				Before: lastId,
 				Limit:  limit,
 			})
@@ -206,12 +209,12 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			},
 		}
 
-		if _, err := cmd.Worker().ModifyChannel(cmd.ChannelId(), data); err != nil {
+		if _, err := cmd.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
 			cmd.HandleError(err)
 			return
 		}
 	} else {
-		if _, err := cmd.Worker().DeleteChannel(cmd.ChannelId()); err != nil {
+		if _, err := cmd.Worker().DeleteChannel(*ticket.ChannelId); err != nil {
 			// Check if we should exclude this from autoclose
 			var restError request.RestError
 			if errors.As(err, &restError) && restError.StatusCode == 403 {
