@@ -86,10 +86,22 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 				return
 			}
 
+			inputApiConfigs, err := dbclient.Client.FormInputApiConfig.GetByFormId(ctx, form.Id)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			inputApiHeaders, err := dbclient.Client.FormInputApiHeaders.GetAllByGuild(ctx, ctx.GuildId())
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
 			if len(inputs) == 0 { // Don't open a blank form
 				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
 			} else {
-				modal := buildForm(panel, form, inputs, inputOptions)
+				modal := buildForm(ctx.UserId(), panel, form, inputs, inputOptions, inputApiConfigs, inputApiHeaders)
 				ctx.Modal(modal)
 			}
 		}

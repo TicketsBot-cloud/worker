@@ -2,7 +2,9 @@ package button
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker"
 )
@@ -20,5 +22,7 @@ func (r ResponseModal) Build() interface{} {
 }
 
 func (r ResponseModal) HandleDeferred(interactionData interaction.InteractionMetadata, worker *worker.Context) error {
-	return errors.New("cannot defer modal response")
+	err := errors.New("cannot defer modal response")
+	sentry.Error(fmt.Errorf("failed to send deferred modal response with custom_id %s: %w", r.Data.CustomId, err))
+	return err
 }

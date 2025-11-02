@@ -12,6 +12,7 @@ import (
 
 	"cloud.google.com/go/profiler"
 	"github.com/TicketsBot-cloud/archiverclient"
+	"github.com/TicketsBot-cloud/common/experiments"
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/observability"
 	"github.com/TicketsBot-cloud/common/premium"
@@ -91,6 +92,11 @@ func main() {
 	logger.Info("Connecting to DB")
 	dbclient.Connect(logger.With(zap.String("service", "database")))
 	logger.Info("Connected to DB")
+
+	logger.Info("Initializing experiments manager")
+	expManager := experiments.NewManager(redis.Client, dbclient.Client)
+	experiments.SetGlobalManager(expManager)
+	logger.Info("Initialized experiments manager")
 
 	logger.Info("Loading i18n files")
 	i18n.Init()
