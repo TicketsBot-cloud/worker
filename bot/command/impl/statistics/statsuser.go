@@ -411,21 +411,30 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 			var topSection []component.Component
 
-			if userData.AvatarUrl(1) == "" {
-				topSection = append(topSection, component.BuildSection(component.Section{
-					Components: []component.Component{
-						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
-						component.BuildTextDisplay(component.TextDisplay{
-							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-						}),
-					},
-				}))
-			} else {
-				topSection = append(topSection,
+			avatarUrl := member.User.AvatarUrl(256)
+			if avatarUrl == "" {
+				topSection = []component.Component{
 					component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
 					component.BuildTextDisplay(component.TextDisplay{
 						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-					}))
+					}),
+				}
+			} else {
+				topSection = []component.Component{
+					component.BuildSection(component.Section{
+						Accessory: component.BuildThumbnail(component.Thumbnail{
+							Media: component.UnfurledMediaItem{
+								Url: avatarUrl,
+							},
+						}),
+						Components: []component.Component{
+							component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+							component.BuildTextDisplay(component.TextDisplay{
+								Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+							}),
+						},
+					}),
+				}
 			}
 
 			innerComponents := append(topSection, []component.Component{
@@ -448,10 +457,6 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 					),
 				}),
 			}...)
-
-			span.SetData("response_obj", component.Container{
-				Components: innerComponents,
-			})
 
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 				Components: innerComponents,
