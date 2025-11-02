@@ -449,6 +449,10 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				}),
 			}...)
 
+			span.SetData("response_obj", component.Container{
+				Components: innerComponents,
+			})
+
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 				Components: innerComponents,
 			}))))
