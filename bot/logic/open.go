@@ -162,7 +162,12 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 	span.Finish()
 
+	// Determine if we should use threads
+	// If a panel is provided, use the panel's setting; otherwise use the global setting
 	isThread := settings.UseThreads
+	if panel != nil {
+		isThread = panel.UseThreads
+	}
 
 	// Check if the parent channel is an announcement channel
 	span = sentry.StartSpan(rootSpan.Context(), "Check if parent channel is announcement channel")
