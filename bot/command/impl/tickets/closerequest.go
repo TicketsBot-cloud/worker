@@ -13,7 +13,6 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -33,7 +32,7 @@ func (c CloseRequestCommand) Properties() registry.Properties {
 		PermissionLevel:  permission.Support,
 		Category:         command.Tickets,
 		InteractionOnly:  true,
-		DefaultEphemeral: true,
+		DisableAutoDefer: true,
 		Arguments: command.Arguments(
 			command.NewOptionalArgument("close_delay", "Hours to close the ticket in if the user does not respond", interaction.OptionTypeInteger, "infallible"),
 			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.OptionTypeString, "infallible", c.ReasonAutoCompleteHandler),
@@ -109,20 +108,19 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		}),
 	)
 
-	_, err = ctx.Worker().CreateMessageComplex(ctx.ChannelId(), rest.CreateMessageData{
+	data := command.MessageResponse{
 		Content: fmt.Sprintf("<@%d>", ticket.UserId),
 		Embeds:  []*embed.Embed{msgEmbed},
 		AllowedMentions: message.AllowedMention{
 			Users: []uint64{ticket.UserId},
 		},
 		Components: []component.Component{components},
-	})
-	if err != nil {
+	}
+	
+	if _, err := ctx.ReplyWith(data); err != nil {
 		ctx.HandleError(err)
 		return
 	}
-
-	ctx.ReplyPlain(ctx.GetMessage(i18n.MessageCloseRequested))
 
 	if err := dbclient.Client.Tickets.SetStatus(ctx, ctx.GuildId(), ticket.Id, model.TicketStatusPending); err != nil {
 		ctx.HandleError(err)
