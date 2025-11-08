@@ -99,7 +99,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	}
 
 	if !ticket.IsThread && newPanel.UseThreads {
-		ctx.Reply(customisation.Red, i18n.Error, "You cannot switch to a panel that uses threads from a non-thread ticket.")
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageSwitchPanelNonThreadToThread)
 	}
 
 	// Get ticket claimer
