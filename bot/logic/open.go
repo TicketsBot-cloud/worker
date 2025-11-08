@@ -165,7 +165,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	// Determine if we should use threads
 	// If a panel is provided, use the panel's setting; otherwise use the global setting
 	isThread := settings.UseThreads
-	if panel != nil {
+	if panel != nil && !isThread {
 		isThread = panel.UseThreads
 	}
 
