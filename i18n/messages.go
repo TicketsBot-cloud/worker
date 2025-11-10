@@ -292,7 +292,9 @@ var (
 	MessageErrorInvalidCharacters       MessageId = "errors.invalid_characters"
 	MessageErrorInvalidChoice           MessageId = "errors.invalid_choice"
 	MessageErrorInvalidForm             MessageId = "errors.invalid_form"
-	MessageErrorTimeout                 MessageId = "errors.timeout"
+	MessageErrorTimeout                 MessageId = "errors.timed_out"
+	MessageErrorRateLimited             MessageId = "errors.rate_limited"
+	MessageErrorRateLimitedGlobal       MessageId = "errors.rate_limited_global"
 	MessageErrorGeneral                 MessageId = "errors.general"
 	MessageErrorId                      MessageId = "errors.error_id"
 
