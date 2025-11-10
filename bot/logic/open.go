@@ -162,7 +162,12 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 	span.Finish()
 
+	// Determine if we should use threads
+	// If a panel is provided, use the panel's setting; otherwise use the global setting
 	isThread := settings.UseThreads
+	if panel != nil && !isThread {
+		isThread = panel.UseThreads
+	}
 
 	// Check if the parent channel is an announcement channel
 	span = sentry.StartSpan(rootSpan.Context(), "Check if parent channel is announcement channel")
@@ -665,6 +670,17 @@ func checkChannelLimitAndDetermineParentId(
 		categoryChildrenCount := countRealChannels(channels, categoryId)
 
 		if categoryChildrenCount >= 50 {
+			// Check if we're already in the overflow category
+			isOverflowCategory := settings.OverflowEnabled &&
+				settings.OverflowCategoryId != nil &&
+				*settings.OverflowCategoryId == categoryId
+
+			// If this is the overflow category and it's full, we can't retry or use another overflow
+			if isOverflowCategory {
+				span.Finish()
+				return 0, errCategoryChannelLimitReached
+			}
+
 			if canRetry {
 				canRefresh, err := redis.TakeChannelRefetchToken(ctx, guildId)
 				if err != nil {
@@ -678,7 +694,11 @@ func checkChannelLimitAndDetermineParentId(
 
 					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
 				} else {
-					return 0, errCategoryChannelLimitReached
+					// If we can't refresh but overflow is available, try overflow
+					// instead of immediately returning an error
+					if !settings.OverflowEnabled {
+						return 0, errCategoryChannelLimitReached
+					}
 				}
 			}
 
@@ -714,6 +734,7 @@ func checkChannelLimitAndDetermineParentId(
 				return 0, errCategoryChannelLimitReached
 			}
 		}
+		span.Finish()
 	}
 
 	return categoryId, nil
