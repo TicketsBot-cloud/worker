@@ -409,20 +409,35 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				fmt.Sprintf("**Weekly**: %d", weeklyClaimedTickets),
 			}
 
-			innerComponents := []component.Component{
-				component.BuildSection(component.Section{
-					Accessory: component.BuildThumbnail(component.Thumbnail{
-						Media: component.UnfurledMediaItem{
-							Url: userData.AvatarUrl(256),
+			var topSection []component.Component
+
+			avatarUrl := member.User.AvatarUrl(256)
+			if avatarUrl == "" {
+				topSection = []component.Component{
+					component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+					component.BuildTextDisplay(component.TextDisplay{
+						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+					}),
+				}
+			} else {
+				topSection = []component.Component{
+					component.BuildSection(component.Section{
+						Accessory: component.BuildThumbnail(component.Thumbnail{
+							Media: component.UnfurledMediaItem{
+								Url: avatarUrl,
+							},
+						}),
+						Components: []component.Component{
+							component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+							component.BuildTextDisplay(component.TextDisplay{
+								Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+							}),
 						},
 					}),
-					Components: []component.Component{
-						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
-						component.BuildTextDisplay(component.TextDisplay{
-							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-						}),
-					},
-				}),
+				}
+			}
+
+			innerComponents := append(topSection, []component.Component{
 				component.BuildSeparator(component.Separator{}),
 				component.BuildTextDisplay(component.TextDisplay{
 					Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
@@ -441,7 +456,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 						strings.Join(claimedStats, "\n● "),
 					),
 				}),
-			}
+			}...)
 
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 				Components: innerComponents,

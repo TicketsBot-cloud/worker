@@ -7,11 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -91,6 +94,42 @@ func (h *JoinThreadHandler) Execute(ctx *context.ButtonContext) {
 	if err := ctx.Worker().AddThreadMember(*ticket.ChannelId, ctx.UserId()); err != nil {
 		ctx.HandleError(err)
 		return
+	}
+
+	// Update ticket's member count
+	if ticket.JoinMessageId != nil {
+		var panel *database.Panel
+		if ticket.PanelId != nil {
+			tmp, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			if tmp.PanelId != 0 && ctx.GuildId() == tmp.GuildId {
+				panel = &tmp
+			}
+		}
+
+		threadStaff, err := logic.GetStaffInThread(ctx, ctx.Worker(), ticket, *ticket.ChannelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		settings, err := dbclient.Client.Settings.Get(ctx, ctx.GuildId())
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if settings.TicketNotificationChannel != nil {
+			name, _ := logic.GenerateChannelName(ctx, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
+			data := logic.BuildJoinThreadMessage(ctx, ctx.Worker(), ticket.GuildId, ticket.UserId, name, ticket.Id, panel, threadStaff, ctx.PremiumTier())
+			if _, err := ctx.Worker().EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, data.IntoEditMessageData()); err != nil {
+				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: ctx.GuildId()})
+			}
+		}
 	}
 
 	ctx.Reply(customisation.Green, i18n.Success, i18n.MessageJoinThreadSuccess, *ticket.ChannelId)

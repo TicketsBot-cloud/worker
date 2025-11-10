@@ -98,6 +98,10 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		}
 	}
 
+	if !ticket.IsThread && newPanel.UseThreads {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageSwitchPanelNonThreadToThread)
+	}
+
 	// Get ticket claimer
 	claimer, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
 	if err != nil {
