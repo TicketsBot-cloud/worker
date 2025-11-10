@@ -2,8 +2,10 @@ package context
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -27,6 +29,12 @@ import (
 type Replyable struct {
 	ctx         registry.CommandContext
 	colourCodes map[customisation.Colour]int
+}
+
+type rateLimitResponse struct {
+	Message    string  `json:"message"`
+	RetryAfter float64 `json:"retry_after"`
+	Global     bool    `json:"global"`
 }
 
 func NewReplyable(ctx registry.CommandContext) *Replyable {
@@ -237,6 +245,21 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 				message = r.GetMessage(i18n.MessageErrorInvalidForm) + "\n\n" +
 					r.formatDiscordError(restError, eventId)
 			}
+		} else if restError.StatusCode == http.StatusTooManyRequests {
+			// Rate limit error - parse raw response to extract retry_after and global flag
+			var rateLimit rateLimitResponse
+			if err := json.Unmarshal(restError.Raw, &rateLimit); err == nil && rateLimit.RetryAfter > 0 {
+				timestamp := formatTimestamp(rateLimit.RetryAfter)
+
+				if rateLimit.Global {
+					message = r.GetMessage(i18n.MessageErrorRateLimitedGlobal, timestamp)
+				} else {
+					message = r.GetMessage(i18n.MessageErrorRateLimited, timestamp)
+				}
+			} else {
+				// Fallback if parsing fails or retry_after is not available
+				message = r.GetMessage(i18n.MessageErrorRateLimited, "soon")
+			}
 		} else {
 			message = r.formatDiscordError(restError, eventId)
 		}
@@ -293,4 +316,9 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 	}
 
 	return missingPermissions, nil
+}
+
+func formatTimestamp(seconds float64) string {
+	futureTime := time.Now().Add(time.Duration(seconds) * time.Second)
+	return fmt.Sprintf("<t:%d:R>", futureTime.Unix())
 }

@@ -202,8 +202,9 @@ var (
 	MessageCloseRequestAccept       MessageId = "commands.close_request.accept"
 	MessageCloseRequestDeny         MessageId = "commands.close_request.deny"
 
-	MessageSwitchPanelInvalidPanel MessageId = "commands.switch_panel.invalid_panel"
-	MessageSwitchPanelSuccess      MessageId = "commands.switch_panel.success"
+	MessageSwitchPanelInvalidPanel      MessageId = "commands.switch_panel.invalid_panel"
+	MessageSwitchPanelSuccess           MessageId = "commands.switch_panel.success"
+	MessageSwitchPanelNonThreadToThread MessageId = "commands.switch_panel.non_thread_to_thread"
 
 	MessageAutoCloseConfigure MessageId = "commands.autoclose.configure"
 	MessageAutoCloseExclude   MessageId = "commands.autoclose.exclude.success"
@@ -292,7 +293,9 @@ var (
 	MessageErrorInvalidCharacters       MessageId = "errors.invalid_characters"
 	MessageErrorInvalidChoice           MessageId = "errors.invalid_choice"
 	MessageErrorInvalidForm             MessageId = "errors.invalid_form"
-	MessageErrorTimeout                 MessageId = "errors.timeout"
+	MessageErrorTimeout                 MessageId = "errors.timed_out"
+	MessageErrorRateLimited             MessageId = "errors.rate_limited"
+	MessageErrorRateLimitedGlobal       MessageId = "errors.rate_limited_global"
 	MessageErrorGeneral                 MessageId = "errors.general"
 	MessageErrorId                      MessageId = "errors.error_id"
 
