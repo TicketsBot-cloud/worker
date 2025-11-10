@@ -162,7 +162,12 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 	span.Finish()
 
+	// Determine if we should use threads
+	// If a panel is provided, use the panel's setting; otherwise use the global setting
 	isThread := settings.UseThreads
+	if panel != nil && !isThread {
+		isThread = panel.UseThreads
+	}
 
 	// Check if the parent channel is an announcement channel
 	span = sentry.StartSpan(rootSpan.Context(), "Check if parent channel is announcement channel")
@@ -323,7 +328,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 	} else {
 		span = sentry.StartSpan(rootSpan.Context(), "Build permission overwrites")
-		overwrites, err := CreateOverwrites(ctx, cmd, cmd.UserId(), panel)
+		overwrites, err := CreateOverwrites(ctx, cmd, cmd.UserId(), panel, category)
 		if err != nil {
 			cmd.HandleError(err)
 			return database.Ticket{}, err
@@ -631,6 +636,17 @@ func checkChannelLimitAndDetermineParentId(
 		categoryChildrenCount := countRealChannels(channels, categoryId)
 
 		if categoryChildrenCount >= 50 {
+			// Check if we're already in the overflow category
+			isOverflowCategory := settings.OverflowEnabled &&
+				settings.OverflowCategoryId != nil &&
+				*settings.OverflowCategoryId == categoryId
+
+			// If this is the overflow category and it's full, we can't retry or use another overflow
+			if isOverflowCategory {
+				span.Finish()
+				return 0, errCategoryChannelLimitReached
+			}
+
 			if canRetry {
 				canRefresh, err := redis.TakeChannelRefetchToken(ctx, guildId)
 				if err != nil {
@@ -644,7 +660,11 @@ func checkChannelLimitAndDetermineParentId(
 
 					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
 				} else {
-					return 0, errCategoryChannelLimitReached
+					// If we can't refresh but overflow is available, try overflow
+					// instead of immediately returning an error
+					if !settings.OverflowEnabled {
+						return 0, errCategoryChannelLimitReached
+					}
 				}
 			}
 
@@ -680,6 +700,7 @@ func checkChannelLimitAndDetermineParentId(
 				return 0, errCategoryChannelLimitReached
 			}
 		}
+		span.Finish()
 	}
 
 	return categoryId, nil
@@ -804,7 +825,7 @@ func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int,
 	return nil
 }
 
-func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, userId uint64, panel *database.Panel, otherUsers ...uint64) ([]channel.PermissionOverwrite, error) {
+func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, userId uint64, panel *database.Panel, categoryId uint64, otherUsers ...uint64) ([]channel.PermissionOverwrite, error) {
 	overwrites := []channel.PermissionOverwrite{ // @everyone
 		{
 			Id:    cmd.GuildId(),
@@ -826,11 +847,31 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	}
 
 	// Add the bot to the overwrites
-	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+1)
+	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+2)
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
-	if permission.HasPermissionRaw(cmd.InteractionMetadata().AppPermissions, permission.ManageWebhooks) {
-		selfAllow = append(selfAllow, permission.ManageWebhooks)
+	// Check bot's permissions in the target category (or guild if no category)
+	var checkChannelId uint64
+	if categoryId != 0 {
+		checkChannelId = categoryId
+	}
+
+	if checkChannelId != 0 {
+		// Check permissions in the category
+		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.ManageChannels) {
+			selfAllow = append(selfAllow, permission.ManageChannels)
+		}
+		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.ManageWebhooks) {
+			selfAllow = append(selfAllow, permission.ManageWebhooks)
+		}
+	} else {
+		// Check guild-wide permissions
+		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageChannels) {
+			selfAllow = append(selfAllow, permission.ManageChannels)
+		}
+		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageWebhooks) {
+			selfAllow = append(selfAllow, permission.ManageWebhooks)
+		}
 	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())

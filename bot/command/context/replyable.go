@@ -175,38 +175,75 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 
 	var restError request.RestError
 	if errors.As(err, &restError) {
-		if restError.ApiError.Message == "Missing Permissions" { // Override for missing permissions
+		if restError.ApiError.Code == 10003 { // Unknown channel
+			message = r.GetMessage(i18n.MessageErrorUnknownChannel, config.Conf.Bot.DashboardUrl)
+		} else if restError.ApiError.Code == 10004 { // Unknown guild
+			message = r.GetMessage(i18n.MessageErrorUnknownGuild)
+		} else if restError.ApiError.Code == 10007 { // Unknown member
+			message = r.GetMessage(i18n.MessageErrorUnknownMember)
+		} else if restError.ApiError.Code == 10008 { // Unknown message
+			message = r.GetMessage(i18n.MessageErrorUnknownMessage)
+		} else if restError.ApiError.Code == 10011 { // Unknown role
+			message = r.GetMessage(i18n.MessageErrorUnknownRole, config.Conf.Bot.DashboardUrl)
+		} else if restError.ApiError.Code == 10013 { // Unknown user
+			message = r.GetMessage(i18n.MessageErrorUnknownUser)
+		} else if restError.ApiError.Code == 10059 { // Unknown category
+			message = r.GetMessage(i18n.MessageErrorUnknownCategory, config.Conf.Bot.DashboardUrl)
+		} else if restError.ApiError.Code == 10062 { // Unknown interaction
+			message = r.GetMessage(i18n.MessageErrorUnknownInteraction)
+		} else if restError.ApiError.Code == 30007 { // Maximum number of webhooks reached
+			message = r.GetMessage(i18n.MessageErrorMaxWebhooks)
+		} else if restError.ApiError.Code == 40060 { // Interaction has already been acknowledged
+			message = r.GetMessage(i18n.MessageErrorInteractionAcknowledged)
+		} else if restError.ApiError.Code == 50001 || restError.ApiError.Code == 50013 { // Missing permissions / Missing access
 			interactionCtx, ok := r.ctx.(registry.InteractionContext)
 			if ok {
 				missingPermissions, err := findMissingPermissions(interactionCtx)
 				if err == nil {
 					if len(missingPermissions) > 0 {
-						message = "I am missing the following permissions required to perform this action:\n"
+						message = r.GetMessage(i18n.MessageErrorMissingPermissionsTitle) + ":\n"
 						for _, perm := range missingPermissions {
-							message += fmt.Sprintf("• `%s`\n", perm.String())
+							message += fmt.Sprintf("* `%s`\n", perm.String())
 						}
 
-						message += "\nPlease assign these permissions to the bot, or alternatively, the `Administrator` permission and try again."
+						message += "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, config.Conf.Bot.DocsUrl+"/miscellaneous/permissions-explained")
 					} else {
-						message = formatDiscordError(restError, eventId)
+						message = r.formatDiscordError(restError, eventId)
 					}
 				} else {
 					sentry.ErrorWithContext(err, r.ctx.ToErrorContext())
-					message = formatDiscordError(restError, eventId)
+					message = r.formatDiscordError(restError, eventId)
 				}
 			} else {
-				message = formatDiscordError(restError, eventId)
+				message = r.formatDiscordError(restError, eventId)
 			}
-		} else if restError.ApiError.FirstErrorCode() == "CHANNEL_PARENT_INVALID" {
-			message = "Could not find the ticket channel category: it must have been deleted. Ask a server " +
-				"administrator to visit the dashboard and assign a valid channel category to this ticket panel."
+		} else if restError.ApiError.Code == 50035 { // Invalid Form Body
+			// Check for specific form validation errors
+			if restError.ApiError.FirstErrorCode() == "BASE_TYPE_BAD_LENGTH" {
+				message = r.GetMessage(i18n.MessageErrorInvalidLength, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "BASE_TYPE_REQUIRED" {
+				message = r.GetMessage(i18n.MessageErrorRequiredField, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "CHANNEL_INVALID_TYPE" {
+				message = r.GetMessage(i18n.MessageErrorInvalidChannelType, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "CHANNEL_PARENT_INVALID" {
+				message = r.GetMessage(i18n.MessageErrorInvalidCategory, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "NUMBER_TYPE_COERCE" {
+				message = r.GetMessage(i18n.MessageErrorInvalidId, config.Conf.Bot.DashboardUrl)
+			} else if restError.ApiError.FirstErrorCode() == "STRING_TYPE_REGEX" {
+				message = r.GetMessage(i18n.MessageErrorInvalidCharacters)
+			} else if restError.ApiError.FirstErrorCode() == "UNION_TYPE_CHOICES" {
+				message = r.GetMessage(i18n.MessageErrorInvalidChoice, config.Conf.Bot.DashboardUrl)
+			} else {
+				message = r.GetMessage(i18n.MessageErrorInvalidForm) + "\n\n" +
+					r.formatDiscordError(restError, eventId)
+			}
 		} else {
-			message = formatDiscordError(restError, eventId)
+			message = r.formatDiscordError(restError, eventId)
 		}
 	} else if errors.Is(err, context.DeadlineExceeded) {
-		message = "The operation timed out, please try again."
+		message = r.GetMessage(i18n.MessageErrorTimeout)
 	} else {
-		message = fmt.Sprintf("An error occurred while performing this action.\nError ID: `%s`", eventId)
+		message = r.GetMessage(i18n.MessageErrorGeneral) + "\n" + r.GetMessage(i18n.MessageErrorId) + ": `" + eventId + "`"
 	}
 
 	embed := r.buildEmbedRaw(customisation.Red, r.GetMessage(i18n.Error), message)
@@ -232,13 +269,10 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 	return res
 }
 
-func formatDiscordError(restError request.RestError, eventId string) string {
-	return fmt.Sprintf("An error occurred while performing this action:\n"+
-		"```\n"+
-		"%s\n"+
-		"```\n"+
-		"Error ID: `%s`",
-		restError.Error(), eventId)
+func (r *Replyable) formatDiscordError(restError request.RestError, eventId string) string {
+	return r.GetMessage(i18n.MessageErrorGeneral) + ":\n```\n" +
+		restError.Error() + "\n```\n" +
+		r.GetMessage(i18n.MessageErrorId) + ": `" + eventId + "`"
 }
 
 func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permission, error) {
