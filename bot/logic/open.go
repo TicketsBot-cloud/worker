@@ -675,12 +675,6 @@ func checkChannelLimitAndDetermineParentId(
 				settings.OverflowCategoryId != nil &&
 				*settings.OverflowCategoryId == categoryId
 
-			// If this is the overflow category and it's full, we can't retry or use another overflow
-			if isOverflowCategory {
-				span.Finish()
-				return 0, errCategoryChannelLimitReached
-			}
-
 			if canRetry {
 				canRefresh, err := redis.TakeChannelRefetchToken(ctx, guildId)
 				if err != nil {
@@ -694,11 +688,23 @@ func checkChannelLimitAndDetermineParentId(
 
 					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
 				} else {
+					// If this is the overflow category and it's full (and we can't refresh), we can't use another overflow
+					if isOverflowCategory {
+						span.Finish()
+						return 0, errCategoryChannelLimitReached
+					}
+
 					// If we can't refresh but overflow is available, try overflow
 					// instead of immediately returning an error
 					if !settings.OverflowEnabled {
 						return 0, errCategoryChannelLimitReached
 					}
+				}
+			} else {
+				// If this is the overflow category and it's full (and we can't retry), we can't use another overflow
+				if isOverflowCategory {
+					span.Finish()
+					return 0, errCategoryChannelLimitReached
 				}
 			}
 
