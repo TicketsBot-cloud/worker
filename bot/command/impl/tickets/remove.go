@@ -76,6 +76,10 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
+	// Remove user from ticket
+	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
+	ticketChannelId := *ticket.ChannelId
+
 	if mentionableType == context.MentionableTypeUser {
 		// verify that the user isn't trying to remove staff
 		member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id)
@@ -114,7 +118,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 				Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 			}
 
-			if err := ctx.Worker().EditChannelPermissions(ctx.ChannelId(), data); err != nil {
+			if err := ctx.Worker().EditChannelPermissions(ticketChannelId, data); err != nil {
 				ctx.HandleError(err)
 				return
 			}
@@ -128,7 +132,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 		}
 
-		if err := ctx.Worker().EditChannelPermissions(ctx.ChannelId(), data); err != nil {
+		if err := ctx.Worker().EditChannelPermissions(ticketChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}
@@ -145,5 +149,5 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 		mention = fmt.Sprintf("%d", id)
 	}
 
-	ctx.ReplyPermanent(customisation.Green, i18n.TitleRemove, i18n.MessageRemoveSuccess, mention, ctx.ChannelId())
+	ctx.ReplyPermanent(customisation.Green, i18n.TitleRemove, i18n.MessageRemoveSuccess, mention, ticketChannelId)
 }

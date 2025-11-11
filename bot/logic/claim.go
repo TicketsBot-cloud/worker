@@ -54,15 +54,31 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 
 	// If newOverwrites = nil, no changes to permissions should be made
 	if newOverwrites != nil {
-		channelName, err := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &userId)
+		newChannelName, err := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &userId)
 		if err != nil {
 			return err
 		}
 
+		// Fetch current channel to check if user has manually renamed it
+		currentChannel, err := cmd.Worker().GetChannel(*ticket.ChannelId)
+		if err != nil {
+			return err
+		}
+
+		// Always update the name to match the new claimed naming scheme
+		shouldUpdateName := true
+		// But skip if the user has manually renamed the channel (doesn't match old unclaimed name)
+		oldChannelName, _ := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
+		if currentChannel.Name != oldChannelName {
+			shouldUpdateName = false
+		}
+
 		// Update channel
 		data := rest.ModifyChannelData{
-			Name:                 channelName,
 			PermissionOverwrites: newOverwrites,
+		}
+		if shouldUpdateName {
+			data.Name = newChannelName
 		}
 
 		if _, err = cmd.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
