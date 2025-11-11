@@ -16,9 +16,9 @@ require (
 	cloud.google.com/go/profiler v0.4.2
 	github.com/TicketsBot-cloud/analytics-client v0.0.0-20250604180646-6606dfc8fc8c
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20251015181023-f0b66a074704
-	github.com/TicketsBot-cloud/common v0.0.0-20251018211322-28f838700959
+	github.com/TicketsBot-cloud/common v0.0.0-20251026182733-99fa0dc31d90
 	github.com/TicketsBot-cloud/database v0.0.0-20251018211325-3d2b9b4ad642
-	github.com/TicketsBot-cloud/gdl v0.0.0-20251018211314-75f1c9bf22f6
+	github.com/TicketsBot-cloud/gdl v0.0.0-20251030191756-fbf81e31ba1d
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0
@@ -51,8 +51,8 @@ require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/ClickHouse/ch-go v0.66.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.36.0 // indirect
-	github.com/TicketsBot-cloud/logarchiver v0.0.0-20250809082842-70aa389bcbdf // indirect
-	github.com/TicketsBot/common v0.0.0-20241117150316-ff54c97b45c1 // indirect
+	github.com/TicketsBot-cloud/logarchiver v0.0.0-20251018211319-7a7df5cacbdc // indirect
+	github.com/TicketsBot/common v0.0.0-20240613013221-1e27eb8bfe37 // indirect
 	github.com/TicketsBot/ttlcache v1.6.1-0.20200405150101-acc18e37b261 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
