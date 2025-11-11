@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -47,14 +46,8 @@ func (ClaimCommand) Execute(ctx registry.CommandContext) {
 		return
 	}
 
-	// Check if thread
-	ch, err := ctx.Worker().GetChannel(ctx.ChannelId())
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	if ch.Type == channel.ChannelTypeGuildPrivateThread {
+	// Check if this is a thread-mode ticket (not if we're currently in a thread, as we could be in notes)
+	if ticket.IsThread {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageClaimThread)
 		return
 	}
