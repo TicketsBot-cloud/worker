@@ -88,8 +88,11 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
 	}
 
 	// Remove user from ticket
+	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
+	ticketChannelId := *ticket.ChannelId
+
 	if ticket.IsThread {
-		if err := ctx.Worker().RemoveThreadMember(ctx.ChannelId(), userId); err != nil {
+		if err := ctx.Worker().RemoveThreadMember(ticketChannelId, userId); err != nil {
 			ctx.HandleError(err)
 			return
 		}
@@ -101,11 +104,11 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 		}
 
-		if err := ctx.Worker().EditChannelPermissions(ctx.ChannelId(), data); err != nil {
+		if err := ctx.Worker().EditChannelPermissions(ticketChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}
 	}
 
-	ctx.ReplyPermanent(customisation.Green, i18n.TitleRemove, i18n.MessageRemoveSuccess, userId, ctx.ChannelId())
+	ctx.ReplyPermanent(customisation.Green, i18n.TitleRemove, i18n.MessageRemoveSuccess, userId, ticketChannelId)
 }
