@@ -13,6 +13,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -117,9 +118,29 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		Components: []component.Component{components},
 	}
 	
-	if _, err := ctx.ReplyWith(data); err != nil {
-		ctx.HandleError(err)
-		return
+	// If command is run in the ticket channel, send as reply
+	// If command is run outside the ticket channel, send as new message in ticket channel
+	ticketChannelId := *ticket.ChannelId
+	if ctx.ChannelId() == ticketChannelId {
+		if _, err := ctx.ReplyWith(data); err != nil {
+			ctx.HandleError(err)
+			return
+		}
+	} else {
+		_, err = ctx.Worker().CreateMessageComplex(ticketChannelId, rest.CreateMessageData{
+			Content: fmt.Sprintf("<@%d>", ticket.UserId),
+			Embeds:  []*embed.Embed{msgEmbed},
+			AllowedMentions: message.AllowedMention{
+				Users: []uint64{ticket.UserId},
+			},
+			Components: []component.Component{components},
+		})
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+		
+		ctx.ReplyPlain(ctx.GetMessage(i18n.MessageCloseRequested))
 	}
 
 	if err := dbclient.Client.Tickets.SetStatus(ctx, ctx.GuildId(), ticket.Id, model.TicketStatusPending); err != nil {
