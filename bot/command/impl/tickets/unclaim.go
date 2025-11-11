@@ -93,8 +93,11 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		}
 	}
 
+	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
+	ticketChannelId := *ticket.ChannelId
+
 	// Get the channel to determine its parent category
-	ch, err := ctx.Worker().GetChannel(ctx.ChannelId())
+	ch, err := ctx.Worker().GetChannel(ticketChannelId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
@@ -111,7 +114,7 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		PermissionOverwrites: overwrites,
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ctx.ChannelId(), data); err != nil {
+	if _, err := ctx.Worker().ModifyChannel(ticketChannelId, data); err != nil {
 		ctx.HandleError(err)
 		return
 	}
