@@ -915,9 +915,6 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageWebhooks) {
 			selfAllow = append(selfAllow, permission.ManageWebhooks)
 		}
-		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageRoles) {
-			selfAllow = append(selfAllow, permission.ManageRoles)
-		}
 		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
 			selfAllow = append(selfAllow, permission.PinMessages)
 		}
