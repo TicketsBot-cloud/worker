@@ -113,14 +113,14 @@ func executeCommand(
 					Content: "This command can only be used in DMs.",
 				}
 			}
-			return false, nil
+			return false, false, nil
 		}
 	} else {
 		if currentContext == interaction.InteractionContextBotDM {
 			responseCh <- interaction.ApplicationCommandCallbackData{
 				Content: "This command can only be used in servers.",
 			}
-			return false, nil
+			return false, false, nil
 		}
 	}
 
