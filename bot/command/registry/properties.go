@@ -25,6 +25,7 @@ type Properties struct {
 	MainBotOnly      bool
 	Arguments        []command.Argument
 	DefaultEphemeral bool
+	DisableAutoDefer bool
 	Timeout          time.Duration
 
 	SetupFunc func()

@@ -28,20 +28,20 @@ import (
 )
 
 // TODO: Command not found messages
-// (defaultDefer, error)
+// (disableAutoDefer, defaultEphemeral, error)
 func executeCommand(
 	ctx context.Context,
 	worker *worker.Context,
 	registry cmdregistry.Registry,
 	data interaction.ApplicationCommandInteraction,
 	responseCh chan interaction.ApplicationCommandCallbackData,
-) (bool, error) {
+) (bool, bool, error) {
 	// data.Member is needed for permission level lookup
 	if data.GuildId.Value == 0 || data.Member == nil {
 		responseCh <- interaction.ApplicationCommandCallbackData{
 			Content: "Commands in DMs are not currently supported. Please run this command in a server.",
 		}
-		return false, nil
+		return false, false, nil
 	}
 
 	cmd, ok := registry[data.Data.Name]
@@ -50,11 +50,11 @@ func executeCommand(
 		tag, exists, err := dbclient.Client.Tag.GetByApplicationCommandId(ctx, data.GuildId.Value, data.Data.Id)
 		if err != nil {
 			sentry.Error(err)
-			return false, err
+			return false, false, err
 		}
 
 		if !exists {
-			return false, fmt.Errorf("command %s does not exist", data.Data.Name)
+			return false, false, fmt.Errorf("command %s does not exist", data.Data.Name)
 		}
 
 		// Execute tag
@@ -76,7 +76,7 @@ func executeCommand(
 		}
 
 		if !found {
-			return false, fmt.Errorf("subcommand %s does not exist for command %s", subCommand.Name, cmd.Properties().Name)
+			return false, false, fmt.Errorf("subcommand %s does not exist for command %s", subCommand.Name, cmd.Properties().Name)
 		}
 
 		options = subCommand.Options
@@ -208,5 +208,5 @@ func executeCommand(
 		}
 	}()
 
-	return properties.DefaultEphemeral, nil
+	return properties.DisableAutoDefer, properties.DefaultEphemeral, nil
 }
