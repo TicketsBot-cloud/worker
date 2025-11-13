@@ -16,17 +16,13 @@ import (
 
 // StandardPermissions Returns the standard permissions that users are given in a ticket
 var StandardPermissions = [...]permission.Permission{
-	permission.ManageChannels,
 	permission.AddReactions,
 	permission.ViewChannel,
 	permission.SendMessages,
 	permission.EmbedLinks,
 	permission.AttachFiles,
 	permission.ReadMessageHistory,
-	permission.ManageRoles,
-	permission.ManageWebhooks,
 	permission.UseApplicationCommands,
-	permission.PinMessages,
 }
 
 var MinimalPermissions = [...]permission.Permission{
