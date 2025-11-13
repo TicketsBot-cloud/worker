@@ -1,13 +1,12 @@
-package tickets
+package handlers
 
 import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest"
-	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry"
+	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
-	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -15,25 +14,34 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-type UnclaimCommand struct {
-}
+type UnclaimHandler struct{}
 
-func (UnclaimCommand) Properties() registry.Properties {
-	return registry.Properties{
-		Name:            "unclaim",
-		Description:     i18n.HelpUnclaim,
-		Type:            interaction.ApplicationCommandTypeChatInput,
-		PermissionLevel: permission.Support,
-		Category:        command.Tickets,
-		Timeout:         constants.TimeoutOpenTicket,
+func (h *UnclaimHandler) Matcher() matcher.Matcher {
+	return &matcher.SimpleMatcher{
+		CustomId: "unclaim",
 	}
 }
 
-func (c UnclaimCommand) GetExecutor() interface{} {
-	return c.Execute
+func (h *UnclaimHandler) Properties() registry.Properties {
+	return registry.Properties{
+		Flags:   registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
+		Timeout: constants.TimeoutOpenTicket,
+	}
 }
 
-func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
+func (h *UnclaimHandler) Execute(ctx *context.ButtonContext) {
+	// Get permission level
+	permissionLevel, err := ctx.UserPermissionLevel(ctx)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if permissionLevel < permission.Support {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageClaimNoPermission)
+		return
+	}
+
 	// Get ticket struct
 	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, ctx.ChannelId(), ctx.GuildId())
 	if err != nil {
@@ -65,12 +73,7 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		return
 	}
 
-	permissionLevel, err := ctx.UserPermissionLevel(ctx)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
+	// Check if user has permission to unclaim
 	if permissionLevel < permission.Admin && ctx.UserId() != whoClaimed {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnlyClaimerCanUnclaim)
 		return
@@ -82,39 +85,40 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		return
 	}
 
-	// get panel
+	// Get panel
 	var panel *database.Panel
 	if ticket.PanelId != nil {
-		var derefPanel database.Panel
-		derefPanel, err = dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		tmp, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
 
-		if derefPanel.PanelId != 0 {
-			panel = &derefPanel
+		if tmp.GuildId != 0 {
+			panel = &tmp
 		}
 	}
 
-	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
-	ticketChannelId := *ticket.ChannelId
-
 	// Get the channel to determine its parent category
-	ch, err := ctx.Worker().GetChannel(ticketChannelId)
+	ch, err := ctx.Worker().GetChannel(ctx.ChannelId())
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
+	// Restore original permissions
 	overwrites, err := logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, panel, ch.ParentId.Value)
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	// Update channel
+	// Update channel permissions
 	data := rest.ModifyChannelData{
 		PermissionOverwrites: overwrites,
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ticketChannelId, data); err != nil {
+	if _, err := ctx.Worker().ModifyChannel(ctx.ChannelId(), data); err != nil {
 		ctx.HandleError(err)
 		return
 	}

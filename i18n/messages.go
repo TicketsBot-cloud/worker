@@ -30,6 +30,7 @@ var (
 	TitleTicketClosed      MessageId = "generic.title.ticket_closed"
 	TitleCloseWithReason   MessageId = "generic.title.close_with_reason"
 	TitleClaim             MessageId = "generic.title.claim"
+	TitleUnclaim           MessageId = "generic.title.unclaim"
 	TitleBlacklist         MessageId = "generic.title.blacklist"
 	TitleBlacklisted       MessageId = "generic.title.blacklisted"
 	TitleAddAdmin          MessageId = "generic.title.add_admin"

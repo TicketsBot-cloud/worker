@@ -31,12 +31,13 @@ func NewTagAliasCommand(tag database.Tag) TagAliasCommand {
 
 func (c TagAliasCommand) Properties() registry.Properties {
 	return registry.Properties{
-		Name:            c.tag.Id,
-		Description:     i18n.HelpTag,
-		Type:            interaction.ApplicationCommandTypeChatInput,
-		PermissionLevel: permission.Everyone,
-		Category:        command.Tags,
-		Timeout:         time.Second * 5,
+		Name:             c.tag.Id,
+		Description:      i18n.HelpTag,
+		Type:             interaction.ApplicationCommandTypeChatInput,
+		PermissionLevel:  permission.Everyone,
+		Category:         command.Tags,
+		DisableAutoDefer: true,
+		Timeout:          time.Second * 5,
 	}
 }
 

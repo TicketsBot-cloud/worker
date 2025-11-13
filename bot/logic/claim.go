@@ -7,6 +7,9 @@ import (
 
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker"
@@ -312,4 +315,88 @@ func overwritesCantType(claimerId, selfId, openerId, guildId uint64, supportUser
 	}
 
 	return
+}
+
+// Updates the claim/unclaim button on the welcome message
+func UpdateWelcomeMessageClaimButton(ctx context.Context, worker *worker.Context, cmd registry.CommandContext, ticket database.Ticket, claimed bool) error {
+	// Check if welcome message exists
+	if ticket.WelcomeMessageId == nil || ticket.ChannelId == nil {
+		return nil
+	}
+
+	// Get the welcome message
+	msg, err := worker.GetChannelMessage(*ticket.ChannelId, *ticket.WelcomeMessageId)
+	if err != nil {
+		return nil
+	}
+
+	// Check if message has components
+	if len(msg.Components) == 0 {
+		return nil
+	}
+
+	// Find and update the button
+	updated := false
+	for i, comp := range msg.Components {
+		if comp.Type == component.ComponentActionRow {
+			row := comp.ComponentData.(component.ActionRow)
+
+			for j, btnComp := range row.Components {
+				if btnComp.Type == component.ComponentButton {
+					btn := btnComp.ComponentData.(component.Button)
+
+					if claimed && btn.CustomId == "claim" {
+						// Replace claim button with unclaim button
+						row.Components[j] = component.BuildButton(component.Button{
+							Label:    cmd.GetMessage(i18n.TitleUnclaim),
+							CustomId: "unclaim",
+							Style:    component.ButtonStyleSecondary,
+							Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+						})
+						updated = true
+						break
+					} else if !claimed && btn.CustomId == "unclaim" {
+						// Replace unclaim button with claim button
+						row.Components[j] = component.BuildButton(component.Button{
+							Label:    cmd.GetMessage(i18n.TitleClaim),
+							CustomId: "claim",
+							Style:    component.ButtonStyleSuccess,
+							Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+						})
+						updated = true
+						break
+					}
+				}
+			}
+
+			if updated {
+				msg.Components[i] = component.Component{
+					Type:          component.ComponentActionRow,
+					ComponentData: row,
+				}
+				break
+			}
+		}
+	}
+
+	// If no button was found to update, nothing to do
+	if !updated {
+		return nil
+	}
+
+	// Convert embeds to pointers
+	embeds := make([]*embed.Embed, len(msg.Embeds))
+	for i := range msg.Embeds {
+		embeds[i] = &msg.Embeds[i]
+	}
+
+	// Edit the message with updated components
+	editData := rest.EditMessageData{
+		Content:    msg.Content,
+		Embeds:     embeds,
+		Components: msg.Components,
+	}
+
+	_, err = worker.EditMessage(*ticket.ChannelId, *ticket.WelcomeMessageId, editData)
+	return err
 }

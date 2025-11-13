@@ -132,23 +132,49 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 
 			responseCh := make(chan interaction.ApplicationCommandCallbackData, 1)
 
-			deferDefault, err := executeCommand(ctx, worker, commandManager.GetCommands(), interactionData, responseCh)
+			disableAutoDefer, defaultEphemeral, err := executeCommand(ctx, worker, commandManager.GetCommands(), interactionData, responseCh)
 			if err != nil {
 				marshalled, _ := json.Marshal(payload)
 				logrus.Warnf("error executing payload: %v (payload: %s)", err, string(marshalled))
 				return
 			}
 
-			var flags uint
-			if deferDefault {
-				flags = message.SumFlags(message.FlagEphemeral)
+			// If fisableAutoDefer is true, wait for command to respond quickly
+			// Otherwise, auto-defer immediately
+			if disableAutoDefer {
+				select {
+				case data := <-responseCh:
+					if defaultEphemeral {
+						data.Flags = message.SumFlags(message.FlagEphemeral)
+					}
+					res := interaction.NewResponseChannelMessage(data)
+					ctx.JSON(200, res)
+					ctx.Writer.Flush()
+				case <-time.After(time.Second * 2):
+					// Command is taking too long - fallback to auto-defer
+					var flags uint
+					if defaultEphemeral {
+						flags = message.SumFlags(message.FlagEphemeral)
+					}
+
+					res := interaction.NewResponseAckWithSource(flags)
+					ctx.JSON(200, res)
+					ctx.Writer.Flush()
+
+					go handleApplicationCommandResponseAfterDefer(interactionData, worker, responseCh)
+				}
+			} else {
+				var flags uint
+				if defaultEphemeral {
+					flags = message.SumFlags(message.FlagEphemeral)
+				}
+
+				res := interaction.NewResponseAckWithSource(flags)
+				ctx.JSON(200, res)
+				ctx.Writer.Flush()
+
+				go handleApplicationCommandResponseAfterDefer(interactionData, worker, responseCh)
 			}
-
-			res := interaction.NewResponseAckWithSource(flags)
-			ctx.JSON(200, res)
-			ctx.Writer.Flush()
-
-			go handleApplicationCommandResponseAfterDefer(interactionData, worker, responseCh)
 
 			prometheus.InteractionTimeToReceive.Observe(calculateTimeToReceive(interactionData.Id).Seconds())
 		case interaction.InteractionTypeMessageComponent:

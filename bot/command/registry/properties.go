@@ -26,6 +26,7 @@ type Properties struct {
 	Contexts         []interaction.InteractionContextType
 	Arguments        []command.Argument
 	DefaultEphemeral bool
+	DisableAutoDefer bool
 	Timeout          time.Duration
 
 	SetupFunc func()

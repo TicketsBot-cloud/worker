@@ -54,6 +54,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.CloseHandler),
 		new(handlers.CloseWithReasonModalHandler),
 		new(handlers.ClaimHandler),
+		new(handlers.UnclaimHandler),
 		new(handlers.CloseConfirmHandler),
 		new(handlers.CloseRequestAcceptHandler),
 		new(handlers.CloseRequestDenyHandler),
