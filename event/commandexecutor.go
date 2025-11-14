@@ -36,14 +36,6 @@ func executeCommand(
 	data interaction.ApplicationCommandInteraction,
 	responseCh chan interaction.ApplicationCommandCallbackData,
 ) (bool, bool, error) {
-	// data.Member is needed for permission level lookup
-	if data.GuildId.Value == 0 || data.Member == nil {
-		responseCh <- interaction.ApplicationCommandCallbackData{
-			Content: "Commands in DMs are not currently supported. Please run this command in a server.",
-		}
-		return false, false, nil
-	}
-
 	cmd, ok := registry[data.Data.Name]
 	if !ok {
 		// If a registered command is not found, check for a tag alias
