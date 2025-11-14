@@ -77,6 +77,13 @@ func StartCacheRefreshLoop(logger *zap.Logger) {
 	}
 }
 
+func AddGuildToCache(guildId uint64) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	blacklistedGuilds[guildId] = struct{}{}
+}
+
 func sliceToMap(slice []uint64) map[uint64]struct{} {
 	m := make(map[uint64]struct{})
 	for _, v := range slice {
