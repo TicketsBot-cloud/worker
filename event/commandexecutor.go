@@ -203,16 +203,18 @@ func executeCommand(
 
 		// Check for user blacklist - cannot parallelise as relies on permission level
 		// If data.Member is nil, it does not matter, as it is not checked if the command is not executed in a guild
-		blacklisted, err := interactionContext.IsBlacklisted(lookupCtx)
-		cancelLookupCtx()
-		if err != nil {
-			interactionContext.HandleError(err)
-			return
-		}
+		if !properties.IgnoreBlacklist {
+			blacklisted, err := interactionContext.IsBlacklisted(lookupCtx)
+			cancelLookupCtx()
+			if err != nil {
+				interactionContext.HandleError(err)
+				return
+			}
 
-		if blacklisted {
-			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
-			return
+			if blacklisted {
+				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+				return
+			}
 		}
 
 		statsd.Client.IncrementKey(statsd.KeySlashCommands)

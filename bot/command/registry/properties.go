@@ -28,6 +28,7 @@ type Properties struct {
 	DefaultEphemeral bool
 	DisableAutoDefer bool
 	Timeout          time.Duration
+	IgnoreBlacklist  bool
 
 	SetupFunc func()
 }

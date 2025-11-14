@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/objects/user"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
@@ -165,8 +166,9 @@ func (c *SlashCommandContext) User() (user.User, error) {
 }
 
 func (c *SlashCommandContext) IsBlacklisted(ctx context.Context) (bool, error) {
+	// In DMs, only check global blacklist
 	if c.GuildId() == 0 {
-		return false, nil
+		return blacklist.IsUserBlacklisted(c.UserId()), nil
 	}
 
 	permLevel, err := c.UserPermissionLevel(ctx)
