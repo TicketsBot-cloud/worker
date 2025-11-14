@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -56,7 +57,13 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 		}
 
 		if blacklisted {
-			ctx.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+			var message i18n.MessageId
+			if ctx.GuildId() == 0 || blacklist.IsUserBlacklisted(ctx.UserId()) {
+				message = i18n.MessageUserBlacklisted
+			} else {
+				message = i18n.MessageBlacklisted
+			}
+			ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
 			return
 		}
 

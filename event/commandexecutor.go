@@ -177,7 +177,7 @@ func executeCommand(
 
 		// Check if the guild is globally blacklisted
 		if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
 			return
 		}
 
@@ -212,7 +212,13 @@ func executeCommand(
 			}
 
 			if blacklisted {
-				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+				var message i18n.MessageId
+				if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(interactionContext.UserId()) {
+					message = i18n.MessageUserBlacklisted
+				} else {
+					message = i18n.MessageGuildBlacklisted
+				}
+				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, message)
 				return
 			}
 		}

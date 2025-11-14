@@ -115,6 +115,8 @@ var (
 	MessageAddSuccess      MessageId = "commands.add.success"
 
 	MessageBlacklisted         MessageId = "generic.error.blacklisted"
+	MessageGuildBlacklisted    MessageId = "generic.error.guild_blacklisted"
+	MessageUserBlacklisted     MessageId = "generic.error.user_blacklisted"
 	MessageBlacklistNoMembers  MessageId = "commands.blacklist.no_members"
 	MessageBlacklistSelf       MessageId = "commands.blacklist.self"
 	MessageBlacklistStaff      MessageId = "commands.blacklist.staff"

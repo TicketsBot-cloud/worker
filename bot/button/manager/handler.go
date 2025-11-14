@@ -71,7 +71,7 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 
 	// Check for guild-wide blacklist
 	if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-		cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+		cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
 		return false
 	}
 
@@ -99,7 +99,13 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 	}
 
 	if userBlacklisted {
-		cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+		var message i18n.MessageId
+		if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(cc.UserId()) {
+			message = i18n.MessageUserBlacklisted
+		} else {
+			message = i18n.MessageBlacklisted
+		}
+		cc.Reply(customisation.Red, i18n.TitleBlacklisted, message)
 		return false
 	}
 

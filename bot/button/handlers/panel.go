@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -74,7 +75,13 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		}
 
 		if blacklisted {
-			ctx.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+			var message i18n.MessageId
+			if ctx.GuildId() == 0 || blacklist.IsUserBlacklisted(ctx.UserId()) {
+				message = i18n.MessageUserBlacklisted
+			} else {
+				message = i18n.MessageBlacklisted
+			}
+			ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
 			return
 		}
 
