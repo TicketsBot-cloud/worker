@@ -58,6 +58,11 @@ func RefreshCache(ctx context.Context) error {
 func StartCacheRefreshLoop(logger *zap.Logger) {
 	logger.Info("Starting blacklist cache refresh loop")
 
+	// Load cache on startup
+	if err := RefreshCache(context.Background()); err != nil {
+		logger.Error("Failed to refresh blacklist cache on startup", zap.Error(err))
+	}
+
 	timer := time.NewTicker(time.Minute * 5)
 
 	for {
