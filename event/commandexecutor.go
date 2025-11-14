@@ -177,7 +177,12 @@ func executeCommand(
 
 		// Check if the guild is globally blacklisted
 		if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
+			reason, _ := dbclient.Client.ServerBlacklist.GetReason(lookupCtx, data.GuildId.Value)
+			if reason != "" {
+				interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, i18n.MessageGuildBlacklisted)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
+			} else {
+				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
+			}
 			return
 		}
 
@@ -213,12 +218,20 @@ func executeCommand(
 
 			if blacklisted {
 				var message i18n.MessageId
+				var reason string
+
 				if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(interactionContext.UserId()) {
 					message = i18n.MessageUserBlacklisted
+					reason, _ = dbclient.Client.GlobalBlacklist.GetReason(lookupCtx, interactionContext.UserId())
 				} else {
-					message = i18n.MessageGuildBlacklisted
+					message = i18n.MessageBlacklisted
 				}
-				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+
+				if reason != "" {
+					interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, message)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
+				} else {
+					interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+				}
 				return
 			}
 		}

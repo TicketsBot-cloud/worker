@@ -17,6 +17,7 @@ import (
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	cmdregistry "github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
@@ -71,7 +72,12 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 
 	// Check for guild-wide blacklist
 	if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-		cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
+		reason, _ := dbclient.Client.ServerBlacklist.GetReason(lookupCtx, data.GuildId.Value)
+		if reason != "" {
+			cc.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, i18n.MessageGuildBlacklisted)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
+		} else {
+			cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
+		}
 		return false
 	}
 
@@ -100,12 +106,20 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 
 	if userBlacklisted {
 		var message i18n.MessageId
+		var reason string
+
 		if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(cc.UserId()) {
 			message = i18n.MessageUserBlacklisted
+			reason, _ = dbclient.Client.GlobalBlacklist.GetReason(lookupCtx, cc.UserId())
 		} else {
 			message = i18n.MessageBlacklisted
 		}
-		cc.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+
+		if reason != "" {
+			cc.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, message)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
+		} else {
+			cc.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+		}
 		return false
 	}
 

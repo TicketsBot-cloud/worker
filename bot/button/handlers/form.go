@@ -79,12 +79,20 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 
 		if blacklisted {
 			var message i18n.MessageId
+			var reason string
+
 			if ctx.GuildId() == 0 || blacklist.IsUserBlacklisted(ctx.UserId()) {
 				message = i18n.MessageUserBlacklisted
+				reason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, ctx.UserId())
 			} else {
 				message = i18n.MessageBlacklisted
 			}
-			ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+
+			if reason != "" {
+				ctx.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(ctx.GuildId(), i18n.TitleBlacklisted), i18n.GetMessageFromGuild(ctx.GuildId(), message)+"\n\n**"+i18n.GetMessageFromGuild(ctx.GuildId(), i18n.Reason)+":** "+reason)
+			} else {
+				ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+			}
 			return
 		}
 
