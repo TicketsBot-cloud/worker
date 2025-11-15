@@ -33,6 +33,7 @@ func (HelpCommand) Properties() registry.Properties {
 		Category:         command.General,
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,
+		Contexts: 	      []interaction.InteractionContextType{interaction.InteractionContextGuild,interaction.InteractionContextBotDM},
 	}
 }
 
@@ -126,7 +127,7 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 		}
 	}
 
-	if ctx.PremiumTier() == premium.None {
+	if ctx.PremiumTier() == premium.None && !ctx.Worker().IsWhitelabel {
 		embed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 	}
 
