@@ -91,6 +91,50 @@ func getAllPermissions(ctx *worker.Context, guildId, userId uint64) []permission
 	return permissions
 }
 
+func GetMissingPermissions(ctx *worker.Context, guildId, userId uint64, required ...permission.Permission) []permission.Permission {
+	missing := make([]permission.Permission, 0)
+
+	sum, err := getEffectivePermissions(ctx, guildId, userId)
+	if err != nil {
+		sentry.Error(err)
+		return required
+	}
+
+	if permission.HasPermissionRaw(sum, permission.Administrator) {
+		return missing
+	}
+
+	for _, perm := range required {
+		if !permission.HasPermissionRaw(sum, perm) {
+			missing = append(missing, perm)
+		}
+	}
+
+	return missing
+}
+
+func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) []permission.Permission {
+	missing := make([]permission.Permission, 0)
+
+	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
+	if err != nil {
+		sentry.Error(err)
+		return required
+	}
+
+	if permission.HasPermissionRaw(sum, permission.Administrator) {
+		return missing
+	}
+
+	for _, perm := range required {
+		if !permission.HasPermissionRaw(sum, perm) {
+			missing = append(missing, perm)
+		}
+	}
+
+	return missing
+}
+
 func getEffectivePermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64) (uint64, error) {
 	permissions, err := getBasePermissions(ctx, guildId)
 	if err != nil {

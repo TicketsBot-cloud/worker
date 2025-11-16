@@ -20,7 +20,9 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -303,15 +305,51 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 		return nil, nil
 	}
 
+	var targetChannelId uint64
+	settings, err := ctx.Settings()
+	if err == nil {
+		if settings.UseThreads {
+			// Thread mode - check permissions in the current channel
+			targetChannelId = ctx.ChannelId()
+		} else {
+			// Channel mode - check permissions in the ticket category
+			if btnCtx, ok := ctx.(*ButtonContext); ok {
+				panel, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
+				if err == nil && panelExists && panel.TargetCategory != 0 {
+					targetChannelId = panel.TargetCategory
+				}
+			}
+		}
+	}
+
 	requiredPermissions := append(
-		[]permission.Permission{permission.ManageChannels, permission.ManageRoles},
+		[]permission.Permission{
+			permission.ManageChannels,
+			permission.ManageWebhooks,
+			permission.PinMessages,
+		},
 		logic.StandardPermissions[:]...,
 	)
 
-	var missingPermissions []permission.Permission
-	for _, requiredPermission := range requiredPermissions {
-		if !permission.HasPermissionRaw(ctx.InteractionMetadata().AppPermissions, requiredPermission) {
-			missingPermissions = append(missingPermissions, requiredPermission)
+	// Check guild-level permissions
+	missingAtGuild := permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, requiredPermissions...)
+
+	// If no target channel, just return guild-level missing permissions
+	if targetChannelId == 0 {
+		return missingAtGuild, nil
+	}
+
+	// Check channel-level permissions
+	missingAtChannel := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, targetChannelId, requiredPermissions...)
+
+	// Find missing permissions in both guild and channel
+	missingPermissions := make([]permission.Permission, 0)
+	for _, guildMissing := range missingAtGuild {
+		for _, channelMissing := range missingAtChannel {
+			if guildMissing == channelMissing {
+				missingPermissions = append(missingPermissions, guildMissing)
+				break
+			}
 		}
 	}
 
