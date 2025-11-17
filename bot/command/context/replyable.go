@@ -331,29 +331,12 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 		logic.StandardPermissions[:]...,
 	)
 
-	// Check guild-level permissions
-	missingAtGuild := permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, requiredPermissions...)
+	if targetChannelId != 0 {
+		return permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, targetChannelId, requiredPermissions...), nil
+	}
 
 	// If no target channel, just return guild-level missing permissions
-	if targetChannelId == 0 {
-		return missingAtGuild, nil
-	}
-
-	// Check channel-level permissions
-	missingAtChannel := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, targetChannelId, requiredPermissions...)
-
-	// Find missing permissions in both guild and channel
-	missingPermissions := make([]permission.Permission, 0)
-	for _, guildMissing := range missingAtGuild {
-		for _, channelMissing := range missingAtChannel {
-			if guildMissing == channelMissing {
-				missingPermissions = append(missingPermissions, guildMissing)
-				break
-			}
-		}
-	}
-
-	return missingPermissions, nil
+	return permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, requiredPermissions...), nil
 }
 
 func formatTimestamp(seconds float64) string {
