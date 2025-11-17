@@ -446,30 +446,31 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 			if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err != nil {
 				cmd.HandleError(err)
-			} else {
-				// Delete the system pin notification message
-				span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
-
-				// Fetch recent messages to find the system pin notification
-				messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
-					Limit: 3,
-				})
-
-				if err == nil {
-					// Find and delete the system pin notification message
-					for _, msg := range messages {
-						// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
-						if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
-							_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
-							break
-						}
-					}
-				} else {
-					cmd.HandleError(err)
-				}
-
-				span2.Finish()
 			}
+			// else {
+			// 	// Delete the system pin notification message
+			// 	span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
+
+			// 	// Fetch recent messages to find the system pin notification
+			// 	messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
+			// 		Limit: 3,
+			// 	})
+
+			// 	if err == nil {
+			// 		// Find and delete the system pin notification message
+			// 		for _, msg := range messages {
+			// 			// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
+			// 			if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
+			// 				_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
+			// 				break
+			// 			}
+			// 		}
+			// 	} else {
+			// 		cmd.HandleError(err)
+			// 	}
+
+			// 	span2.Finish()
+			// }
 			span.Finish()
 		}
 
