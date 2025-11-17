@@ -12,6 +12,7 @@ import (
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -305,31 +306,65 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 		return nil, nil
 	}
 
+	var useThreads bool
 	var targetChannelId uint64
+
 	settings, err := ctx.Settings()
 	if err == nil {
-		if settings.UseThreads {
-			// Thread mode - check permissions in the current channel
-			targetChannelId = ctx.ChannelId()
-		} else {
-			// Channel mode - check permissions in the ticket category
-			if btnCtx, ok := ctx.(*ButtonContext); ok {
-				panel, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
-				if err == nil && panelExists && panel.TargetCategory != 0 {
-					targetChannelId = panel.TargetCategory
-				}
+		useThreads = settings.UseThreads
+	}
+
+	var panel *database.Panel
+	if btnCtx, ok := ctx.(*ButtonContext); ok {
+		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
+		if err == nil && panelExists {
+			panel = &p
+			// Panel can enable threads if global setting is disabled
+			if !useThreads {
+				useThreads = panel.UseThreads
 			}
 		}
 	}
 
-	requiredPermissions := append(
-		[]permission.Permission{
-			permission.ManageChannels,
-			permission.ManageWebhooks,
-			permission.PinMessages,
-		},
-		logic.StandardPermissions[:]...,
-	)
+	if useThreads {
+		// Thread mode - check permissions in the current channel
+		targetChannelId = ctx.ChannelId()
+	} else {
+		// Channel mode - check permissions in the ticket category
+		if panel != nil && panel.TargetCategory != 0 {
+			// Use panel's target category
+			targetChannelId = panel.TargetCategory
+		} else {
+			// Fall back to guild default category
+			targetChannelId, _ = dbclient.Client.ChannelCategory.Get(context.Background(), ctx.GuildId())
+		}
+	}
+
+	// Build required permissions based on mode
+	var requiredPermissions []permission.Permission
+	if useThreads {
+		// Thread mode permissions
+		requiredPermissions = append(
+			[]permission.Permission{
+				permission.CreatePrivateThreads,
+				permission.SendMessagesInThreads,
+				permission.ManageThreads,
+				permission.ManageWebhooks,
+				permission.PinMessages,
+			},
+			logic.StandardPermissions[:]...,
+		)
+	} else {
+		// Channel mode permissions
+		requiredPermissions = append(
+			[]permission.Permission{
+				permission.ManageChannels,
+				permission.ManageWebhooks,
+				permission.PinMessages,
+			},
+			logic.StandardPermissions[:]...,
+		)
+	}
 
 	if targetChannelId != 0 {
 		return permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, targetChannelId, requiredPermissions...), nil
