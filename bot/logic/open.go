@@ -794,8 +794,10 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
 	// Check if bot has ManageWebhooks permission in the channel before attempting to create
-	if !permissionwrapper.HasPermissionsChannel(c.Worker(), guildId, c.Worker().BotId, channelId, permission.ManageWebhooks) {
-		return nil // Silently skip webhook creation if no permission
+	if !permissionwrapper.HasPermissions(c.Worker(), guildId, c.Worker().BotId, permission.ManageWebhooks) {
+		return nil // Silently skip webhook creation if no permission in guild
+	} else if !permissionwrapper.HasPermissionsChannel(c.Worker(), guildId, c.Worker().BotId, channelId, permission.ManageWebhooks) {
+		return nil // Silently skip webhook creation if no permission in channel
 	}
 
 	root := sentry.StartSpan(ctx, "Create or reuse webhook")
@@ -891,35 +893,9 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+2)
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
-	// Check bot's permissions in the target category (or guild if no category)
-	var checkChannelId uint64
-	if categoryId != 0 {
-		checkChannelId = categoryId
-	}
-
-	if checkChannelId != 0 {
-		// Check permissions in the category
-		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.ManageChannels) {
-			selfAllow = append(selfAllow, permission.ManageChannels)
-		}
-		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.ManageWebhooks) {
-			selfAllow = append(selfAllow, permission.ManageWebhooks)
-		}
-		if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, checkChannelId, permission.PinMessages) {
-			selfAllow = append(selfAllow, permission.PinMessages)
-		}
-	} else {
-		// Check guild-wide permissions
-		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageChannels) {
-			selfAllow = append(selfAllow, permission.ManageChannels)
-		}
-		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageWebhooks) {
-			selfAllow = append(selfAllow, permission.ManageWebhooks)
-		}
-		if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
-			selfAllow = append(selfAllow, permission.PinMessages)
-		}
-	}
+	selfAllow = append(selfAllow, permission.ManageChannels)
+	selfAllow = append(selfAllow, permission.ManageWebhooks)
+	selfAllow = append(selfAllow, permission.PinMessages)
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
 	if err != nil {
