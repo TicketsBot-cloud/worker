@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -17,7 +17,7 @@ func LoadMessages() {
 	for idx, locale := range Locales {
 		path := fmt.Sprintf("./locale/%s.json", locale.IsoLongCode)
 
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Printf("Failed to read locale %s: %s\n", locale.IsoShortCode, err.Error())
 
