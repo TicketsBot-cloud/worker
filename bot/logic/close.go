@@ -214,6 +214,15 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			return
 		}
 	} else {
+		// For button interactions, we need to acknowledge before deleting the channel
+		// since we won't be able to send a message response after the channel is deleted
+		type acknowledger interface {
+			Ack()
+		}
+		if acker, ok := cmd.(acknowledger); ok {
+			acker.Ack()
+		}
+
 		if _, err := cmd.Worker().DeleteChannel(*ticket.ChannelId); err != nil {
 			// Check if we should exclude this from autoclose
 			var restError request.RestError
