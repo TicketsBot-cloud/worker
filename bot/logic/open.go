@@ -591,9 +591,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
 		channelId := *ticket.ChannelId
 
-		if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err != nil {
-			cmd.HandleError(err)
-		} else {
+		if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err == nil {
 			// Delete the system pin notification message
 			span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
 
@@ -611,8 +609,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 						break
 					}
 				}
-			} else {
-				cmd.HandleError(err)
 			}
 
 			span2.Finish()
