@@ -52,7 +52,7 @@ func (h *AdminDebugServerMonitoredBotsHandler) Execute(ctx *context.ButtonContex
 		if err == nil {
 			botUser, err := ctx.Worker().GetUser(botId)
 			if err == nil {
-				monitoredBotsPresent = append(monitoredBotsPresent, fmt.Sprintf("- `%s` (%d)", botUser.Username, botId))
+				monitoredBotsPresent = append(monitoredBotsPresent, fmt.Sprintf("- `%s` - <@%d> (%d)", botUser.Username, botId, botId))
 			} else {
 				monitoredBotsPresent = append(monitoredBotsPresent, fmt.Sprintf("- `Unknown` (%d)", botId))
 			}
