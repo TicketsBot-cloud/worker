@@ -51,6 +51,11 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 	m.buttonRegistry = append(m.buttonRegistry,
 		new(handlers.AddAdminHandler),
 		new(handlers.AddSupportHandler),
+		new(handlers.AdminDebugServerMonitoredBotsHandler),
+		new(handlers.AdminDebugServerPanelSettingsHandler),
+		new(handlers.AdminDebugServerPermissionsHandler),
+		new(handlers.AdminDebugServerTicketPermissionsHandler),
+		new(handlers.AdminDebugServerUserTicketsHandler),
 		new(handlers.CloseHandler),
 		new(handlers.CloseWithReasonModalHandler),
 		new(handlers.ClaimHandler),
@@ -77,6 +82,10 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 	)
 
 	m.modalRegistry = append(m.modalRegistry,
+		new(handlers.AdminDebugServerPanelSettingsModalHandler),
+		new(handlers.AdminDebugServerPermissionsModalSubmitHandler),
+		new(handlers.AdminDebugServerTicketPermissionsModalSubmitHandler),
+		new(handlers.AdminDebugServerUserTicketsModalSubmitHandler),
 		new(handlers.FormHandler),
 		new(handlers.CloseWithReasonSubmitHandler),
 		new(handlers.ExitSurveySubmitHandler),

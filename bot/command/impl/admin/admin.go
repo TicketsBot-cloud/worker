@@ -20,12 +20,8 @@ func (AdminCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Everyone,
 		Children: []registry.Command{
 			AdminBlacklistCommand{},
-			AdminCheckBlacklistCommand{},
-			AdminCheckPremiumCommand{},
 			AdminDebugCommand{},
 			AdminGenPremiumCommand{},
-			AdminGetOwnerCommand{},
-			AdminListGuildEntitlementsCommand{},
 			AdminListUserEntitlementsCommand{},
 			AdminRecacheCommand{},
 			AdminWhitelabelAssignGuildCommand{},

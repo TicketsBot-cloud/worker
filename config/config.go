@@ -39,6 +39,7 @@ type (
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
+			MonitoredBots       []uint64 `env:"MONITORED_BOTS"`
 		}
 
 		PremiumProxy struct {

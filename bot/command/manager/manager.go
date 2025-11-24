@@ -154,8 +154,14 @@ func buildOption(cmd registry.Command) interaction.ApplicationCommandOption {
 
 	options := append(required, optional...)
 
+	// Determine the correct type based on whether this command has children
+	optionType := interaction.OptionTypeSubCommand
+	if len(properties.Children) > 0 {
+		optionType = interaction.OptionTypeSubCommandGroup
+	}
+
 	return interaction.ApplicationCommandOption{
-		Type:        interaction.OptionTypeSubCommand,
+		Type:        optionType,
 		Name:        properties.Name,
 		Description: i18n.GetMessage(i18n.LocaleEnglish, properties.Description),
 		Default:     false,
