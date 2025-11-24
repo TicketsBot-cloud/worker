@@ -203,7 +203,7 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 
 		// Find the active entitlement to get subscription owner and details
 		for _, entitlement := range entitlements {
-			premiumExpires = fmt.Sprintf("<t:%d:f><t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
+			premiumExpires = fmt.Sprintf("<t:%d:f>, <t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
 			skuId = entitlement.SkuId.String()
 			skuPriority = fmt.Sprintf("%d", entitlement.SkuPriority)
 
