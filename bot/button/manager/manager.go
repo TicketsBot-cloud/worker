@@ -51,6 +51,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 	m.buttonRegistry = append(m.buttonRegistry,
 		new(handlers.AddAdminHandler),
 		new(handlers.AddSupportHandler),
+		new(handlers.AdminDebugServerBlacklistReasonHandler),
 		new(handlers.AdminDebugServerMonitoredBotsHandler),
 		new(handlers.AdminDebugServerPanelSettingsHandler),
 		new(handlers.AdminDebugServerPermissionsHandler),

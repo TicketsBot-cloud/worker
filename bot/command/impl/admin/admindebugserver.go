@@ -37,6 +37,7 @@ func (AdminDebugServerCommand) Properties() registry.Properties {
 		PermissionLevel:  permcache.Everyone,
 		Category:         command.Settings,
 		HelperOnly:       true,
+		DisableAutoDefer: true,
 		Arguments: command.Arguments(
 			command.NewRequiredArgument("guild_id", "ID of the guild", interaction.OptionTypeString, i18n.MessageInvalidArgument),
 		),
@@ -105,15 +106,15 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		if blacklist.IsGuildBlacklisted(guildId) {
 			var reason string
 			reason, _ = dbclient.Client.ServerBlacklist.GetReason(ctx, guildId)
-			message := fmt.Sprintf("**Server ID:** `%d`\n**This server is blacklisted**", guildId)
 			if reason != "" {
-				message += fmt.Sprintf("\n**Reason:** %s", reason)
+				reason = "No reason provided"
 			}
+			message := fmt.Sprintf("\n**Reason:** %s\n**Server ID:** `%d`", reason, guildId)
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
 				utils.BuildContainerRaw(
 					ctx,
 					customisation.Red,
-					"Admin - Debug Server Blacklisted",
+					"Admin - This server is blacklisted",
 					message,
 				),
 			}))
@@ -239,18 +240,14 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		ctx.HandleError(err)
 		return
 	}
-	guildInfo = append(guildInfo, fmt.Sprintf("Owner Blacklisted: `%t`", IsOwnerBlacklisted))
+
+	var GlobalBlacklistReason string
 	if IsOwnerBlacklisted {
-		var GlobalBlacklistReason string
-		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, ctx.UserId())
-		if GlobalBlacklistReason != "" {
-			guildInfo = append(guildInfo, fmt.Sprintf("Reason: %s", GlobalBlacklistReason))
-		}
+		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, owner.Id)
 	}
+
+	guildInfo = append(guildInfo, fmt.Sprintf("Owner Blacklisted: `%t`", IsOwnerBlacklisted))
 	guildInfo = append(guildInfo, fmt.Sprintf("Server Blacklisted: `%t`", IsGuildBlacklisted))
-	if ServerBlacklistReason != nil {
-		guildInfo = append(guildInfo, fmt.Sprintf("Reason: %s", *ServerBlacklistReason))
-	}
 
 	// Count panels with per-panel thread mode override
 	perPanelThreadModeCount := 0
@@ -380,6 +377,16 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		}))
 	}
 
+	// Add blacklist reason button if there's a blacklist reason
+	hasBlacklistReason := (IsOwnerBlacklisted && GlobalBlacklistReason != "") || (IsGuildBlacklisted && ServerBlacklistReason != nil && *ServerBlacklistReason != "")
+	if hasBlacklistReason {
+		conditionalButtons = append(conditionalButtons, component.BuildButton(component.Button{
+			Label:    "View Blacklist Reason",
+			Style:    component.ButtonStyleDanger,
+			CustomId: fmt.Sprintf("admin_debug_blacklist_reason_%d", guild.Id),
+		}))
+	}
+
 	colour := customisation.Orange
 	if IsGuildBlacklisted || IsOwnerBlacklisted {
 		colour = customisation.Red
@@ -401,5 +408,5 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		components = append(components, component.BuildActionRow(conditionalButtons...))
 	}
 
-	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(components))
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(components))
 }
