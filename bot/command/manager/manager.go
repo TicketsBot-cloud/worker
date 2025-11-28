@@ -30,6 +30,7 @@ func (cm *CommandManager) RegisterCommands() {
 	cm.registry["admin"] = admin.AdminCommand{}
 
 	cm.registry["about"] = general.AboutCommand{}
+	cm.registry["gdpr"] = general.GDPRCommand{}
 	cm.registry["invite"] = general.InviteCommand{}
 	cm.registry["jumptotop"] = general.JumpToTopCommand{}
 	cm.registry["vote"] = general.VoteCommand{}
@@ -95,11 +96,19 @@ func (cm *CommandManager) BuildCreatePayload(isWhitelabel bool, adminCommandGuil
 			continue
 		}
 
+		var contexts []interaction.InteractionContextType
+		if len(properties.Contexts) > 0 {
+			contexts = properties.Contexts
+		} else {
+			contexts = []interaction.InteractionContextType{interaction.InteractionContextGuild}
+		}
+
 		cmdData := rest.CreateCommandData{
 			Name:        option.Name,
 			Description: description,
 			Options:     option.Options,
 			Type:        properties.Type,
+			Contexts:    contexts,
 		}
 
 		if properties.HelperOnly || properties.AdminOnly {

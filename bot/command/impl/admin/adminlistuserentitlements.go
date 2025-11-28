@@ -58,7 +58,7 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 			sourceFormatted = "None"
 		}
 		value := fmt.Sprintf(
-			"#### %s\n\n**Tier:** %s\n**Source:** %s\n**Expires:** <t:%d>\n**SKU ID:** %s\n**SKU Priority:** %d\n\n",
+			"### %s\n\n**Tier:** %s\n**Source:** %s\n**Expires:** <t:%d>\n**SKU ID:** %s\n**SKU Priority:** %d\n\n",
 			entitlement.SkuLabel,
 			entitlement.Tier,
 			sourceFormatted,

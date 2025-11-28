@@ -23,9 +23,12 @@ type Properties struct {
 	InteractionOnly  bool
 	MessageOnly      bool
 	MainBotOnly      bool
+	Contexts         []interaction.InteractionContextType
 	Arguments        []command.Argument
 	DefaultEphemeral bool
+	DisableAutoDefer bool
 	Timeout          time.Duration
+	IgnoreBlacklist  bool
 
 	SetupFunc func()
 }

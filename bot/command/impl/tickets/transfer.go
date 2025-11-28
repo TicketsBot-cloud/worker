@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -51,14 +50,8 @@ func (TransferCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		return
 	}
 
-	// Check if thread
-	ch, err := ctx.Channel()
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	if ch.Type == channel.ChannelTypeGuildPrivateThread {
+	// Check if this is a thread-mode ticket (not if we're currently in a thread, as we could be in notes)
+	if ticket.IsThread {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageClaimThread)
 		return
 	}
@@ -83,6 +76,11 @@ func (TransferCommand) Execute(ctx registry.CommandContext, userId uint64) {
 	if err := logic.ClaimTicket(ctx, ctx, ticket, userId); err != nil {
 		ctx.HandleError(err)
 		return
+	}
+
+	// Update the welcome message claim button
+	if err := logic.UpdateWelcomeMessageClaimButton(ctx, ctx.Worker(), ctx, ticket, true); err != nil {
+		ctx.HandleWarning(err)
 	}
 
 	ctx.ReplyPermanent(customisation.Green, i18n.TitleClaim, i18n.MessageClaimed, fmt.Sprintf("<@%d>", userId))

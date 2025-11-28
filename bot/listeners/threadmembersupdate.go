@@ -15,7 +15,7 @@ import (
 )
 
 func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*6) // TODO: Propagate context
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15) // TODO: Propagate context
 	defer cancel()
 
 	settings, err := dbclient.Client.Settings.Get(ctx, e.GuildId)

@@ -25,12 +25,13 @@ type TagCommand struct {
 
 func (c TagCommand) Properties() registry.Properties {
 	return registry.Properties{
-		Name:            "tag",
-		Description:     i18n.HelpTag,
-		Type:            interaction.ApplicationCommandTypeChatInput,
-		Aliases:         []string{"canned", "cannedresponse", "cr", "tags", "tag", "snippet", "c"},
-		PermissionLevel: permission.Everyone,
-		Category:        command.Tags,
+		Name:             "tag",
+		Description:      i18n.HelpTag,
+		Type:             interaction.ApplicationCommandTypeChatInput,
+		Aliases:          []string{"canned", "cannedresponse", "cr", "tags", "tag", "snippet", "c"},
+		PermissionLevel:  permission.Everyone,
+		Category:         command.Tags,
+		DisableAutoDefer: true,
 		Arguments: command.Arguments(
 			command.NewRequiredAutocompleteableArgument("id", "The ID of the tag to be sent to the channel", interaction.OptionTypeString, i18n.MessageTagInvalidArguments, c.AutoCompleteHandler),
 		),
