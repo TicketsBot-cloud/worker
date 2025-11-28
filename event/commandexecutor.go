@@ -36,14 +36,6 @@ func executeCommand(
 	data interaction.ApplicationCommandInteraction,
 	responseCh chan interaction.ApplicationCommandCallbackData,
 ) (bool, bool, error) {
-	// data.Member is needed for permission level lookup
-	if data.GuildId.Value == 0 || data.Member == nil {
-		responseCh <- interaction.ApplicationCommandCallbackData{
-			Content: "Commands in DMs are not currently supported. Please run this command in a server.",
-		}
-		return false, false, nil
-	}
-
 	cmd, ok := registry[data.Data.Name]
 	if !ok {
 		// If a registered command is not found, check for a tag alias
@@ -84,6 +76,46 @@ func executeCommand(
 
 	properties := cmd.Properties()
 
+	// Determine the current interaction context
+	var currentContext interaction.InteractionContextType
+	if data.GuildId.Value == 0 || data.Member == nil {
+		currentContext = interaction.InteractionContextBotDM
+	} else {
+		currentContext = interaction.InteractionContextGuild
+	}
+
+	// Check if command has Contexts specified
+	if len(properties.Contexts) > 0 {
+		// Check if the current context is allowed
+		allowed := false
+		for _, ctx := range properties.Contexts {
+			if ctx == currentContext {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			if currentContext == interaction.InteractionContextBotDM {
+				responseCh <- interaction.ApplicationCommandCallbackData{
+					Content: "This command can only be used in servers.",
+				}
+			} else {
+				responseCh <- interaction.ApplicationCommandCallbackData{
+					Content: "This command can only be used in DMs.",
+				}
+			}
+			return false, false, nil
+		}
+	} else {
+		if currentContext == interaction.InteractionContextBotDM {
+			responseCh <- interaction.ApplicationCommandCallbackData{
+				Content: "This command can only be used in servers.",
+			}
+			return false, false, nil
+		}
+	}
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -92,45 +124,46 @@ func executeCommand(
 			}
 		}()
 
+		var premiumLevel = premium.None
+		var permLevel = permission.Everyone
+
 		lookupCtx, cancelLookupCtx := context.WithTimeout(ctx, time.Second*2)
 		defer cancelLookupCtx()
 
-		// Parallelise queries
-		group, _ := errgroup.WithContext(lookupCtx)
+		if data.GuildId.Value != 0 && data.Member != nil {
 
-		// Get premium level
-		var premiumLevel = premium.None
-		group.Go(func() error {
-			tier, err := utils.PremiumClient.GetTierByGuildId(lookupCtx, data.GuildId.Value, true, worker.Token, worker.RateLimiter)
-			if err != nil {
-				// TODO: Better error handling
-				// But do not hard fail, as Patreon / premium proxy may be experiencing some issues
-				sentry.Error(err)
-			} else {
-				premiumLevel = tier
+			group, _ := errgroup.WithContext(lookupCtx)
+
+			group.Go(func() error {
+				tier, err := utils.PremiumClient.GetTierByGuildId(lookupCtx, data.GuildId.Value, true, worker.Token, worker.RateLimiter)
+				if err != nil {
+					// TODO: Better error handling
+					// But do not hard fail, as Patreon / premium proxy may be experiencing some issues
+					sentry.Error(err)
+				} else {
+					premiumLevel = tier
+				}
+
+				return nil
+			})
+
+			group.Go(func() error {
+				res, err := permission.GetPermissionLevel(lookupCtx, utils.ToRetriever(worker), *data.Member, data.GuildId.Value)
+				if err != nil {
+					return err
+				}
+
+				permLevel = res
+				return nil
+			})
+
+			if err := group.Wait(); err != nil {
+				errorId := sentry.Error(err)
+				responseCh <- interaction.ApplicationCommandCallbackData{
+					Content: fmt.Sprintf("An error occurred while processing this request (Error ID `%s`)", errorId),
+				}
+				return
 			}
-
-			return nil
-		})
-
-		// Get permission level
-		var permLevel = permission.Everyone
-		group.Go(func() error {
-			res, err := permission.GetPermissionLevel(lookupCtx, utils.ToRetriever(worker), *data.Member, data.GuildId.Value)
-			if err != nil {
-				return err
-			}
-
-			permLevel = res
-			return nil
-		})
-
-		if err := group.Wait(); err != nil {
-			errorId := sentry.Error(err)
-			responseCh <- interaction.ApplicationCommandCallbackData{
-				Content: fmt.Sprintf("An error occurred while processing this request (Error ID `%s`)", errorId),
-			}
-			return
 		}
 
 		if premiumLevel == premium.None && config.Conf.PremiumOnly {
@@ -143,8 +176,13 @@ func executeCommand(
 		interactionContext := cmdcontext.NewSlashCommandContext(ctx, worker, data, premiumLevel, responseCh)
 
 		// Check if the guild is globally blacklisted
-		if blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+		if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
+			reason, _ := dbclient.Client.ServerBlacklist.GetReason(lookupCtx, data.GuildId.Value)
+			if reason != "" {
+				interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, i18n.MessageGuildBlacklisted)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
+			} else {
+				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
+			}
 			return
 		}
 
@@ -170,16 +208,32 @@ func executeCommand(
 
 		// Check for user blacklist - cannot parallelise as relies on permission level
 		// If data.Member is nil, it does not matter, as it is not checked if the command is not executed in a guild
-		blacklisted, err := interactionContext.IsBlacklisted(lookupCtx)
-		cancelLookupCtx()
-		if err != nil {
-			interactionContext.HandleError(err)
-			return
-		}
+		if !properties.IgnoreBlacklist {
+			blacklisted, err := interactionContext.IsBlacklisted(lookupCtx)
+			cancelLookupCtx()
+			if err != nil {
+				interactionContext.HandleError(err)
+				return
+			}
 
-		if blacklisted {
-			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
-			return
+			if blacklisted {
+				var message i18n.MessageId
+				var reason string
+
+				if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(interactionContext.UserId()) {
+					message = i18n.MessageUserBlacklisted
+					reason, _ = dbclient.Client.GlobalBlacklist.GetReason(lookupCtx, interactionContext.UserId())
+				} else {
+					message = i18n.MessageBlacklisted
+				}
+
+				if reason != "" {
+					interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, message)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
+				} else {
+					interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+				}
+				return
+			}
 		}
 
 		statsd.Client.IncrementKey(statsd.KeySlashCommands)

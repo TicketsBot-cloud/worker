@@ -7,6 +7,7 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -77,7 +78,21 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 		}
 
 		if blacklisted {
-			ctx.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageBlacklisted)
+			var message i18n.MessageId
+			var reason string
+
+			if ctx.GuildId() == 0 || blacklist.IsUserBlacklisted(ctx.UserId()) {
+				message = i18n.MessageUserBlacklisted
+				reason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, ctx.UserId())
+			} else {
+				message = i18n.MessageBlacklisted
+			}
+
+			if reason != "" {
+				ctx.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(ctx.GuildId(), i18n.TitleBlacklisted), i18n.GetMessageFromGuild(ctx.GuildId(), message)+"\n\n**"+i18n.GetMessageFromGuild(ctx.GuildId(), i18n.Reason)+":** "+reason)
+			} else {
+				ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
+			}
 			return
 		}
 
