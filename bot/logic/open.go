@@ -896,7 +896,12 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
 	selfAllow = append(selfAllow, permission.ManageWebhooks)
-	selfAllow = append(selfAllow, permission.PinMessages)
+
+	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
+		selfAllow = append(selfAllow, permission.PinMessages)
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.ChannelId(), cmd.Worker().BotId, permission.PinMessages) {
+		selfAllow = append(selfAllow, permission.PinMessages)
+	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
 	if err != nil {
