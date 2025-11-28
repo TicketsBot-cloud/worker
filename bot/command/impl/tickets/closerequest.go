@@ -33,7 +33,7 @@ func (c CloseRequestCommand) Properties() registry.Properties {
 		PermissionLevel:  permission.Support,
 		Category:         command.Tickets,
 		InteractionOnly:  true,
-		DefaultEphemeral: true,
+		DisableAutoDefer: true,
 		Arguments: command.Arguments(
 			command.NewOptionalArgument("close_delay", "Hours to close the ticket in if the user does not respond", interaction.OptionTypeInteger, "infallible"),
 			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.OptionTypeString, "infallible", c.ReasonAutoCompleteHandler),
@@ -109,23 +109,39 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		}),
 	)
 
-	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
-	ticketChannelId := *ticket.ChannelId
-
-	_, err = ctx.Worker().CreateMessageComplex(ticketChannelId, rest.CreateMessageData{
+	data := command.MessageResponse{
 		Content: fmt.Sprintf("<@%d>", ticket.UserId),
 		Embeds:  []*embed.Embed{msgEmbed},
 		AllowedMentions: message.AllowedMention{
 			Users: []uint64{ticket.UserId},
 		},
 		Components: []component.Component{components},
-	})
-	if err != nil {
-		ctx.HandleError(err)
-		return
 	}
-
-	ctx.ReplyPlain(ctx.GetMessage(i18n.MessageCloseRequested))
+	
+	// If command is run in the ticket channel, send as reply
+	// If command is run outside the ticket channel, send as new message in ticket channel
+	ticketChannelId := *ticket.ChannelId
+	if ctx.ChannelId() == ticketChannelId {
+		if _, err := ctx.ReplyWith(data); err != nil {
+			ctx.HandleError(err)
+			return
+		}
+	} else {
+		_, err = ctx.Worker().CreateMessageComplex(ticketChannelId, rest.CreateMessageData{
+			Content: fmt.Sprintf("<@%d>", ticket.UserId),
+			Embeds:  []*embed.Embed{msgEmbed},
+			AllowedMentions: message.AllowedMention{
+				Users: []uint64{ticket.UserId},
+			},
+			Components: []component.Component{components},
+		})
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+		
+		ctx.ReplyPlain(ctx.GetMessage(i18n.MessageCloseRequested))
+	}
 
 	if err := dbclient.Client.Tickets.SetStatus(ctx, ctx.GuildId(), ticket.Id, model.TicketStatusPending); err != nil {
 		ctx.HandleError(err)

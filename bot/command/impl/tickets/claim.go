@@ -57,5 +57,10 @@ func (ClaimCommand) Execute(ctx registry.CommandContext) {
 		return
 	}
 
+	// Update the welcome message claim button
+	if err := logic.UpdateWelcomeMessageClaimButton(ctx, ctx.Worker(), ctx, ticket, true); err != nil {
+		ctx.HandleWarning(err)
+	}
+
 	ctx.ReplyPermanent(customisation.Green, i18n.TitleClaimed, i18n.MessageClaimed, fmt.Sprintf("<@%d>", ctx.UserId()))
 }
