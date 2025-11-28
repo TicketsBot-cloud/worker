@@ -349,7 +349,6 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 				permission.CreatePrivateThreads,
 				permission.SendMessagesInThreads,
 				permission.ManageThreads,
-				permission.ManageWebhooks,
 				permission.PinMessages,
 			},
 			logic.StandardPermissions[:]...,
@@ -359,11 +358,15 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 		requiredPermissions = append(
 			[]permission.Permission{
 				permission.ManageChannels,
-				permission.ManageWebhooks,
 				permission.PinMessages,
 			},
 			logic.StandardPermissions[:]...,
 		)
+	}
+
+	// Webhooks are only used for whitelabel bots to send messages via the dashboard
+	if ctx.Worker().IsWhitelabel {
+		requiredPermissions = append(requiredPermissions, permission.ManageWebhooks)
 	}
 
 	if targetChannelId != 0 {

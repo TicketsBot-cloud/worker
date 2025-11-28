@@ -793,8 +793,11 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
-	// Check if bot has ManageWebhooks permission in the channel before attempting to create
-	if !permissionwrapper.HasPermissions(c.Worker(), guildId, c.Worker().BotId, permission.ManageWebhooks) {
+	// Webhooks are only used for whitelabel bots to send messages via the dashboard
+	if !c.Worker().IsWhitelabel {
+		return nil // Silently skip webhook creation if whitelabel bot
+	} else if !permissionwrapper.HasPermissions(c.Worker(), guildId, c.Worker().BotId, permission.ManageWebhooks) {
+		// Check if bot has ManageWebhooks permission in the channel before attempting to create
 		return nil // Silently skip webhook creation if no permission in guild
 	} else if !permissionwrapper.HasPermissionsChannel(c.Worker(), guildId, c.Worker().BotId, channelId, permission.ManageWebhooks) {
 		return nil // Silently skip webhook creation if no permission in channel
@@ -894,8 +897,12 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
-	selfAllow = append(selfAllow, permission.ManageWebhooks)
 	selfAllow = append(selfAllow, permission.PinMessages)
+
+	// Webhooks are only used for whitelabel bots to send messages via the dashboard
+	if cmd.Worker().IsWhitelabel {
+		selfAllow = append(selfAllow, permission.ManageWebhooks)
+	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
 	if err != nil {
