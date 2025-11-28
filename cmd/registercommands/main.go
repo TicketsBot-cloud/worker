@@ -62,6 +62,7 @@ func main() {
 						Description: cmd.Description,
 						Options:     cmd.Options,
 						Type:        interaction.ApplicationCommandTypeChatInput,
+						Contexts:    cmd.Contexts,
 					})
 				}
 			}

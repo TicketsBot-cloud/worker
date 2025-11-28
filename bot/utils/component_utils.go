@@ -36,7 +36,7 @@ func BuildContainerWithComponents(ctx registry.CommandContext, colour customisat
 		component.BuildSeparator(component.Separator{}),
 	), innerComponents...)
 
-	if ctx.PremiumTier() == premium.None {
+	if ctx.PremiumTier() == premium.None && !ctx.Worker().IsWhitelabel {
 		components = addPremiumFooter(components)
 	}
 
@@ -53,7 +53,7 @@ func addPremiumFooter(existingComponents []component.Component) []component.Comp
 
 	existingComponents = append(existingComponents,
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("-# %s Powered by [%s](https://%s)", "TODO::ADDTHIS", config.Conf.Bot.PoweredBy, config.Conf.Bot.PoweredBy),
+			Content: fmt.Sprintf("-# %s Powered by [%s](https://%s)", customisation.EmojiLogo, config.Conf.Bot.PoweredBy, config.Conf.Bot.PoweredBy),
 		}),
 	)
 

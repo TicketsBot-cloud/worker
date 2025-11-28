@@ -137,6 +137,7 @@ type (
 			BulletLine uint64 `env:"BULLETLINE" envDefault:"1327350311110574201"`
 			Patreon    uint64 `env:"PATREON" envDefault:"1327350319612690563"`
 			Discord    uint64 `env:"DISCORD" envDefault:"1327350329381228544"`
+			Logo       uint64 `env:"LOGO" envDefault:"1421596160379850783"`
 		} `envPrefix:"EMOJI_"`
 
 		VoteSkuId uuid.UUID `env:"VOTE_SKU_ID"`

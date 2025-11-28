@@ -9,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -64,6 +65,9 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, raw string, re
 		ctx.HandleError(err)
 		return
 	}
+
+	// Add to cache
+	blacklist.AddGuildToCache(guildId)
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
 		utils.BuildContainerRaw(
