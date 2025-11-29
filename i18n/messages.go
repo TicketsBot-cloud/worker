@@ -113,6 +113,7 @@ var (
 	MessageAddNoMembers    MessageId = "commands.add.no_members"
 	MessageAddNoPermission MessageId = "commands.add.no_permission"
 	MessageAddSuccess      MessageId = "commands.add.success"
+	MessageAddRoleThread   MessageId = "commands.add.role_thread"
 
 	MessageBlacklisted         MessageId = "generic.error.blacklisted"
 	MessageGuildBlacklisted    MessageId = "generic.error.guild_blacklisted"
@@ -174,6 +175,7 @@ var (
 	MessageRemoveNoPermission      MessageId = "commands.remove.no_permission"
 	MessageRemoveCannotRemoveStaff MessageId = "commands.remove.staff"
 	MessageRemoveSuccess           MessageId = "commands.remove.success"
+	MessageRemoveRoleThread        MessageId = "commands.remove.role_thread"
 
 	MessageRenamed           MessageId = "commands.rename.success"
 	MessageRenameMissingName MessageId = "commands.rename.missing_name"
