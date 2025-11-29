@@ -350,7 +350,6 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 				permission.SendMessagesInThreads,
 				permission.ManageThreads,
 				permission.ManageWebhooks,
-				permission.PinMessages,
 			},
 			logic.StandardPermissions[:]...,
 		)
@@ -360,7 +359,6 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 			[]permission.Permission{
 				permission.ManageChannels,
 				permission.ManageWebhooks,
-				permission.PinMessages,
 			},
 			logic.StandardPermissions[:]...,
 		)
