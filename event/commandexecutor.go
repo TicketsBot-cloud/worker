@@ -218,20 +218,14 @@ func executeCommand(
 
 			if blacklisted {
 				var message i18n.MessageId
-				var reason string
 
 				if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(interactionContext.UserId()) {
 					message = i18n.MessageUserBlacklisted
-					reason, _ = dbclient.Client.GlobalBlacklist.GetReason(lookupCtx, interactionContext.UserId())
 				} else {
 					message = i18n.MessageBlacklisted
 				}
 
-				if reason != "" {
-					interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, message)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
-				} else {
-					interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, message)
-				}
+				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, message)
 				return
 			}
 		}
