@@ -386,6 +386,9 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		JoinMessageId:    joinMessageId,
 	}
 
+	// Variable to store welcome message ID for pinning later
+	var welcomeMessageId uint64
+
 	// Welcome message
 	group.Go(func() error {
 		span = sentry.StartSpan(rootSpan.Context(), "Fetch custom integration placeholders")
@@ -402,46 +405,14 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span.Finish()
 
 		span = sentry.StartSpan(rootSpan.Context(), "Send welcome message")
-		welcomeMessageId, err := SendWelcomeMessage(ctx, cmd, ticket, subject, panel, formData, additionalPlaceholders)
+		msgId, err := SendWelcomeMessage(ctx, cmd, ticket, subject, panel, formData, additionalPlaceholders)
 		span.Finish()
 		if err != nil {
 			return err
 		}
 
-		// Pin the welcome message
-		if welcomeMessageId != 0 && ticket.ChannelId != nil {
-			span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
-			channelId := *ticket.ChannelId
-
-			if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err != nil {
-				cmd.HandleError(err)
-			}
-			// else {
-			// 	// Delete the system pin notification message
-			// 	span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
-
-			// 	// Fetch recent messages to find the system pin notification
-			// 	messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
-			// 		Limit: 3,
-			// 	})
-
-			// 	if err == nil {
-			// 		// Find and delete the system pin notification message
-			// 		for _, msg := range messages {
-			// 			// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
-			// 			if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
-			// 				_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
-			// 				break
-			// 			}
-			// 		}
-			// 	} else {
-			// 		cmd.HandleError(err)
-			// 	}
-
-			// 	span2.Finish()
-			// }
-			span.Finish()
-		}
+		// Store the welcome message ID for pinning later
+		welcomeMessageId = msgId
 
 		// Update message IDs in DB
 		span = sentry.StartSpan(rootSpan.Context(), "Update ticket properties in database")
@@ -582,6 +553,36 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if err := group.Wait(); err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
+	}
+
+	// Pin the welcome message as the last step after everything else is complete
+	if welcomeMessageId != 0 && ticket.ChannelId != nil {
+		span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
+		channelId := *ticket.ChannelId
+
+		if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err == nil {
+			// Delete the system pin notification message
+			span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
+
+			// Fetch recent messages to find the system pin notification
+			messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
+				Limit: 3,
+			})
+
+			if err == nil {
+				// Find and delete the system pin notification message
+				for _, msg := range messages {
+					// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
+					if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
+						_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
+						break
+					}
+				}
+			}
+
+			span2.Finish()
+		}
+		span.Finish()
 	}
 
 	span = sentry.StartSpan(rootSpan.Context(), "Increment statsd counters")
@@ -864,7 +865,12 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
 	selfAllow = append(selfAllow, permission.ManageWebhooks)
-	selfAllow = append(selfAllow, permission.PinMessages)
+
+	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
+		selfAllow = append(selfAllow, permission.PinMessages)
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.ChannelId(), cmd.Worker().BotId, permission.PinMessages) {
+		selfAllow = append(selfAllow, permission.PinMessages)
+	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
 	if err != nil {
