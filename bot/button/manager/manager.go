@@ -52,6 +52,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.AddAdminHandler),
 		new(handlers.AddSupportHandler),
 		new(handlers.AdminDebugServerBlacklistReasonHandler),
+		new(handlers.AdminDebugServerEntitlementsHandler),
 		new(handlers.AdminDebugServerMonitoredBotsHandler),
 		new(handlers.AdminDebugServerPanelSettingsHandler),
 		new(handlers.AdminDebugServerPermissionsHandler),

@@ -202,8 +202,9 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		premiumSource = string(source)
 		panelLimit = "∞"
 
-		// Find the active entitlement to get subscription owner and details
-		for _, entitlement := range entitlements {
+		// Only show entitlement details inline if there's exactly 1 entitlement
+		if len(entitlements) == 1 {
+			entitlement := entitlements[0]
 			premiumExpires = fmt.Sprintf("<t:%d:f>, <t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
 			skuId = entitlement.SkuId.String()
 			skuPriority = fmt.Sprintf("%d", entitlement.SkuPriority)
@@ -217,7 +218,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 					subscriptionOwnerInfo = fmt.Sprintf("`Unknown` - <@%s> (%s)", subscriptionOwnerId, subscriptionOwnerId)
 				}
 			}
-			break
 		}
 	}
 
@@ -310,10 +310,16 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		premiumInfo := []string{
 			fmt.Sprintf("Premium Tier: `%s`", premiumTier),
 			fmt.Sprintf("Premium Source: `%s`", premiumSource),
-			fmt.Sprintf("Subscription Owner: %s", subscriptionOwnerInfo),
-			fmt.Sprintf("Premium Expires: %s", premiumExpires),
-			fmt.Sprintf("SKU ID: ||`%s`||", skuId),
-			fmt.Sprintf("SKU Priority: `%s`", skuPriority),
+		}
+
+		// Only add entitlement details if there's exactly 1 entitlement
+		if len(entitlements) == 1 {
+			premiumInfo = append(premiumInfo, fmt.Sprintf("Subscription Owner: %s", subscriptionOwnerInfo))
+			premiumInfo = append(premiumInfo, fmt.Sprintf("Premium Expires: %s", premiumExpires))
+			premiumInfo = append(premiumInfo, fmt.Sprintf("SKU ID: ||`%s`||", skuId))
+			premiumInfo = append(premiumInfo, fmt.Sprintf("SKU Priority: `%s`", skuPriority))
+		} else if len(entitlements) > 1 {
+			premiumInfo = append(premiumInfo, fmt.Sprintf("Entitlements: `%d` (click button to view)", len(entitlements)))
 		}
 
 		// Add whitelabel bot info if applicable
@@ -384,6 +390,15 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 			Label:    "View Blacklist Reason",
 			Style:    component.ButtonStyleDanger,
 			CustomId: fmt.Sprintf("admin_debug_blacklist_reason_%d", guild.Id),
+		}))
+	}
+
+	// Add entitlements button if there's more than 1 entitlement
+	if len(entitlements) > 1 {
+		conditionalButtons = append(conditionalButtons, component.BuildButton(component.Button{
+			Label:    "View Entitlements",
+			Style:    component.ButtonStyleSecondary,
+			CustomId: fmt.Sprintf("admin_debug_entitlements_%d", guild.Id),
 		}))
 	}
 
