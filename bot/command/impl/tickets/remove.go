@@ -124,6 +124,34 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			}
 		}
 	} else if mentionableType == context.MentionableTypeRole {
+		// Verify that the role isn't a staff role (admin or support)
+		adminRoles, err := dbclient.Client.RolePermissions.GetAdminRoles(ctx, ctx.GuildId())
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, ctx.GuildId())
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		// Check if the role is an admin or support role
+		for _, roleId := range adminRoles {
+			if roleId == id {
+				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+				return
+			}
+		}
+
+		for _, roleId := range supportRoles {
+			if roleId == id {
+				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+				return
+			}
+		}
+
 		// Handle role removal
 		data := channel.PermissionOverwrite{
 			Id:    id,
