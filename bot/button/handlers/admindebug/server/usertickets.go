@@ -13,8 +13,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
-	"github.com/TicketsBot-cloud/worker/bot/customisation"
-	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
 type AdminDebugServerUserTicketsHandler struct{}
@@ -30,15 +28,11 @@ func (h *AdminDebugServerUserTicketsHandler) Properties() registry.Properties {
 		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
 		Timeout:         time.Second * 15,
 		PermissionLevel: permcache.Support,
+		HelperOnly:      true,
 	}
 }
 
 func (h *AdminDebugServerUserTicketsHandler) Execute(ctx *context.ButtonContext) {
-	if !utils.IsBotHelper(ctx.UserId()) {
-		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
-		return
-	}
-
 	guildId, err := strconv.ParseUint(strings.Replace(ctx.InteractionData.CustomId, "admin_debug_user_tickets_", "", -1), 10, 64)
 	if err != nil {
 		ctx.HandleError(err)

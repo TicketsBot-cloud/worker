@@ -33,15 +33,11 @@ func (h *AdminDebugServerUserTicketsModalSubmitHandler) Properties() registry.Pr
 		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
 		Timeout:         time.Second * 30,
 		PermissionLevel: permcache.Support,
+		HelperOnly:      true,
 	}
 }
 
 func (h *AdminDebugServerUserTicketsModalSubmitHandler) Execute(ctx *context.ModalContext) {
-	if !utils.IsBotHelper(ctx.UserId()) {
-		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this.")
-		return
-	}
-
 	// Extract guild ID from custom ID
 	parts := strings.Split(ctx.Interaction.Data.CustomId, "_")
 	if len(parts) < 6 {

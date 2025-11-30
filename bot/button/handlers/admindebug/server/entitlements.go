@@ -30,15 +30,11 @@ func (h *AdminDebugServerEntitlementsHandler) Properties() registry.Properties {
 		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
 		Timeout:         time.Second * 10,
 		PermissionLevel: permcache.Support,
+		HelperOnly:      true,
 	}
 }
 
 func (h *AdminDebugServerEntitlementsHandler) Execute(ctx *context.ButtonContext) {
-	if !utils.IsBotHelper(ctx.UserId()) {
-		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this.")
-		return
-	}
-
 	// Extract guild ID from custom ID
 	guildId, err := strconv.ParseUint(strings.Replace(ctx.InteractionData.CustomId, "admin_debug_entitlements_", "", -1), 10, 64)
 	if err != nil {

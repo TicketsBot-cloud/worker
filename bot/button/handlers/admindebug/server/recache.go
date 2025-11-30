@@ -33,6 +33,7 @@ func (h *AdminDebugServerRecacheHandler) Properties() registry.Properties {
 		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
 		Timeout:         time.Second * 30,
 		PermissionLevel: permcache.Support,
+		HelperOnly:      true,
 	}
 }
 

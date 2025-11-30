@@ -30,15 +30,11 @@ func (h *AdminDebugServerMonitoredBotsHandler) Properties() registry.Properties 
 		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
 		Timeout:         time.Second * 15,
 		PermissionLevel: permcache.Support,
+		HelperOnly:      true,
 	}
 }
 
 func (h *AdminDebugServerMonitoredBotsHandler) Execute(ctx *context.ButtonContext) {
-	if !utils.IsBotHelper(ctx.UserId()) {
-		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
-		return
-	}
-
 	guildId, err := strconv.ParseUint(strings.Replace(ctx.InteractionData.CustomId, "admin_debug_monitored_bots_", "", -1), 10, 64)
 	if err != nil {
 		ctx.HandleError(err)
