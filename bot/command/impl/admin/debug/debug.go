@@ -1,4 +1,4 @@
-package admin
+package debug
 
 import (
 	"github.com/TicketsBot-cloud/common/permission"

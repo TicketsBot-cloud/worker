@@ -1,4 +1,4 @@
-package handlers
+package modals
 
 import (
 	"errors"

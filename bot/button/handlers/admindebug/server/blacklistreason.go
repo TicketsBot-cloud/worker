@@ -1,4 +1,4 @@
-package handlers
+package server
 
 import (
 	"fmt"
@@ -70,7 +70,7 @@ func (h *AdminDebugServerBlacklistReasonHandler) Execute(ctx *context.ButtonCont
 
 	// Owner blacklist info
 	var message, globalReason, serverReason string
-	
+
 	if IsOwnerBlacklisted && GlobalBlacklistReason != "" {
 		globalReason = GlobalBlacklistReason
 	} else {
