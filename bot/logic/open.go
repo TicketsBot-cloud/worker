@@ -287,11 +287,19 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 	span.Finish()
 
+	// Get member for audit log reason
+	member, err := cmd.Member()
+	auditReason := "Ticket opened"
+	if err == nil {
+		auditReason = fmt.Sprintf("Ticket %d opened by %s", ticketId, member.User.Username)
+	}
+
 	var ch channel.Channel
 	var joinMessageId *uint64
 	if isThread {
 		span = sentry.StartSpan(rootSpan.Context(), "Create thread")
-		ch, err = cmd.Worker().CreatePrivateThread(cmd.ChannelId(), name, uint16(settings.ThreadArchiveDuration), false)
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(settings.ThreadArchiveDuration), false)
 		if err != nil {
 			cmd.HandleError(err)
 
@@ -347,7 +355,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 
 		span = sentry.StartSpan(rootSpan.Context(), "Create channel")
-		tmp, err := cmd.Worker().CreateGuildChannel(cmd.GuildId(), data)
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		tmp, err := cmd.Worker().CreateGuildChannel(reasonCtx, cmd.GuildId(), data)
 		if err != nil { // Bot likely doesn't have permission
 			// To prevent tickets getting in a glitched state, we should mark it as closed (or delete it completely?)
 			if err := dbclient.Client.Tickets.Close(ctx, ticketId, cmd.GuildId()); err != nil {

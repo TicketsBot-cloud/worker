@@ -164,7 +164,9 @@ func addMessageSender(ctx registry.CommandContext, ticket database.Ticket, msg m
 		}
 
 		overwrite := logic.BuildUserOverwrite(msg.Author.Id, additionalPermissions)
-		if err := ctx.Worker().EditChannelPermissions(*ticket.ChannelId, overwrite); err != nil {
+		auditReason := fmt.Sprintf("Started ticket %d for user %s", ticket.Id, msg.Author.Username)
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		if err := ctx.Worker().EditChannelPermissions(reasonCtx, *ticket.ChannelId, overwrite); err != nil {
 			return err
 		}
 	}

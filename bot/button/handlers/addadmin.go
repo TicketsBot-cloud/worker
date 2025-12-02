@@ -135,9 +135,38 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
+	// Get member and target name once for reuse in audit reasons
+	member, err := ctx.Member()
+	hasMember := err == nil
+
+	// Get the name of the user/role being added
+	var targetName string
+	if mentionableType == context.MentionableTypeUser {
+		if targetMember, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id); err == nil {
+			targetName = targetMember.User.Username
+		}
+	} else if mentionableType == context.MentionableTypeRole {
+		if roles, err := ctx.Worker().GetGuildRoles(ctx.GuildId()); err == nil {
+			for _, role := range roles {
+				if role.Id == id {
+					targetName = role.Name
+					break
+				}
+			}
+		}
+	}
+
 	// Add user / role to thread notification channel
 	if settings.TicketNotificationChannel != nil {
-		_ = ctx.Worker().EditChannelPermissions(*settings.TicketNotificationChannel, channel.PermissionOverwrite{
+		auditReason := "Added admin member/role"
+		if hasMember && targetName != "" {
+			auditReason = fmt.Sprintf("Added admin %s (%s) by %s", mentionableType, targetName, member.User.Username)
+		} else if hasMember {
+			auditReason = fmt.Sprintf("Added admin member/role by %s", member.User.Username)
+		}
+
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		_ = ctx.Worker().EditChannelPermissions(reasonCtx, *settings.TicketNotificationChannel, channel.PermissionOverwrite{
 			Id:    id,
 			Type:  mentionableType.OverwriteType(),
 			Allow: permission.BuildPermissions(permission.ViewChannel, permission.UseApplicationCommands, permission.ReadMessageHistory),
@@ -190,7 +219,15 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			Position:             ch.Position,
 		}
 
-		if _, err = ctx.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
+		ticketAuditReason := fmt.Sprintf("Added admin to ticket %d", ticket.Id)
+		if hasMember && targetName != "" {
+			ticketAuditReason = fmt.Sprintf("Added admin %s (%s) to ticket %d by %s", mentionableType, targetName, ticket.Id, member.User.Username)
+		} else if hasMember {
+			ticketAuditReason = fmt.Sprintf("Added admin to ticket %d by %s", ticket.Id, member.User.Username)
+		}
+
+		ticketReasonCtx := request.WithAuditReason(ctx, ticketAuditReason)
+		if _, err = ctx.Worker().ModifyChannel(ticketReasonCtx, *ticket.ChannelId, data); err != nil {
 			var restError request.RestError
 			if errors.As(err, &restError) {
 				if restError.StatusCode == 403 {

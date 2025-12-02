@@ -89,7 +89,7 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 	ctx.ReplyWithEmbed(embed)
 
 	// create transcripts channel
-	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
+	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
 	case nil:
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelSuccess, transcriptChannel.Id))
 
@@ -114,7 +114,7 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 		Type: channel.ChannelTypeGuildCategory,
 	}
 
-	switch category, err := ctx.Worker().CreateGuildChannel(ctx.GuildId(), categoryData); err {
+	switch category, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), categoryData); err {
 	case nil: // ok
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategorySuccess))
 

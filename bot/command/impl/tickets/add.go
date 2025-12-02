@@ -1,6 +1,8 @@
 package tickets
 
 import (
+	"fmt"
+
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
@@ -91,7 +93,28 @@ func (AddCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		// ticket.ChannelId cannot be nil, as we get by channel id
 		data := logic.BuildUserOverwrite(userId, additionalPermissions)
-		if err := ctx.Worker().EditChannelPermissions(*ticket.ChannelId, data); err != nil {
+
+		user, err := ctx.Worker().GetUser(userId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		ticket, err = dbclient.Client.Tickets.GetByChannelAndGuild(ctx, ctx.ChannelId(), ctx.GuildId())
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		member, err := ctx.Member()
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		auditReason := fmt.Sprintf("Added %s to ticket %d by %s", user.Username, ticket.PanelId, member.User.Username)
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		if err := ctx.Worker().EditChannelPermissions(reasonCtx, *ticket.ChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}

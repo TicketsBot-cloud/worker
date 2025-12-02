@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
@@ -107,7 +108,9 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 		ctx.Reply(customisation.Green, i18n.Success, i18n.MessageOnCallSuccess)
 	} else {
 		if defaultTeam && metadata.OnCallRole != nil {
-			if err := ctx.Worker().RemoveGuildMemberRole(ctx.GuildId(), ctx.UserId(), *metadata.OnCallRole); err != nil {
+			auditReason := fmt.Sprintf("Removed on-call role from %s", member.User.Username)
+			reasonCtx := request.WithAuditReason(ctx, auditReason)
+			if err := ctx.Worker().RemoveGuildMemberRole(reasonCtx, ctx.GuildId(), ctx.UserId(), *metadata.OnCallRole); err != nil {
 				ctx.HandleError(err)
 				return
 			}
@@ -127,7 +130,8 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 				continue
 			}
 
-			if err := ctx.Worker().RemoveGuildMemberRole(ctx.GuildId(), ctx.UserId(), *team.OnCallRole); err != nil {
+			reasonCtx2 := request.WithAuditReason(ctx, fmt.Sprintf("Removed team on-call role from %s", member.User.Username))
+			if err := ctx.Worker().RemoveGuildMemberRole(reasonCtx2, ctx.GuildId(), ctx.UserId(), *team.OnCallRole); err != nil {
 				ctx.HandleError(err)
 				return
 			}
@@ -153,7 +157,8 @@ func assignOnCallRole(ctx registry.CommandContext, member member.Member, roleId 
 		roleId = &tmp
 	}
 
-	if err := ctx.Worker().AddGuildMemberRole(ctx.GuildId(), ctx.UserId(), *roleId); err != nil {
+	reasonCtx3 := request.WithAuditReason(ctx, fmt.Sprintf("Added on-call role to %s", member.User.Username))
+	if err := ctx.Worker().AddGuildMemberRole(reasonCtx3, ctx.GuildId(), ctx.UserId(), *roleId); err != nil {
 		// If role was deleted, recreate it
 		if err, ok := err.(request.RestError); ok && err.StatusCode == 404 && err.ApiError.Message == "Unknown Role" {
 			if team == nil {

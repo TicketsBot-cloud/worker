@@ -209,7 +209,13 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			},
 		}
 
-		if _, err := cmd.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
+		auditReason := fmt.Sprintf("Ticket %d closed by %s", ticket.Id, member.User.Username)
+		if reason != nil && *reason != "" {
+			auditReason = fmt.Sprintf("%s - Reason: %s", auditReason, *reason)
+		}
+
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		if _, err := cmd.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 			cmd.HandleError(err)
 			return
 		}
@@ -223,7 +229,13 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			acker.Ack()
 		}
 
-		if _, err := cmd.Worker().DeleteChannel(*ticket.ChannelId); err != nil {
+		auditReason := fmt.Sprintf("Ticket %d closed by %s", ticket.Id, member.User.Username)
+		if reason != nil && *reason != "" {
+			auditReason = fmt.Sprintf("%s - Reason: %s", auditReason, *reason)
+		}
+
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		if _, err := cmd.Worker().DeleteChannel(reasonCtx, *ticket.ChannelId); err != nil {
 			// Check if we should exclude this from autoclose
 			var restError request.RestError
 			if errors.As(err, &restError) && restError.StatusCode == 403 {
