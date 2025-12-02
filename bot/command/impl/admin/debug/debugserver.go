@@ -246,6 +246,7 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, owner.Id)
 	}
 
+	guildInfo = append(guildInfo, fmt.Sprintf("Shard ID: `%d`", ctx.Worker().ShardId))
 	guildInfo = append(guildInfo, fmt.Sprintf("Owner Blacklisted: `%t`", IsOwnerBlacklisted))
 	guildInfo = append(guildInfo, fmt.Sprintf("Server Blacklisted: `%t`", IsGuildBlacklisted))
 
