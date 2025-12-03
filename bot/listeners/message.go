@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/chatrelay"
@@ -52,46 +53,100 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 
 	var isStaffCached *bool
 
+	// Start fetching premium tier early (in parallel)
+	premiumChan := make(chan struct {
+		tier premium.PremiumTier
+		err  error
+	}, 1)
+	go func() {
+		tier, err := sentry.WithSpan2(span.Context(), "Get premium tier", func(span *sentry.Span) (premium.PremiumTier, error) {
+			// Use fresh context for premium check
+			premiumCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			return utils.PremiumClient.GetTierByGuildId(premiumCtx, e.GuildId, true, worker.Token, worker.RateLimiter)
+		})
+		premiumChan <- struct {
+			tier premium.PremiumTier
+			err  error
+		}{tier, err}
+	}()
+
 	// ignore our own messages
 	if e.Author.Id != worker.BotId && !e.Author.Bot {
-		// set participants, for logging
-		sentry.WithSpan0(span.Context(), "Add participant", func(span *sentry.Span) {
-			if err := dbclient.Client.Participants.Set(ctx, e.GuildId, ticket.Id, e.Author.Id); err != nil {
-				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
-			}
-		})
+		// Run participant set and isStaff check in parallel
+		var wg sync.WaitGroup
+		var isStaffErr error
 
-		isStaffCached, err = sentry.WithSpan2(span.Context(), "Update ticket last activity", func(span *sentry.Span) (*bool, error) {
-			v, err := isStaff(ctx, e, ticket)
-			return &v, err
-		})
+		// Set participants (parallel)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sentry.WithSpan0(span.Context(), "Add participant", func(span *sentry.Span) {
+				// Use fresh context for DB operation
+				participantCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+				if err := dbclient.Client.Participants.Set(participantCtx, e.GuildId, ticket.Id, e.Author.Id); err != nil {
+					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+				}
+			})
+		}()
 
-		if err != nil {
-			sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
-		} else {
-			// set ticket last message, for autoclose
-			// isStaffCached cannot be nil at this point
-			// Create a new context with timeout for the database operation to avoid deadline exceeded errors
-			updateCtx, updateCancel := context.WithTimeout(context.Background(), time.Second*3)
-			defer updateCancel()
-			if err := updateLastMessage(updateCtx, e, ticket, *isStaffCached); err != nil {
-				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+		// Check if user is staff (parallel)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var v bool
+			v, isStaffErr = sentry.WithSpan2(span.Context(), "Check if staff", func(span *sentry.Span) (bool, error) {
+				// Use fresh context for this check
+				staffCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+				return isStaff(staffCtx, e, ticket)
+			})
+			isStaffCached = &v
+		}()
+
+		// Wait for both operations to complete
+		wg.Wait()
+
+		if isStaffErr != nil {
+			sentry.ErrorWithContext(isStaffErr, utils.MessageCreateErrorContext(e))
+		} else if isStaffCached != nil {
+			// Run updateLastMessage and FirstResponseTime in parallel for staff
+			var dbWg sync.WaitGroup
+
+			// Update last message
+			dbWg.Add(1)
+			go func() {
+				defer dbWg.Done()
+				updateCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+				if err := updateLastMessage(updateCtx, e, ticket, *isStaffCached); err != nil {
+					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+				}
+			}()
+
+			// Set first response time if staff
+			if *isStaffCached {
+				dbWg.Add(1)
+				go func() {
+					defer dbWg.Done()
+					sentry.WithSpan0(span.Context(), "Set first response time", func(span *sentry.Span) {
+						responseCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+						defer cancel()
+						if err := dbclient.Client.FirstResponseTime.Set(responseCtx, e.GuildId, e.Author.Id, ticket.Id, time.Now().Sub(ticket.OpenTime)); err != nil {
+							sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+						}
+					})
+				}()
 			}
 
-			if *isStaffCached { // check the user is staff
-				// We don't have to check for previous responses due to ON CONFLICT DO NOTHING
-				sentry.WithSpan0(span.Context(), "Set first response time", func(span *sentry.Span) {
-					if err := dbclient.Client.FirstResponseTime.Set(ctx, e.GuildId, e.Author.Id, ticket.Id, time.Now().Sub(ticket.OpenTime)); err != nil {
-						sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
-					}
-				})
-			}
+			dbWg.Wait()
 		}
 	}
 
-	premiumTier, err := sentry.WithSpan2(span.Context(), "Get premium tier", func(span *sentry.Span) (premium.PremiumTier, error) {
-		return utils.PremiumClient.GetTierByGuildId(ctx, e.GuildId, true, worker.Token, worker.RateLimiter)
-	})
+	// Get premium tier result
+	premiumResult := <-premiumChan
+	premiumTier, err := premiumResult.tier, premiumResult.err
 	if err != nil {
 		sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 		return
@@ -118,7 +173,10 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			if isStaffCached != nil {
 				userIsStaff = *isStaffCached
 			} else {
-				tmp, err := isStaff(ctx, e, ticket)
+				// Use fresh context for staff check
+				staffCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+				tmp, err := isStaff(staffCtx, e, ticket)
 				if err != nil {
 					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 					return
@@ -135,13 +193,18 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			}
 
 			if ticket.Status != newStatus {
-				if err := dbclient.Client.Tickets.SetStatus(ctx, e.GuildId, ticket.Id, newStatus); err != nil {
+				// Use fresh context for status update
+				statusCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+				if err := dbclient.Client.Tickets.SetStatus(statusCtx, e.GuildId, ticket.Id, newStatus); err != nil {
 					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 				}
 
 				if !ticket.IsThread {
 					if err := sentry.WithSpan1(span.Context(), "Update status update queue", func(span *sentry.Span) error {
-						return dbclient.Client.CategoryUpdateQueue.Add(ctx, e.GuildId, ticket.Id, newStatus)
+						queueCtx, queueCancel := context.WithTimeout(context.Background(), time.Second*3)
+						defer queueCancel()
+						return dbclient.Client.CategoryUpdateQueue.Add(queueCtx, e.GuildId, ticket.Id, newStatus)
 					}); err != nil {
 						sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 					}
