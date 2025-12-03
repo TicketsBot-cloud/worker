@@ -48,6 +48,11 @@ func OnGuildCreate(worker *worker.Context, e events.GuildCreate) {
 			sentry.Error(err)
 		}
 
+		// Add guild owner as ticket admin
+		if err := dbclient.Client.Permissions.AddAdmin(ctx, e.Guild.Id, e.Guild.OwnerId); err != nil {
+			sentry.Error(err)
+		}
+
 		// Add roles with Administrator permission as bot admins by default
 		for _, role := range e.Roles {
 			// Don't add @everyone role, even if it has Administrator
