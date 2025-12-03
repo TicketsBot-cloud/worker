@@ -97,10 +97,8 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			defer wg.Done()
 			var v bool
 			v, isStaffErr = sentry.WithSpan2(span.Context(), "Check if staff", func(span *sentry.Span) (bool, error) {
-				// Use fresh context for this check
-				staffCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-				defer cancel()
-				return isStaff(staffCtx, e, ticket)
+				// isStaff creates its own timeout context
+				return isStaff(context.Background(), e, ticket)
 			})
 			isStaffCached = &v
 		}()
@@ -118,9 +116,8 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			dbWg.Add(1)
 			go func() {
 				defer dbWg.Done()
-				updateCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-				defer cancel()
-				if err := updateLastMessage(updateCtx, e, ticket, *isStaffCached); err != nil {
+				// Pass context.Background() directly since updateLastMessage creates its own timeouts
+				if err := updateLastMessage(context.Background(), e, ticket, *isStaffCached); err != nil {
 					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 				}
 			}()
@@ -173,10 +170,8 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			if isStaffCached != nil {
 				userIsStaff = *isStaffCached
 			} else {
-				// Use fresh context for staff check
-				staffCtx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-				defer cancel()
-				tmp, err := isStaff(staffCtx, e, ticket)
+				// isStaff creates its own timeout context
+				tmp, err := isStaff(context.Background(), e, ticket)
 				if err != nil {
 					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 					return
@@ -218,20 +213,28 @@ func updateLastMessage(ctx context.Context, msg events.MessageCreate, ticket dat
 	span := sentry.StartSpan(ctx, "Update last message")
 	defer span.Finish()
 
+	// Create a fresh context for the Get operation to ensure we have enough time
+	getCtx, getCancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer getCancel()
+
 	// If last message was sent by staff, don't reset the timer
-	lastMessage, err := dbclient.Client.TicketLastMessage.Get(ctx, ticket.GuildId, ticket.Id)
+	lastMessage, err := dbclient.Client.TicketLastMessage.Get(getCtx, ticket.GuildId, ticket.Id)
 	if err != nil {
 		return err
 	}
 
+	// Create a fresh context for the Set operation
+	setCtx, setCancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer setCancel()
+
 	// No last message, or last message was before we started storing user IDs
 	if lastMessage.UserId == nil {
-		return dbclient.Client.TicketLastMessage.Set(ctx, ticket.GuildId, ticket.Id, msg.Id, msg.Author.Id, false)
+		return dbclient.Client.TicketLastMessage.Set(setCtx, ticket.GuildId, ticket.Id, msg.Id, msg.Author.Id, false)
 	}
 
 	// If the last message was sent by the ticket opener, we can skip the rest of the logic, and update straight away
 	if ticket.UserId == msg.Author.Id {
-		return dbclient.Client.TicketLastMessage.Set(ctx, ticket.GuildId, ticket.Id, msg.Id, msg.Author.Id, false)
+		return dbclient.Client.TicketLastMessage.Set(setCtx, ticket.GuildId, ticket.Id, msg.Id, msg.Author.Id, false)
 	}
 
 	// If the last message *and* this message were sent by staff members, then do not reset the timer
@@ -239,7 +242,7 @@ func updateLastMessage(ctx context.Context, msg events.MessageCreate, ticket dat
 		return nil
 	}
 
-	return dbclient.Client.TicketLastMessage.Set(ctx, ticket.GuildId, ticket.Id, msg.Id, msg.Author.Id, isStaff)
+	return dbclient.Client.TicketLastMessage.Set(setCtx, ticket.GuildId, ticket.Id, msg.Id, msg.Author.Id, isStaff)
 }
 
 // This method should not be used for anything requiring elevated privileges
@@ -249,7 +252,11 @@ func isStaff(ctx context.Context, msg events.MessageCreate, ticket database.Tick
 		return false, nil
 	}
 
-	members, err := dbclient.Client.TicketMembers.Get(ctx, ticket.GuildId, ticket.Id)
+	// Create fresh context for database operation
+	memberCtx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	members, err := dbclient.Client.TicketMembers.Get(memberCtx, ticket.GuildId, ticket.Id)
 	if err != nil {
 		return false, err
 	}
