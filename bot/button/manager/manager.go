@@ -2,6 +2,8 @@ package manager
 
 import (
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers"
+	"github.com/TicketsBot-cloud/worker/bot/button/handlers/admindebug/server"
+	"github.com/TicketsBot-cloud/worker/bot/button/handlers/admindebug/server/modals"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 )
@@ -72,10 +74,17 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.PremiumCheckAgain),
 		new(handlers.PremiumKeyButtonHandler),
 		new(handlers.RateHandler),
-		new(handlers.RecacheHandler),
 		new(handlers.RedeemVoteCreditsHandler),
 		new(handlers.ViewStaffHandler),
 		new(handlers.ViewSurveyHandler),
+		new(server.AdminDebugServerRecacheHandler),
+		new(server.AdminDebugServerBlacklistReasonHandler),
+		new(server.AdminDebugServerEntitlementsHandler),
+		new(server.AdminDebugServerMonitoredBotsHandler),
+		new(server.AdminDebugServerPanelSettingsHandler),
+		new(server.AdminDebugServerPermissionsHandler),
+		new(server.AdminDebugServerTicketPermissionsHandler),
+		new(server.AdminDebugServerUserTicketsHandler),
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
@@ -93,6 +102,10 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.GDPRModalAllMessagesHandler),
 		new(handlers.GDPRModalSpecificMessagesHandler),
 		new(handlers.PremiumKeySubmitHandler),
+		new(modals.AdminDebugServerPanelSettingsModalHandler),
+		new(modals.AdminDebugServerPermissionsModalSubmitHandler),
+		new(modals.AdminDebugServerTicketPermissionsModalSubmitHandler),
+		new(modals.AdminDebugServerUserTicketsModalSubmitHandler),
 	)
 
 	for _, handler := range m.buttonRegistry {
