@@ -1,12 +1,14 @@
 package tickets
 
 import (
+	"fmt"
 	"time"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/permission"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -91,8 +93,21 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
 	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
 	ticketChannelId := *ticket.ChannelId
 
+	user, err := ctx.Worker().GetUser(userId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	ticket, err = dbclient.Client.Tickets.GetByChannelAndGuild(ctx, ctx.ChannelId(), ctx.GuildId())
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	if ticket.IsThread {
-		if err := ctx.Worker().RemoveThreadMember(ticketChannelId, userId); err != nil {
+		reasonCtx := request.WithAuditReason(ctx, fmt.Sprintf("Removed %s from ticket %d by %s", user.Username, ticket.PanelId, member.User.Username))
+		if err := ctx.Worker().RemoveThreadMember(reasonCtx, ticketChannelId, userId); err != nil {
 			ctx.HandleError(err)
 			return
 		}
@@ -104,7 +119,8 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 		}
 
-		if err := ctx.Worker().EditChannelPermissions(ticketChannelId, data); err != nil {
+		reasonCtx := request.WithAuditReason(ctx, fmt.Sprintf("Removed %s from ticket %d by %s", user.Username, ticket.PanelId, member.User.Username))
+		if err := ctx.Worker().EditChannelPermissions(reasonCtx, ticketChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}

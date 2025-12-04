@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -125,7 +127,14 @@ func (NotesCommand) Execute(ctx registry.CommandContext) {
 			Content: b.String(),
 		}
 
-		thread, err := ctx.Worker().CreatePrivateThread(ctx.ChannelId(), ctx.GetMessage(i18n.MessageNotesThreadName), 10080, false)
+		member, err := ctx.Member()
+		auditReason := "Created note thread"
+		if err == nil {
+			auditReason = fmt.Sprintf("Created note thread in ticket %d by %s", ticket.PanelId, member.User.Username)
+		}
+
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		thread, err := ctx.Worker().CreatePrivateThread(reasonCtx, ctx.ChannelId(), ctx.GetMessage(i18n.MessageNotesThreadName), 10080, false)
 		if err != nil {
 			ctx.HandleError(err)
 			return

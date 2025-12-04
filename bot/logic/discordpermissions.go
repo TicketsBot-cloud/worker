@@ -73,8 +73,10 @@ func RemoveOnCallRoles(ctx context.Context, cmd registry.CommandContext, userId 
 		return err
 	}
 
+	auditReason := fmt.Sprintf("User %s removed from guild - cleaning up on-call role", member.User.Username)
+	reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 	if metadata.OnCallRole != nil && member.HasRole(*metadata.OnCallRole) {
-		if err := cmd.Worker().RemoveGuildMemberRole(cmd.GuildId(), userId, *metadata.OnCallRole); err != nil && !isUnknownRoleError(err) {
+		if err := cmd.Worker().RemoveGuildMemberRole(reasonCtx, cmd.GuildId(), userId, *metadata.OnCallRole); err != nil && !isUnknownRoleError(err) {
 			return err
 		}
 	}
@@ -86,7 +88,7 @@ func RemoveOnCallRoles(ctx context.Context, cmd registry.CommandContext, userId 
 
 	for _, team := range teams {
 		if team.OnCallRole != nil && member.HasRole(*team.OnCallRole) {
-			if err := cmd.Worker().RemoveGuildMemberRole(cmd.GuildId(), userId, *team.OnCallRole); err != nil && !isUnknownRoleError(err) {
+			if err := cmd.Worker().RemoveGuildMemberRole(reasonCtx, cmd.GuildId(), userId, *team.OnCallRole); err != nil && !isUnknownRoleError(err) {
 				return err
 			}
 		}
@@ -110,7 +112,9 @@ func RecreateOnCallRole(ctx context.Context, cmd registry.CommandContext, team *
 			return nil
 		}
 
-		if err := cmd.Worker().DeleteGuildRole(cmd.GuildId(), *metadata.OnCallRole); err != nil && !isUnknownRoleError(err) {
+		auditReason := "Recreating on-call role"
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		if err := cmd.Worker().DeleteGuildRole(reasonCtx, cmd.GuildId(), *metadata.OnCallRole); err != nil && !isUnknownRoleError(err) {
 			return err
 		}
 
@@ -130,7 +134,9 @@ func RecreateOnCallRole(ctx context.Context, cmd registry.CommandContext, team *
 			return err
 		}
 
-		if err := cmd.Worker().DeleteGuildRole(cmd.GuildId(), *team.OnCallRole); err != nil && !isUnknownRoleError(err) {
+		auditReason := "Recreating team on-call role"
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		if err := cmd.Worker().DeleteGuildRole(reasonCtx, cmd.GuildId(), *team.OnCallRole); err != nil && !isUnknownRoleError(err) {
 			return err
 		}
 
