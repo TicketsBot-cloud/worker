@@ -47,7 +47,7 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 	}
 
 	// Delete pin notification messages in ticket channels
-	if isTicket && ticket.Id != 0 && e.Type == message.MessageTypeDefault && e.Author.Bot && e.Content == "" && e.MessageReference.MessageId != 0 && !e.Pinned {
+	if isTicket && ticket.Id != 0 && e.Type == message.MessageTypeDefault && e.Author.Id == worker.BotId && e.Content == "" && e.MessageReference.MessageId != 0 && !e.Pinned {
 		sentry.WithSpan0(span.Context(), "Delete pin notification", func(span *sentry.Span) {
 			if err := worker.DeleteMessage(e.ChannelId, e.Id); err != nil {
 				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
