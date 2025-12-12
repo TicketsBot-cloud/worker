@@ -2,8 +2,9 @@ package settings
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -39,14 +40,16 @@ func (c LanguageCommand) GetExecutor() interface{} {
 }
 
 func (c *LanguageCommand) Execute(ctx registry.CommandContext) {
+	sortedLocales := getSortedLocales()
+
 	var languageList string
-	for _, locale := range i18n.Locales {
+	for _, locale := range sortedLocales {
 		if locale.Coverage == 0 {
 			continue
 		}
 
 		bar := progressbar.NewOptions(100,
-			progressbar.OptionSetWriter(ioutil.Discard),
+			progressbar.OptionSetWriter(io.Discard),
 			progressbar.OptionSetWidth(15),
 			progressbar.OptionSetPredictTime(false),
 			progressbar.OptionSetRenderBlankState(true),
@@ -72,12 +75,25 @@ func (c *LanguageCommand) Execute(ctx registry.CommandContext) {
 	_, _ = ctx.ReplyWith(res)
 }
 
+func getSortedLocales() []*i18n.Locale {
+	sortedLocales := make([]*i18n.Locale, len(i18n.Locales))
+	copy(sortedLocales, i18n.Locales)
+
+	sort.Slice(sortedLocales, func(i, j int) bool {
+		return sortedLocales[i].EnglishName < sortedLocales[j].EnglishName
+	})
+
+	return sortedLocales
+}
+
 func buildComponents(ctx registry.CommandContext) []component.Component {
-	components := make([]component.Component, 0, int(math.Ceil(float64(len(i18n.Locales))/25.0)))
+	sortedLocales := getSortedLocales()
+
+	components := make([]component.Component, 0, int(math.Ceil(float64(len(sortedLocales))/25.0)))
 
 	var menu component.SelectMenu
 	var firstLocale, lastLocale *i18n.Locale
-	for _, locale := range i18n.Locales {
+	for _, locale := range sortedLocales {
 		if locale.Coverage == 0 {
 			continue
 		}
