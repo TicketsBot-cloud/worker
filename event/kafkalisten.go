@@ -29,11 +29,21 @@ func (k *KafkaConsumer) BuildContext() (context.Context, context.CancelFunc) {
 }
 
 func (k *KafkaConsumer) HandleMessage(ctx context.Context, message []byte) {
+	// Log incoming Kafka message
+	k.logger.Debug("Received Kafka message",
+		zap.Int("message_size", len(message)))
+
 	var event eventforwarding.Event
 	if err := json.Unmarshal(message, &event); err != nil {
 		k.logger.Error("Failed to unmarshal event", zap.Error(err))
 		return
 	}
+
+	// Log parsed event details
+	k.logger.Debug("Processing gateway event",
+		zap.Uint64("bot_id", event.BotId),
+		zap.Bool("is_whitelabel", event.IsWhitelabel),
+		zap.Int("shard_id", event.ShardId))
 
 	workerCtx := &worker.Context{
 		Token:        event.BotToken,
@@ -44,7 +54,7 @@ func (k *KafkaConsumer) HandleMessage(ctx context.Context, message []byte) {
 		RateLimiter:  nil, // Use http-proxy ratelimit functionality
 	}
 
-	if err := execute(workerCtx, event.Event); err != nil {
+	if err := executeWithLogger(workerCtx, event.Event, k.logger); err != nil {
 		k.logger.Error("Failed to handle event", zap.Error(err))
 	}
 }

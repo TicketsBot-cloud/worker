@@ -30,11 +30,21 @@ func NewTicketStatusUpdater(cache *cache.PgCache, logger *zap.Logger) *TicketSta
 }
 
 func (u *TicketStatusUpdater) HandleMessage(ctx context.Context, message []byte) {
+	// Log incoming RPC message
+	u.logger.Debug("Received ticket status update message",
+		zap.Int("message_size", len(message)))
+
 	var event model.TicketStatusUpdate
 	if err := json.Unmarshal(message, &event); err != nil {
 		u.logger.Error("Failed to unmarshal event", zap.Error(err))
 		return
 	}
+
+	// Log parsed ticket status update details
+	u.logger.Debug("Processing ticket status update",
+		zap.Uint64("guild_id", event.GuildId),
+		zap.Uint64("channel_id", event.ChannelId),
+		zap.Uint64("new_category_id", event.NewCategoryId))
 
 	worker, err := u.ContextForGuild(ctx, event.GuildId)
 	if err != nil {
