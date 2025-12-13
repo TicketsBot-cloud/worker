@@ -38,6 +38,12 @@ func executeWithLogger(c *worker.Context, event []byte, logger *zap.Logger) erro
 	prometheus.Events.WithLabelValues(payload.EventName).Inc()
 
 	if err := listeners.HandleEvent(c, span, payload); err != nil {
+		logger.Error("Error whilst handling event",
+			zap.String("event_type", payload.EventName),
+			zap.Uint64("bot_id", c.BotId),
+			zap.Int("shard_id", c.ShardId),
+			zap.Error(err),
+		)
 		return err
 	}
 
