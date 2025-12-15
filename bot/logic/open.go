@@ -1074,7 +1074,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	} else {
 		var err error
-		name, err = doSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
+		name, err = DoSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)
