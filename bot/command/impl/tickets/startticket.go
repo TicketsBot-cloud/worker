@@ -80,6 +80,17 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 		}
 
 		panel = &p
+
+		// Validate panel access
+		canProceed, err := logic.ValidatePanelAccess(interaction, p)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if !canProceed {
+			return
+		}
 	}
 
 	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil)

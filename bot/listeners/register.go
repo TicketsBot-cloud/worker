@@ -6,6 +6,7 @@ func init() {
 	GuildDeleteListeners = append(GuildDeleteListeners, OnGuildLeave)
 	GuildMemberRemoveListeners = append(GuildMemberRemoveListeners, OnMemberLeave)
 	GuildMemberUpdateListeners = append(GuildMemberUpdateListeners, OnMemberUpdate)
+	GuildUpdateListeners = append(GuildUpdateListeners, OnGuildUpdate)
 	MessageCreateListeners = append(MessageCreateListeners, OnMessage)
 	GuildRoleDeleteListeners = append(GuildRoleDeleteListeners, OnRoleDelete)
 	ThreadMembersUpdateListeners = append(ThreadMembersUpdateListeners, OnThreadMembersUpdate)

@@ -2,17 +2,21 @@ package tickets
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/objects/member"
+	"github.com/TicketsBot-cloud/gdl/objects/user"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -59,7 +63,54 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		return
 	}
 
-	if len(name) > 100 {
+	// Get claim information
+	var claimer *uint64
+	claimUserId, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if claimUserId != 0 {
+		claimer = &claimUserId
+	}
+
+	// Process placeholders in the name
+	processedName, err := logic.DoSubstitutions(ctx.Worker(), name, ticket.UserId, ctx.GuildId(), []logic.Substitutor{
+		// %id%
+		logic.NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
+			return strconv.Itoa(ticket.Id)
+		}),
+		// %id_padded%
+		logic.NewSubstitutor("id_padded", false, false, func(user user.User, member member.Member) string {
+			return fmt.Sprintf("%04d", ticket.Id)
+		}),
+		// %claimed%
+		logic.NewSubstitutor("claimed", false, false, func(user user.User, member member.Member) string {
+			if claimer == nil {
+				return "unclaimed"
+			}
+			return "claimed"
+		}),
+		// %username%
+		logic.NewSubstitutor("username", true, false, func(user user.User, member member.Member) string {
+			return user.Username
+		}),
+		// %nickname%
+		logic.NewSubstitutor("nickname", false, true, func(user user.User, member member.Member) string {
+			nickname := member.Nick
+			if len(nickname) == 0 {
+				nickname = member.User.Username
+			}
+			return nickname
+		}),
+	})
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if len(processedName) > 100 {
 		ctx.Reply(customisation.Red, i18n.TitleRename, i18n.MessageRenameTooLong)
 		return
 	}
@@ -79,7 +130,7 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 	}
 
 	data := rest.ModifyChannelData{
-		Name: name,
+		Name: processedName,
 	}
 
 	member, err := ctx.Member()
