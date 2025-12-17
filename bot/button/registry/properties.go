@@ -9,6 +9,7 @@ import (
 type Properties struct {
 	Flags           int
 	PermissionLevel permission.PermissionLevel
+	HelperOnly      bool
 	Timeout         time.Duration
 }
 

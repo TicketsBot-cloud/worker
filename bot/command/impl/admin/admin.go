@@ -4,6 +4,7 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin/debug"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -20,16 +21,12 @@ func (AdminCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Everyone,
 		Children: []registry.Command{
 			AdminBlacklistCommand{},
-			AdminCheckBlacklistCommand{},
-			AdminCheckPremiumCommand{},
-			AdminDebugCommand{},
 			AdminGenPremiumCommand{},
-			AdminGetOwnerCommand{},
-			AdminListGuildEntitlementsCommand{},
 			AdminListUserEntitlementsCommand{},
 			AdminRecacheCommand{},
 			AdminWhitelabelAssignGuildCommand{},
 			AdminWhitelabelDataCommand{},
+			debug.AdminDebugCommand{},
 		},
 		Category:   command.Settings,
 		HelperOnly: true,

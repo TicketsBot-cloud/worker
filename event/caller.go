@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin/debug"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/general"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings/setup"
@@ -57,51 +58,6 @@ func callCommand(
 		}
 
 		v.Execute(ctx, arg0, arg1)
-	case admin.AdminCheckBlacklistCommand:
-		var arg0 string
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a string", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
-	case admin.AdminCheckPremiumCommand:
-		var arg0 string
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a string", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
-	case admin.AdminDebugCommand:
-		var arg0 string
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a string", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
 	case admin.AdminCommand:
 
 		v.Execute(ctx)
@@ -145,36 +101,6 @@ func callCommand(
 		}
 
 		v.Execute(ctx, arg0, arg1, arg2)
-	case admin.AdminGetOwnerCommand:
-		var arg0 string
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a string", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
-	case admin.AdminListGuildEntitlementsCommand:
-		var arg0 string
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a string", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
 	case admin.AdminListUserEntitlementsCommand:
 		var arg0 uint64
 
@@ -252,6 +178,21 @@ func callCommand(
 			argValue, err := strconv.ParseUint(raw, 10, 64)
 			if err != nil {
 				return fmt.Errorf("option %s was not a valid snowflake", opt0.Name)
+			}
+			arg0 = argValue
+		}
+
+		v.Execute(ctx, arg0)
+	case debug.AdminDebugServerCommand:
+		var arg0 string
+
+		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
+		if !ok0 {
+			return ErrArgumentNotFound
+		} else {
+			argValue, ok := opt0.Value.(string)
+			if !ok {
+				return fmt.Errorf("option %s was not a string", opt0.Name)
 			}
 			arg0 = argValue
 		}
