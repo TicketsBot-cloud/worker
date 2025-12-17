@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -102,7 +103,14 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 		},
 	}
 
-	if _, err := cmd.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
+	member, err := cmd.Member()
+	auditReason := fmt.Sprintf("Reopened ticket %d", ticket.Id)
+	if err == nil {
+		auditReason = fmt.Sprintf("Reopened ticket %d by %s", ticket.Id, member.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(ctx, auditReason)
+	if _, err := cmd.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 		if err, ok := err.(request.RestError); ok && err.StatusCode == 404 {
 			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageReopenThreadDeleted)
 			return
