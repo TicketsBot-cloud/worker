@@ -123,37 +123,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, nil
 	}
 
-	if panel != nil {
-		member, err := cmd.Member()
-		if err != nil {
-			cmd.HandleError(err)
-			return database.Ticket{}, err
-		}
-
-		matchedRole, action, err := dbclient.Client.PanelAccessControlRules.GetFirstMatched(
-			ctx,
-			panel.PanelId,
-			append(member.Roles, cmd.GuildId()),
-		)
-
-		if err != nil {
-			cmd.HandleError(err)
-			return database.Ticket{}, err
-		}
-
-		if action == database.AccessControlActionDeny {
-			if err := sendAccessControlDeniedMessage(ctx, cmd, panel.PanelId, matchedRole); err != nil {
-				cmd.HandleError(err)
-				return database.Ticket{}, err
-			}
-
-			return database.Ticket{}, nil
-		} else if action != database.AccessControlActionAllow {
-			cmd.HandleError(fmt.Errorf("invalid access control action %s", action))
-			return database.Ticket{}, err
-		}
-	}
-
 	span = sentry.StartSpan(rootSpan.Context(), "Load settings")
 	settings, err := cmd.Settings()
 	if err != nil {
@@ -895,12 +864,19 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
-	selfAllow = append(selfAllow, permission.ManageWebhooks)
 
+	// Only add PinMessages if the bot has the permission
 	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
 		selfAllow = append(selfAllow, permission.PinMessages)
 	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.ChannelId(), cmd.Worker().BotId, permission.PinMessages) {
 		selfAllow = append(selfAllow, permission.PinMessages)
+	}
+
+	// Only add ManageWebhooks if the bot has the permission
+	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageWebhooks) {
+		selfAllow = append(selfAllow, permission.ManageWebhooks)
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, categoryId, permission.ManageWebhooks) {
+		selfAllow = append(selfAllow, permission.ManageWebhooks)
 	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
@@ -1074,7 +1050,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	} else {
 		var err error
-		name, err = doSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
+		name, err = DoSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)
@@ -1224,40 +1200,4 @@ func buildJoinThreadMessage(
 			}),
 		)),
 	}
-}
-
-func sendAccessControlDeniedMessage(ctx context.Context, cmd registry.InteractionContext, panelId int, matchedRole uint64) error {
-	rules, err := dbclient.Client.PanelAccessControlRules.GetAll(ctx, panelId)
-	if err != nil {
-		return err
-	}
-
-	allowedRoleIds := make([]uint64, 0, len(rules))
-	for _, rule := range rules {
-		if rule.Action == database.AccessControlActionAllow {
-			allowedRoleIds = append(allowedRoleIds, rule.RoleId)
-		}
-	}
-
-	if len(allowedRoleIds) == 0 {
-		cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNoAllowRules)
-		return nil
-	}
-
-	if matchedRole == cmd.GuildId() {
-		mentions := make([]string, 0, len(allowedRoleIds))
-		for _, roleId := range allowedRoleIds {
-			mentions = append(mentions, fmt.Sprintf("<@&%d>", roleId))
-		}
-
-		if len(allowedRoleIds) == 1 {
-			cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNotAllowListedSingle, strings.Join(mentions, ", "))
-		} else {
-			cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNotAllowListedMultiple, strings.Join(mentions, ", "))
-		}
-	} else {
-		cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclDenyListed, matchedRole)
-	}
-
-	return nil
 }
