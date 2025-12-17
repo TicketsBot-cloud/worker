@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -238,6 +239,11 @@ func DoPlaceholderSubstitutions(
 	if err := group.Wait(); err != nil {
 		sentry.Error(err)
 	}
+
+	// Escape placeholders
+	// \%placeholder\% becomes %placeholder%
+	escapedPlaceholderRegex := regexp.MustCompile(`\\%([a-z_]+)\\%`)
+	message = escapedPlaceholderRegex.ReplaceAllString(message, `%$1%`)
 
 	return message
 }

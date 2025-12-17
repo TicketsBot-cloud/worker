@@ -82,7 +82,10 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 		} else {
 			// set ticket last message, for autoclose
 			// isStaffCached cannot be nil at this point
-			if err := updateLastMessage(span.Context(), e, ticket, *isStaffCached); err != nil {
+			// Create a new context with timeout for the database operation to avoid deadline exceeded errors
+			updateCtx, updateCancel := context.WithTimeout(context.Background(), time.Second*3)
+			defer updateCancel()
+			if err := updateLastMessage(updateCtx, e, ticket, *isStaffCached); err != nil {
 				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 			}
 

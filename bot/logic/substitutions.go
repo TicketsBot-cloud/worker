@@ -27,7 +27,7 @@ func NewSubstitutor(placeholder string, needsUser, needsMember bool, f Substitut
 	}
 }
 
-func doSubstitutions(worker *worker.Context, s string, userId uint64, guildId uint64, substitutors []Substitutor) (string, error) {
+func DoSubstitutions(worker *worker.Context, s string, userId uint64, guildId uint64, substitutors []Substitutor) (string, error) {
 	var needsUser, needsMember bool
 
 	// Determine which objects we need to fetch
