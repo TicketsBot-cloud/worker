@@ -8,17 +8,14 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
-	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type PanelHandler struct{}
@@ -47,49 +44,14 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 			return
 		}
 
-		// Check support hours
-		hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)
+		// Validate panel access
+		canProceed, err := logic.ValidatePanelAccess(ctx, panel)
 		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
 
-		if hasSupportHours {
-			isActive, err := dbclient.Client.PanelSupportHours.IsActiveNow(ctx, panel.PanelId)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			if !isActive {
-				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOutsideSupportHours)
-				return
-			}
-		}
-
-		// blacklist check
-		blacklisted, err := ctx.IsBlacklisted(ctx)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if blacklisted {
-			var message i18n.MessageId
-			var reason string
-
-			if ctx.GuildId() == 0 || blacklist.IsUserBlacklisted(ctx.UserId()) {
-				message = i18n.MessageUserBlacklisted
-				reason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, ctx.UserId())
-			} else {
-				message = i18n.MessageBlacklisted
-			}
-
-			if reason != "" {
-				ctx.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(ctx.GuildId(), i18n.TitleBlacklisted), i18n.GetMessageFromGuild(ctx.GuildId(), message)+"\n\n**"+i18n.GetMessageFromGuild(ctx.GuildId(), i18n.Reason)+":** "+reason)
-			} else {
-				ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
-			}
+		if !canProceed {
 			return
 		}
 
