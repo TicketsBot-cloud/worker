@@ -280,7 +280,16 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 		span.Finish()
 
-		if settings.TicketNotificationChannel != nil {
+		// Determine which notification channel to use
+		// Priority: Panel-specific notification channel > Global notification channel
+		var notificationChannel *uint64
+		if panel != nil && panel.TicketNotificationChannel != nil {
+			notificationChannel = panel.TicketNotificationChannel
+		} else if settings.TicketNotificationChannel != nil {
+			notificationChannel = settings.TicketNotificationChannel
+		}
+
+		if notificationChannel != nil {
 			span := sentry.StartSpan(rootSpan.Context(), "Send message to ticket notification channel")
 
 			buildSpan := sentry.StartSpan(span.Context(), "Build ticket notification message")
@@ -288,7 +297,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			buildSpan.Finish()
 
 			// TODO: Check if channel exists
-			if msg, err := cmd.Worker().CreateMessageComplex(*settings.TicketNotificationChannel, data.IntoCreateMessageData()); err == nil {
+			if msg, err := cmd.Worker().CreateMessageComplex(*notificationChannel, data.IntoCreateMessageData()); err == nil {
 				joinMessageId = &msg.Id
 			} else {
 				cmd.HandleError(err)
