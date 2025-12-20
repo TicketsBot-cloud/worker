@@ -247,10 +247,31 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 	}
 
 	// Delete join thread button
-	if ticket.IsThread && ticket.JoinMessageId != nil && settings.TicketNotificationChannel != nil {
-		_ = cmd.Worker().DeleteMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId)
-		if err := dbclient.Client.Tickets.SetJoinMessageId(ctx, ticket.GuildId, ticket.Id, nil); err != nil {
-			sentry.ErrorWithContext(err, errorContext)
+	if ticket.IsThread && ticket.JoinMessageId != nil {
+		// Determine which notification channel was used
+		// Priority: Panel-specific notification channel > Global notification channel
+		var notificationChannel *uint64
+
+		// Get panel if this ticket has one
+		var panel *database.Panel
+		if ticket.PanelId != nil {
+			p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err == nil && p.PanelId != 0 {
+				panel = &p
+			}
+		}
+
+		if panel != nil && panel.TicketNotificationChannel != nil {
+			notificationChannel = panel.TicketNotificationChannel
+		} else if settings.TicketNotificationChannel != nil {
+			notificationChannel = settings.TicketNotificationChannel
+		}
+
+		if notificationChannel != nil {
+			_ = cmd.Worker().DeleteMessage(*notificationChannel, *ticket.JoinMessageId)
+			if err := dbclient.Client.Tickets.SetJoinMessageId(ctx, ticket.GuildId, ticket.Id, nil); err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+			}
 		}
 	}
 
