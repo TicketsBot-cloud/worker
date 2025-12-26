@@ -40,6 +40,12 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 		return
 	}
 
+	// Only process archive/unarchive events for the main ticket channel itself
+	// Child threads (like note threads) being archived should not close the ticket
+	if ticket.ChannelId == nil || *ticket.ChannelId != e.Id {
+		return
+	}
+
 	var panel *database.Panel
 	if ticket.PanelId != nil {
 		tmp, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
