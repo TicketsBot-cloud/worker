@@ -201,6 +201,11 @@ func doPropertiesChecks(ctx context.Context, guildId uint64, cmd cmdregistry.Com
 		}
 	}
 
+	if properties.HelperOnly && !utils.IsBotHelper(cmd.UserId()) {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageNoPermission)
+		return false, false
+	}
+
 	if guildId == 0 && !properties.HasFlag(registry.DMsAllowed) {
 		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageButtonGuildOnly)
 		return false, false
