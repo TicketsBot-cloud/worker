@@ -81,22 +81,129 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 	ticketChannelId := *ticket.ChannelId
 
 	if mentionableType == context.MentionableTypeUser {
-		// verify that the user isn't trying to remove staff
+		// verify that the user isn't trying to remove staff from the current panel
 		member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id)
 		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
 
-		permissionLevel, err := permcache.GetPermissionLevel(ctx, utils.ToRetriever(ctx.Worker()), member, ctx.GuildId())
+		// Check if user is a global admin
+		adminUsers, err := dbclient.Client.Permissions.GetAdmins(ctx, ctx.GuildId())
 		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
 
-		if permissionLevel > permcache.Everyone {
+		adminRoles, err := dbclient.Client.RolePermissions.GetAdminRoles(ctx, ctx.GuildId())
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		// Check if user is admin
+		isAdmin := utils.Contains(adminUsers, id)
+		if !isAdmin {
+			for _, roleId := range member.Roles {
+				if utils.Contains(adminRoles, roleId) {
+					isAdmin = true
+					break
+				}
+			}
+		}
+
+		if isAdmin {
 			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
 			return
+		}
+
+		// Check panel-specific staff
+		if ticket.PanelId != nil {
+			panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			if panel.PanelId != 0 {
+				// Check if user is in the panel's support team
+				teamUsers, err := dbclient.Client.SupportTeamMembers.GetAllSupportMembersForPanel(ctx, panel.PanelId)
+				if err != nil {
+					ctx.HandleError(err)
+					return
+				}
+
+				if utils.Contains(teamUsers, id) {
+					ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+					return
+				}
+
+				// Check if user has a role in the panel's support team
+				teamRoles, err := dbclient.Client.SupportTeamRoles.GetAllSupportRolesForPanel(ctx, panel.PanelId)
+				if err != nil {
+					ctx.HandleError(err)
+					return
+				}
+
+				for _, roleId := range member.Roles {
+					if utils.Contains(teamRoles, roleId) {
+						ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+						return
+					}
+				}
+
+				// If panel includes default team, check default support
+				if panel.WithDefaultTeam {
+					supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, ctx.GuildId())
+					if err != nil {
+						ctx.HandleError(err)
+						return
+					}
+
+					supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, ctx.GuildId())
+					if err != nil {
+						ctx.HandleError(err)
+						return
+					}
+
+					if utils.Contains(supportUsers, id) {
+						ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+						return
+					}
+
+					for _, roleId := range member.Roles {
+						if utils.Contains(supportRoles, roleId) {
+							ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+							return
+						}
+					}
+				}
+			}
+		} else {
+			// No panel, check default support team
+			supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, ctx.GuildId())
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, ctx.GuildId())
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			if utils.Contains(supportUsers, id) {
+				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+				return
+			}
+
+			for _, roleId := range member.Roles {
+				if utils.Contains(supportRoles, roleId) {
+					ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+					return
+				}
+			}
 		}
 
 		// Remove user from ticket in DB
@@ -124,20 +231,14 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			}
 		}
 	} else if mentionableType == context.MentionableTypeRole {
-		// Verify that the role isn't a staff role (admin or support)
+		// Verify that the role isn't a staff role for the current panel
 		adminRoles, err := dbclient.Client.RolePermissions.GetAdminRoles(ctx, ctx.GuildId())
 		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
 
-		supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, ctx.GuildId())
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		// Check if the role is an admin or support role
+		// Check if the role is an admin role
 		for _, roleId := range adminRoles {
 			if roleId == id {
 				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
@@ -145,10 +246,58 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			}
 		}
 
-		for _, roleId := range supportRoles {
-			if roleId == id {
-				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+		// Check panel-specific staff
+		if ticket.PanelId != nil {
+			panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err != nil {
+				ctx.HandleError(err)
 				return
+			}
+
+			if panel.PanelId != 0 {
+				// Check if role is in the panel's support team
+				teamRoles, err := dbclient.Client.SupportTeamRoles.GetAllSupportRolesForPanel(ctx, panel.PanelId)
+				if err != nil {
+					ctx.HandleError(err)
+					return
+				}
+
+				for _, roleId := range teamRoles {
+					if roleId == id {
+						ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+						return
+					}
+				}
+
+				// If panel includes default team, check default support roles
+				if panel.WithDefaultTeam {
+					supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, ctx.GuildId())
+					if err != nil {
+						ctx.HandleError(err)
+						return
+					}
+
+					for _, roleId := range supportRoles {
+						if roleId == id {
+							ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+							return
+						}
+					}
+				}
+			}
+		} else {
+			// No panel, check default support roles
+			supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, ctx.GuildId())
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			for _, roleId := range supportRoles {
+				if roleId == id {
+					ctx.Reply(customisation.Red, i18n.Error, i18n.MessageRemoveCannotRemoveStaff)
+					return
+				}
 			}
 		}
 

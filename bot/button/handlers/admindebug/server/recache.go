@@ -1,4 +1,4 @@
-package handlers
+package server
 
 import (
 	"errors"
@@ -20,23 +20,24 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
-type RecacheHandler struct{}
+type AdminDebugServerRecacheHandler struct{}
 
-func (h *RecacheHandler) Matcher() matcher.Matcher {
+func (h *AdminDebugServerRecacheHandler) Matcher() matcher.Matcher {
 	return matcher.NewFuncMatcher(func(customId string) bool {
 		return strings.HasPrefix(customId, "admin_debug_recache")
 	})
 }
 
-func (h *RecacheHandler) Properties() registry.Properties {
+func (h *AdminDebugServerRecacheHandler) Properties() registry.Properties {
 	return registry.Properties{
 		Flags:           registry.SumFlags(registry.GuildAllowed, registry.CanEdit),
 		Timeout:         time.Second * 30,
 		PermissionLevel: permcache.Support,
+		HelperOnly:      true,
 	}
 }
 
-func (h *RecacheHandler) Execute(ctx *context.ButtonContext) {
+func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 
 	if !utils.IsBotHelper(ctx.UserId()) {
 		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
