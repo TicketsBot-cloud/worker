@@ -41,7 +41,21 @@ func SeedCoverage() {
 	total := len(LocaleEnglish.Messages)
 
 	for _, locale := range Locales {
-		locale.Coverage = len(locale.Messages) * 100 / total
+		if locale == LocaleEnglish {
+			locale.Coverage = 100
+			continue
+		}
+
+		translatedCount := 0
+		for messageId, translatedText := range locale.Messages {
+			englishText, exists := LocaleEnglish.Messages[messageId]
+			// Only count if the translation exists and is different from English
+			if exists && translatedText != englishText && translatedText != "" {
+				translatedCount++
+			}
+		}
+
+		locale.Coverage = translatedCount * 100 / total
 	}
 }
 
@@ -60,12 +74,28 @@ func GetMessage(locale *Locale, id MessageId, format ...interface{}) string {
 	}
 
 	value, ok := locale.Messages[id]
-	if !ok || value == "" {
+
+	// Check if message exists in English
+	englishValue, englishExists := LocaleEnglish.Messages[id]
+
+	// Message is missing, empty, or same as English
+	if !ok || value == "" || (englishExists && value == englishValue) {
 		if locale == LocaleEnglish {
-			return fmt.Sprintf("error: translation for `%s` is missing", id)
+			if !ok || value == "" {
+				return fmt.Sprintf("error: translation for `%s` is missing", id)
+			}
+			return fmt.Sprintf(strings.Replace(value, "\\n", "\n", -1), format...)
 		}
 
-		return GetMessage(LocaleEnglish, id, format...) // default to English
+		// Check if locale has a parent language
+		if locale.ParentIsoShortCode != nil {
+			parentLocale := MappedByIsoShortCode[*locale.ParentIsoShortCode]
+			if parentLocale != nil {
+				return GetMessage(parentLocale, id, format...) // try parent language first
+			}
+		}
+
+		return GetMessage(LocaleEnglish, id, format...)
 	}
 
 	return fmt.Sprintf(strings.Replace(value, "\\n", "\n", -1), format...)
