@@ -254,7 +254,6 @@ var (
 	MessageAlreadyJoinedThread    MessageId = "button.join_thread.already_joined"
 	MessageJoinThreadSuccess      MessageId = "button.join_thread.success"
 
-	HelpAdminCheckPremium MessageId = "help.admin.check_premium"
 	HelpAdminBlacklist    MessageId = "help.admin.blacklist"
 	HelpAdminUnblacklist  MessageId = "help.admin.unblacklist"
 
@@ -315,8 +314,9 @@ var (
 	MessageErrorId                      MessageId = "errors.error_id"
 
 	HelpAdmin              MessageId = "help.admin"
+	HelpAdminDebug         MessageId = "help.admin.debug"
+	HelpAdminDebugServer   MessageId = "help.admin.debug.server"
 	HelpAdminGenPremium    MessageId = "help.admin.generate_premium"
-	HelpAdminGetOwner      MessageId = "help.admin.get_owner"
 	HelpAbout              MessageId = "help.about"
 	HelpAutoClose          MessageId = "help.autoclose"
 	HelpAutoCloseExclude   MessageId = "help.autoclose.exclude"

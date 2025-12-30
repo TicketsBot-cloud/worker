@@ -108,8 +108,16 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 	} else {
 		if defaultTeam && metadata.OnCallRole != nil {
 			if err := ctx.Worker().RemoveGuildMemberRole(ctx.GuildId(), ctx.UserId(), *metadata.OnCallRole); err != nil {
-				ctx.HandleError(err)
-				return
+				// If role was deleted, clear it from database and continue
+				if restErr, ok := err.(request.RestError); ok && restErr.ApiError.Code == 10011 {
+					if err := dbclient.Client.GuildMetadata.SetOnCallRole(ctx, ctx.GuildId(), nil); err != nil {
+						ctx.HandleError(err)
+						return
+					}
+				} else {
+					ctx.HandleError(err)
+					return
+				}
 			}
 		}
 
@@ -128,8 +136,16 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 			}
 
 			if err := ctx.Worker().RemoveGuildMemberRole(ctx.GuildId(), ctx.UserId(), *team.OnCallRole); err != nil {
-				ctx.HandleError(err)
-				return
+				// If role was deleted, clear it from database and continue
+				if restErr, ok := err.(request.RestError); ok && restErr.ApiError.Code == 10011 {
+					if err := dbclient.Client.SupportTeam.SetOnCallRole(ctx, team.Id, nil); err != nil {
+						ctx.HandleError(err)
+						return
+					}
+				} else {
+					ctx.HandleError(err)
+					return
+				}
 			}
 		}
 
@@ -155,7 +171,7 @@ func assignOnCallRole(ctx registry.CommandContext, member member.Member, roleId 
 
 	if err := ctx.Worker().AddGuildMemberRole(ctx.GuildId(), ctx.UserId(), *roleId); err != nil {
 		// If role was deleted, recreate it
-		if err, ok := err.(request.RestError); ok && err.StatusCode == 404 && err.ApiError.Message == "Unknown Role" {
+		if err, ok := err.(request.RestError); ok && err.ApiError.Code == 10011 {
 			if team == nil {
 				if err := dbclient.Client.GuildMetadata.SetOnCallRole(ctx, ctx.GuildId(), nil); err != nil {
 					return err
