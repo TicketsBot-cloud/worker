@@ -12,6 +12,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -84,7 +85,14 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 			data.Name = newChannelName
 		}
 
-		if _, err = cmd.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
+		claimer, err := cmd.Worker().GetGuildMember(ticket.GuildId, userId)
+		auditReason := fmt.Sprintf("Claimed ticket %d", ticket.Id)
+		if err == nil {
+			auditReason = fmt.Sprintf("Claimed ticket %d by %s", ticket.Id, claimer.User.Username)
+		}
+
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		if _, err = cmd.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 			return err
 		}
 	}
