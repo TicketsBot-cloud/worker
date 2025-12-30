@@ -249,7 +249,9 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, owner.Id)
 	}
 
-	guildInfo = append(guildInfo, fmt.Sprintf("Shard ID: `%d`", ctx.Worker().ShardId))
+	// Calculate the shard ID
+	shardId := int((guild.Id >> 22) % uint64(config.Conf.Discord.SharderTotal))
+	guildInfo = append(guildInfo, fmt.Sprintf("Shard ID: `%d`", shardId))
 	guildInfo = append(guildInfo, fmt.Sprintf("Owner Blacklisted: `%t`", IsOwnerBlacklisted))
 	guildInfo = append(guildInfo, fmt.Sprintf("Server Blacklisted: `%t`", IsGuildBlacklisted))
 

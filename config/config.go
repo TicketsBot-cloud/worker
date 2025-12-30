@@ -26,6 +26,7 @@ type (
 			RequestTimeout   time.Duration `env:"DISCORD_REQUEST_TIMEOUT" envDefault:"15s"`
 			CallbackTimeout  time.Duration `env:"DISCORD_CALLBACK_TIMEOUT" envDefault:"2000ms"`
 			DeferHardTimeout time.Duration `env:"DISCORD_DEFER_HARD_TIMEOUT" envDefault:"2500ms"`
+			SharderTotal     int           `env:"SHARDER_TOTAL" envDefault:"1"`
 		}
 
 		Bot struct {
