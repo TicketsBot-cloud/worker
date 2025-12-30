@@ -78,17 +78,16 @@ func (c TagAliasCommand) Execute(ctx registry.CommandContext) {
 		}
 	}
 
-	var allowedMentions message.AllowedMention
-	if ticket.Id != 0 {
-		allowedMentions = message.AllowedMention{
-			Users: []uint64{ticket.UserId},
-		}
-	}
-
 	data := command.MessageResponse{
 		Content:         content,
 		Embeds:          embeds,
-		AllowedMentions: allowedMentions,
+		AllowedMentions: message.AllowedMention{
+			Parse: []message.AllowedMentionType{
+				message.EVERYONE,
+				message.USERS,
+				message.ROLES,
+			},
+		},
 	}
 
 	if _, err := ctx.ReplyWith(data); err != nil {

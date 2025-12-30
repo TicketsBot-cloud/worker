@@ -106,20 +106,14 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 
 	if userBlacklisted {
 		var message i18n.MessageId
-		var reason string
 
 		if data.GuildId.Value == 0 || blacklist.IsUserBlacklisted(cc.UserId()) {
 			message = i18n.MessageUserBlacklisted
-			reason, _ = dbclient.Client.GlobalBlacklist.GetReason(lookupCtx, cc.UserId())
 		} else {
 			message = i18n.MessageBlacklisted
 		}
 
-		if reason != "" {
-			cc.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, message)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
-		} else {
-			cc.Reply(customisation.Red, i18n.TitleBlacklisted, message)
-		}
+		cc.Reply(customisation.Red, i18n.TitleBlacklisted, message)
 		return false
 	}
 
@@ -205,6 +199,11 @@ func doPropertiesChecks(ctx context.Context, guildId uint64, cmd cmdregistry.Com
 			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageNoPermission)
 			return false, false
 		}
+	}
+
+	if properties.HelperOnly && !utils.IsBotHelper(cmd.UserId()) {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageNoPermission)
+		return false, false
 	}
 
 	if guildId == 0 && !properties.HasFlag(registry.DMsAllowed) {

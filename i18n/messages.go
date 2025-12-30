@@ -113,6 +113,7 @@ var (
 	MessageAddNoMembers    MessageId = "commands.add.no_members"
 	MessageAddNoPermission MessageId = "commands.add.no_permission"
 	MessageAddSuccess      MessageId = "commands.add.success"
+	MessageAddRoleThread   MessageId = "commands.add.role_thread"
 
 	MessageBlacklisted         MessageId = "generic.error.blacklisted"
 	MessageGuildBlacklisted    MessageId = "generic.error.guild_blacklisted"
@@ -174,6 +175,7 @@ var (
 	MessageRemoveNoPermission      MessageId = "commands.remove.no_permission"
 	MessageRemoveCannotRemoveStaff MessageId = "commands.remove.staff"
 	MessageRemoveSuccess           MessageId = "commands.remove.success"
+	MessageRemoveRoleThread        MessageId = "commands.remove.role_thread"
 
 	MessageRenamed           MessageId = "commands.rename.success"
 	MessageRenameMissingName MessageId = "commands.rename.missing_name"
@@ -245,7 +247,6 @@ var (
 	MessageAlreadyJoinedThread    MessageId = "button.join_thread.already_joined"
 	MessageJoinThreadSuccess      MessageId = "button.join_thread.success"
 
-	HelpAdminCheckPremium MessageId = "help.admin.check_premium"
 	HelpAdminBlacklist    MessageId = "help.admin.blacklist"
 	HelpAdminUnblacklist  MessageId = "help.admin.unblacklist"
 
@@ -306,8 +307,9 @@ var (
 	MessageErrorId                      MessageId = "errors.error_id"
 
 	HelpAdmin              MessageId = "help.admin"
+	HelpAdminDebug         MessageId = "help.admin.debug"
+	HelpAdminDebugServer   MessageId = "help.admin.debug.server"
 	HelpAdminGenPremium    MessageId = "help.admin.generate_premium"
-	HelpAdminGetOwner      MessageId = "help.admin.get_owner"
 	HelpAbout              MessageId = "help.about"
 	HelpAutoClose          MessageId = "help.autoclose"
 	HelpAutoCloseExclude   MessageId = "help.autoclose.exclude"

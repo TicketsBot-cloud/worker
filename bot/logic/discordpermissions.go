@@ -62,6 +62,36 @@ func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPerm
 	}
 }
 
+func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPermissions) channel.PermissionOverwrite {
+	allow := MinimalPermissions[:]
+	var deny []permission.Permission
+
+	if additionalPermissions.AttachFiles {
+		allow = append(allow, permission.AttachFiles)
+	} else {
+		deny = append(deny, permission.AttachFiles)
+	}
+
+	if additionalPermissions.EmbedLinks {
+		allow = append(allow, permission.EmbedLinks)
+	} else {
+		deny = append(deny, permission.EmbedLinks)
+	}
+
+	if additionalPermissions.AddReactions {
+		allow = append(allow, permission.AddReactions)
+	} else {
+		deny = append(deny, permission.AddReactions)
+	}
+
+	return channel.PermissionOverwrite{
+		Id:    roleId,
+		Type:  channel.PermissionTypeRole,
+		Allow: permission.BuildPermissions(allow...),
+		Deny:  permission.BuildPermissions(deny...),
+	}
+}
+
 func RemoveOnCallRoles(ctx context.Context, cmd registry.CommandContext, userId uint64) error {
 	member, err := cmd.Worker().GetGuildMember(cmd.GuildId(), userId)
 	if err != nil {
@@ -177,7 +207,7 @@ func CreateOnCallRole(ctx context.Context, cmd registry.CommandContext, team *da
 }
 
 func isUnknownRoleError(err error) bool {
-	if err, ok := err.(request.RestError); ok && err.ApiError.Message == "Unknown Role" {
+	if err, ok := err.(request.RestError); ok && err.ApiError.Code == 10011 {
 		return true
 	}
 

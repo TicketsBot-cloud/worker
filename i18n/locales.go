@@ -1,14 +1,15 @@
 package i18n
 
 type Locale struct {
-	IsoShortCode  string
-	IsoLongCode   string
-	FlagEmoji     string
-	EnglishName   string
-	LocalName     string
-	DiscordLocale *string
-	Messages      map[MessageId]string
-	Coverage      int
+	IsoShortCode       string
+	IsoLongCode        string
+	FlagEmoji          string
+	EnglishName        string
+	LocalName          string
+	DiscordLocale      *string
+	ParentIsoShortCode *string
+	Messages           map[MessageId]string
+	Coverage           int
 }
 
 var LocaleEnglish = &Locale{
@@ -52,6 +53,15 @@ var Locales = []*Locale{
 		EnglishName:   "Catalan",
 		LocalName:     "Català",
 		DiscordLocale: nil,
+	},
+	{
+		IsoShortCode:       "ch",
+		IsoLongCode:        "de-CH",
+		FlagEmoji:          "🇨🇭",
+		EnglishName:        "German (Switzerland)",
+		LocalName:          "Schwiizerdütsch",
+		DiscordLocale:      nil,
+		ParentIsoShortCode: ptr("de"),
 	},
 	{
 		IsoShortCode:  "cz",
@@ -231,12 +241,13 @@ var Locales = []*Locale{
 		DiscordLocale: ptr("pl"),
 	},
 	{
-		IsoShortCode:  "br",
-		IsoLongCode:   "pt-BR",
-		FlagEmoji:     "🇧🇷",
-		EnglishName:   "Portuguese (Brazilian)",
-		LocalName:     "Português do Brasil",
-		DiscordLocale: ptr("pt-BR"),
+		IsoShortCode:       "br",
+		IsoLongCode:        "pt-BR",
+		FlagEmoji:          "🇧🇷",
+		EnglishName:        "Portuguese (Brazil)",
+		LocalName:          "Português do Brasil",
+		DiscordLocale:      ptr("pt-BR"),
+		ParentIsoShortCode: ptr("pt"),
 	},
 	{
 		IsoShortCode:  "pt",
@@ -282,7 +293,7 @@ var Locales = []*Locale{
 		IsoShortCode:  "sr",
 		IsoLongCode:   "sr-SP",
 		FlagEmoji:     "🇷🇸",
-		EnglishName:   "Serbian (Cyrillic)",
+		EnglishName:   "Serbian",
 		LocalName:     "Српски",
 		DiscordLocale: nil,
 	},
@@ -343,12 +354,13 @@ var Locales = []*Locale{
 		DiscordLocale: ptr("zh-CN"),
 	},
 	{
-		IsoShortCode:  "tw",
-		IsoLongCode:   "zh-TW",
-		FlagEmoji:     "🇹🇼",
-		EnglishName:   "Chinese (Taiwan)",
-		LocalName:     "繁體中文",
-		DiscordLocale: ptr("zh-TW"),
+		IsoShortCode:       "tw",
+		IsoLongCode:        "zh-TW",
+		FlagEmoji:          "🇹🇼",
+		EnglishName:        "Chinese (Taiwan)",
+		LocalName:          "繁體中文",
+		DiscordLocale:      ptr("zh-TW"),
+		ParentIsoShortCode: ptr("cn"),
 	},
 }
 

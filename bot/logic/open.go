@@ -123,37 +123,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, nil
 	}
 
-	if panel != nil {
-		member, err := cmd.Member()
-		if err != nil {
-			cmd.HandleError(err)
-			return database.Ticket{}, err
-		}
-
-		matchedRole, action, err := dbclient.Client.PanelAccessControlRules.GetFirstMatched(
-			ctx,
-			panel.PanelId,
-			append(member.Roles, cmd.GuildId()),
-		)
-
-		if err != nil {
-			cmd.HandleError(err)
-			return database.Ticket{}, err
-		}
-
-		if action == database.AccessControlActionDeny {
-			if err := sendAccessControlDeniedMessage(ctx, cmd, panel.PanelId, matchedRole); err != nil {
-				cmd.HandleError(err)
-				return database.Ticket{}, err
-			}
-
-			return database.Ticket{}, nil
-		} else if action != database.AccessControlActionAllow {
-			cmd.HandleError(fmt.Errorf("invalid access control action %s", action))
-			return database.Ticket{}, err
-		}
-	}
-
 	span = sentry.StartSpan(rootSpan.Context(), "Load settings")
 	settings, err := cmd.Settings()
 	if err != nil {
@@ -417,6 +386,9 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		JoinMessageId:    joinMessageId,
 	}
 
+	// Variable to store welcome message ID for pinning later
+	var welcomeMessageId uint64
+
 	// Welcome message
 	group.Go(func() error {
 		span = sentry.StartSpan(rootSpan.Context(), "Fetch custom integration placeholders")
@@ -433,46 +405,14 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span.Finish()
 
 		span = sentry.StartSpan(rootSpan.Context(), "Send welcome message")
-		welcomeMessageId, err := SendWelcomeMessage(ctx, cmd, ticket, subject, panel, formData, additionalPlaceholders)
+		msgId, err := SendWelcomeMessage(ctx, cmd, ticket, subject, panel, formData, additionalPlaceholders)
 		span.Finish()
 		if err != nil {
 			return err
 		}
 
-		// Pin the welcome message
-		if welcomeMessageId != 0 && ticket.ChannelId != nil {
-			span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
-			channelId := *ticket.ChannelId
-
-			if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err != nil {
-				cmd.HandleError(err)
-			}
-			// else {
-			// 	// Delete the system pin notification message
-			// 	span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
-
-			// 	// Fetch recent messages to find the system pin notification
-			// 	messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
-			// 		Limit: 3,
-			// 	})
-
-			// 	if err == nil {
-			// 		// Find and delete the system pin notification message
-			// 		for _, msg := range messages {
-			// 			// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
-			// 			if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
-			// 				_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
-			// 				break
-			// 			}
-			// 		}
-			// 	} else {
-			// 		cmd.HandleError(err)
-			// 	}
-
-			// 	span2.Finish()
-			// }
-			span.Finish()
-		}
+		// Store the welcome message ID for pinning later
+		welcomeMessageId = msgId
 
 		// Update message IDs in DB
 		span = sentry.StartSpan(rootSpan.Context(), "Update ticket properties in database")
@@ -613,6 +553,36 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if err := group.Wait(); err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
+	}
+
+	// Pin the welcome message as the last step after everything else is complete
+	if welcomeMessageId != 0 && ticket.ChannelId != nil {
+		span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
+		channelId := *ticket.ChannelId
+
+		if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err == nil {
+			// Delete the system pin notification message
+			span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
+
+			// Fetch recent messages to find the system pin notification
+			messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
+				Limit: 3,
+			})
+
+			if err == nil {
+				// Find and delete the system pin notification message
+				for _, msg := range messages {
+					// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
+					if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
+						_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
+						break
+					}
+				}
+			}
+
+			span2.Finish()
+		}
+		span.Finish()
 	}
 
 	span = sentry.StartSpan(rootSpan.Context(), "Increment statsd counters")
@@ -894,8 +864,20 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
-	selfAllow = append(selfAllow, permission.ManageWebhooks)
-	selfAllow = append(selfAllow, permission.PinMessages)
+
+	// Only add PinMessages if the bot has the permission
+	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
+		selfAllow = append(selfAllow, permission.PinMessages)
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.ChannelId(), cmd.Worker().BotId, permission.PinMessages) {
+		selfAllow = append(selfAllow, permission.PinMessages)
+	}
+
+	// Only add ManageWebhooks if the bot has the permission
+	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.ManageWebhooks) {
+		selfAllow = append(selfAllow, permission.ManageWebhooks)
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, categoryId, permission.ManageWebhooks) {
+		selfAllow = append(selfAllow, permission.ManageWebhooks)
+	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, cmd.Worker(), cmd.GuildId())
 	if err != nil {
@@ -1068,7 +1050,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	} else {
 		var err error
-		name, err = doSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
+		name, err = DoSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)
@@ -1218,40 +1200,4 @@ func buildJoinThreadMessage(
 			}),
 		)),
 	}
-}
-
-func sendAccessControlDeniedMessage(ctx context.Context, cmd registry.InteractionContext, panelId int, matchedRole uint64) error {
-	rules, err := dbclient.Client.PanelAccessControlRules.GetAll(ctx, panelId)
-	if err != nil {
-		return err
-	}
-
-	allowedRoleIds := make([]uint64, 0, len(rules))
-	for _, rule := range rules {
-		if rule.Action == database.AccessControlActionAllow {
-			allowedRoleIds = append(allowedRoleIds, rule.RoleId)
-		}
-	}
-
-	if len(allowedRoleIds) == 0 {
-		cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNoAllowRules)
-		return nil
-	}
-
-	if matchedRole == cmd.GuildId() {
-		mentions := make([]string, 0, len(allowedRoleIds))
-		for _, roleId := range allowedRoleIds {
-			mentions = append(mentions, fmt.Sprintf("<@&%d>", roleId))
-		}
-
-		if len(allowedRoleIds) == 1 {
-			cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNotAllowListedSingle, strings.Join(mentions, ", "))
-		} else {
-			cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNotAllowListedMultiple, strings.Join(mentions, ", "))
-		}
-	} else {
-		cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclDenyListed, matchedRole)
-	}
-
-	return nil
 }
