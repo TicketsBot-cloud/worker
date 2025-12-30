@@ -18,7 +18,7 @@ require (
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20251015181023-f0b66a074704
 	github.com/TicketsBot-cloud/common v0.0.0-20251026182733-99fa0dc31d90
 	github.com/TicketsBot-cloud/database v0.0.0-20251115092952-706aaa38b688
-	github.com/TicketsBot-cloud/gdl v0.0.0-20251114175831-d4fde7035386
+	github.com/TicketsBot-cloud/gdl v0.0.0-20251125181637-0a099bd6a416
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
 	github.com/getsentry/sentry-go v0.32.0
@@ -38,7 +38,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
-	golang.org/x/net v0.46.0
+	golang.org/x/net v0.47.0
 	golang.org/x/sync v0.18.0
 	golang.org/x/tools v0.38.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
@@ -137,7 +137,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.17.0 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect

@@ -213,7 +213,7 @@ func CreateOnCallRole(ctx context.Context, cmd registry.CommandContext, team *da
 }
 
 func isUnknownRoleError(err error) bool {
-	if err, ok := err.(request.RestError); ok && err.ApiError.Message == "Unknown Role" {
+	if err, ok := err.(request.RestError); ok && err.ApiError.Code == 10011 {
 		return true
 	}
 

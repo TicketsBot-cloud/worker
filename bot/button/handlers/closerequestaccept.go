@@ -41,7 +41,15 @@ func (h *CloseRequestAcceptHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	if ctx.UserId() != ticket.UserId {
+	// Check if user is ticket opener or has staff permission
+	isOpener := ctx.UserId() == ticket.UserId
+	hasStaffPermission, err := logic.HasPermissionForTicket(ctx, ctx.Worker(), ticket, ctx.UserId())
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if !isOpener && !hasStaffPermission {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseRequestNoPermission)
 		return
 	}

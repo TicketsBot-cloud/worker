@@ -142,7 +142,7 @@ func addMessageSender(ctx registry.CommandContext, ticket database.Ticket, msg m
 
 	if ticket.IsThread {
 		if err := ctx.Worker().AddThreadMember(*ticket.ChannelId, msg.Author.Id); err != nil {
-			if err, ok := err.(request.RestError); ok && err.ApiError.Message == "Missing Access" {
+			if err, ok := err.(request.RestError); ok && (err.ApiError.Code == 50001 || err.ApiError.Code == 50013) {
 				ch, err := ctx.Worker().GetChannel(ctx.ChannelId())
 				if err != nil {
 					return err
