@@ -205,7 +205,10 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		// Only show entitlement details inline if there's exactly 1 entitlement
 		if len(entitlements) == 1 {
 			entitlement := entitlements[0]
-			premiumExpires = fmt.Sprintf("<t:%d:f>, <t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
+			if entitlement.ExpiresAt != nil {
+				premiumExpires = fmt.Sprintf("<t:%d:f>, <t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
+			}
+
 			skuId = entitlement.SkuId.String()
 			skuPriority = fmt.Sprintf("%d", entitlement.SkuPriority)
 
