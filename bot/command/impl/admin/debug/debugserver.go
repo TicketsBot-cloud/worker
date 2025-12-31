@@ -193,7 +193,7 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 	premiumTier := "None"
 	premiumSource := "None"
 	subscriptionOwnerInfo := "`None`"
-	premiumExpires := "N/A"
+	premiumExpires := "Never"
 	skuId := "N/A"
 	skuPriority := "N/A"
 
