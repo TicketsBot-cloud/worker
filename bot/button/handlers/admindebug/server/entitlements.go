@@ -80,7 +80,11 @@ func (h *AdminDebugServerEntitlementsHandler) Execute(ctx *context.ButtonContext
 		}
 
 		// Expiration
-		response.WriteString(fmt.Sprintf("**Premium Expires:** <t:%d:f>, <t:%d:R>\n", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix()))
+		expiresAt := "Never"
+		if entitlement.ExpiresAt != nil {
+			expiresAt = fmt.Sprintf("<t:%d:f>, <t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
+		}
+		response.WriteString(fmt.Sprintf("**Premium Expires:** %s\n", expiresAt))
 
 		// SKU details
 		response.WriteString(fmt.Sprintf("**SKU ID:** ||`%s`||\n", entitlement.SkuId.String()))

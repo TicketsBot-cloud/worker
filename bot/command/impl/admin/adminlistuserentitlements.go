@@ -57,12 +57,18 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 		if sourceFormatted == "" {
 			sourceFormatted = "None"
 		}
+
+		expiresAt := "Never"
+		if entitlement.ExpiresAt != nil {
+			expiresAt = fmt.Sprintf("<t:%d:f>, <t:%d:R>", entitlement.ExpiresAt.Unix(), entitlement.ExpiresAt.Unix())
+		}
+
 		value := fmt.Sprintf(
-			"### %s\n\n**Tier:** %s\n**Source:** %s\n**Expires:** <t:%d>\n**SKU ID:** %s\n**SKU Priority:** %d\n\n",
+			"### %s\n\n**Tier:** %s\n**Source:** %s\n**Expires:** %s\n**SKU ID:** %s\n**SKU Priority:** %d\n\n",
 			entitlement.SkuLabel,
 			entitlement.Tier,
 			sourceFormatted,
-			entitlement.ExpiresAt.Unix(),
+			expiresAt,
 			entitlement.SkuId.String(),
 			entitlement.SkuPriority,
 		)
