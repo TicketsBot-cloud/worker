@@ -130,7 +130,7 @@ func (NotesCommand) Execute(ctx registry.CommandContext) {
 		member, err := ctx.Member()
 		auditReason := "Created note thread"
 		if err == nil {
-			auditReason = fmt.Sprintf("Created note thread in ticket %d by %s", ticket.PanelId, member.User.Username)
+			auditReason = fmt.Sprintf("Created note thread in ticket %d by %s", ticket.Id, member.User.Username)
 		}
 
 		reasonCtx := request.WithAuditReason(ctx, auditReason)
