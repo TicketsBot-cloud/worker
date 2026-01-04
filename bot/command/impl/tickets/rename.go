@@ -91,6 +91,17 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 			}
 			return "claimed"
 		}),
+		// %claimed_by%
+		logic.NewSubstitutor("claimed_by", false, false, func(user user.User, member member.Member) string {
+			if claimer != nil {
+				claimerUser, err := ctx.Worker().GetUser(*claimer)
+				if err != nil {
+					return "unknown"
+				}
+				return claimerUser.Username
+			}
+			return ""
+		}),
 		// %username%
 		logic.NewSubstitutor("username", true, false, func(user user.User, member member.Member) string {
 			return user.Username
@@ -107,6 +118,14 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 	if err != nil {
 		ctx.HandleError(err)
 		return
+	}
+	
+	// Clean up formatting issues from empty placeholders
+	processedName = logic.CleanChannelName(processedName)
+
+	// If name is empty, use fallback name (only possible with %claimed_by%)
+	if len(processedName) == 0 {
+		processedName = "unclaimed"
 	}
 
 	if len(processedName) > 100 {
