@@ -1075,6 +1075,13 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 				}
 				return "claimed"
 			}),
+			// %claim_indicator%
+			NewSubstitutor("claim_indicator", false, false, func(user user.User, member member.Member) string {
+				if claimer == nil {
+					return "🔴"
+				}
+				return "🟢"
+			}),
 			// %claimed_by%
 			NewSubstitutor("claimed_by", false, false, func(user user.User, member member.Member) string {
 				if claimer != nil {

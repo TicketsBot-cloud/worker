@@ -91,6 +91,13 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 			}
 			return "claimed"
 		}),
+		// %claim_indicator%
+		logic.NewSubstitutor("claim_indicator", false, false, func(user user.User, member member.Member) string {
+			if claimer == nil {
+				return "🔴"
+			}
+			return "🟢"
+		}),
 		// %claimed_by%
 		logic.NewSubstitutor("claimed_by", false, false, func(user user.User, member member.Member) string {
 			if claimer != nil {
