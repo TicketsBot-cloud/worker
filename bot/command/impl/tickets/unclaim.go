@@ -112,9 +112,26 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		return
 	}
 
+	// Generate new channel name
+	newChannelName, err := logic.GenerateChannelName(ctx.Context, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	// Always update the name to match the new panel's naming scheme
+	shouldUpdateName := true
+	claimedChannelName, _ := logic.GenerateChannelName(ctx.Context, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &whoClaimed)
+	if ch.Name != claimedChannelName {
+		shouldUpdateName = false
+	}
+
 	// Update channel
 	data := rest.ModifyChannelData{
 		PermissionOverwrites: overwrites,
+	}
+	if shouldUpdateName {
+		data.Name = newChannelName
 	}
 
 	member, err := ctx.Member()

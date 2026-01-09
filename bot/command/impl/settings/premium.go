@@ -30,7 +30,7 @@ func (PremiumCommand) Properties() registry.Properties {
 		PermissionLevel:  permission.Admin,
 		Category:         command.Settings,
 		DefaultEphemeral: true,
-		Timeout:          time.Second * 5,
+		Timeout:          time.Second * 15,
 	}
 }
 
