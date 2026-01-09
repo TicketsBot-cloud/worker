@@ -94,7 +94,13 @@ func (h *RateHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	}
 
 	// Exit survey
-	if ctx.PremiumTier() > premium.None && ticket.PanelId != nil {
+	premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, guildId, true, ctx.Worker().Token, ctx.Worker().RateLimiter)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if premiumTier > premium.None && ticket.PanelId != nil {
 		panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
 		if err != nil {
 			ctx.HandleError(err)
