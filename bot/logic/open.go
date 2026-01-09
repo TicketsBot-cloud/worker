@@ -280,7 +280,16 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 		span.Finish()
 
-		if settings.TicketNotificationChannel != nil {
+		// Determine which notification channel to use
+		// Priority: Panel-specific notification channel > Global notification channel
+		var notificationChannel *uint64
+		if panel != nil && panel.TicketNotificationChannel != nil {
+			notificationChannel = panel.TicketNotificationChannel
+		} else if settings.TicketNotificationChannel != nil {
+			notificationChannel = settings.TicketNotificationChannel
+		}
+
+		if notificationChannel != nil {
 			span := sentry.StartSpan(rootSpan.Context(), "Send message to ticket notification channel")
 
 			buildSpan := sentry.StartSpan(span.Context(), "Build ticket notification message")
@@ -288,7 +297,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			buildSpan.Finish()
 
 			// TODO: Check if channel exists
-			if msg, err := cmd.Worker().CreateMessageComplex(*settings.TicketNotificationChannel, data.IntoCreateMessageData()); err == nil {
+			if msg, err := cmd.Worker().CreateMessageComplex(*notificationChannel, data.IntoCreateMessageData()); err == nil {
 				joinMessageId = &msg.Id
 			} else {
 				cmd.HandleError(err)
@@ -1063,9 +1072,26 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 			NewSubstitutor("claimed", false, false, func(user user.User, member member.Member) string {
 				if claimer == nil {
 					return "unclaimed"
-				} else {
-					return "claimed"
 				}
+				return "claimed"
+			}),
+			// %claim_indicator%
+			NewSubstitutor("claim_indicator", false, false, func(user user.User, member member.Member) string {
+				if claimer == nil {
+					return "🔴"
+				}
+				return "🟢"
+			}),
+			// %claimed_by%
+			NewSubstitutor("claimed_by", false, false, func(user user.User, member member.Member) string {
+				if claimer != nil {
+					claimerUser, err := worker.GetUser(*claimer)
+					if err != nil {
+						return "unknown"
+					}
+					return claimerUser.Username
+				}
+				return ""
 			}),
 			// %username%
 			NewSubstitutor("username", true, false, func(user user.User, member member.Member) string {
@@ -1087,12 +1113,42 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	}
 
+	// Clean up formatting issues from empty placeholders
+	name = CleanChannelName(name)
+
+	// If name is empty, use fallback name (only possible with %claimed_by%)
+	if len(name) == 0 {
+		name = "unclaimed"
+	}
+
 	// Cap length after substitutions
 	if len(name) > 100 {
 		name = name[:100]
 	}
 
 	return name, nil
+}
+
+// CleanChannelName removes formatting issues caused by empty placeholders
+func CleanChannelName(name string) string {
+	// Replace multiple consecutive hyphens with a single hyphen
+	for strings.Contains(name, "--") {
+		name = strings.ReplaceAll(name, "--", "-")
+	}
+
+	// Replace multiple consecutive spaces with a single space
+	for strings.Contains(name, "  ") {
+		name = strings.ReplaceAll(name, "  ", " ")
+	}
+
+	// Clean up space-hyphen combinations
+	name = strings.ReplaceAll(name, " -", "-")
+	name = strings.ReplaceAll(name, "- ", "-")
+
+	// Trim leading and trailing hyphens, spaces, and underscores
+	name = strings.Trim(name, "-_ ")
+
+	return name
 }
 
 func countRealChannels(channels []channel.Channel, parentId uint64) int {

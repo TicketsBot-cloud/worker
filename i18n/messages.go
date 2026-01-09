@@ -242,6 +242,16 @@ var (
 	MessageNotesAddedToExisting MessageId = "commands.notes.added_to_existing"
 	MessageNotesCreated         MessageId = "commands.notes.created"
 
+	MessageViewStaffTitle            MessageId = "commands.viewstaff.title"
+	MessageViewStaffAdminUsers       MessageId = "commands.viewstaff.admin.users"
+	MessageViewStaffNoAdminUsers     MessageId = "commands.viewstaff.admin.no_users"
+	MessageViewStaffAdminRoles       MessageId = "commands.viewstaff.admin.roles"
+	MessageViewStaffNoAdminRoles     MessageId = "commands.viewstaff.admin.no_roles"
+	MessageViewStaffSupportUsers     MessageId = "commands.viewstaff.support.users"
+	MessageViewStaffSupportUsersWarn MessageId = "commands.viewstaff.support.users_warning"
+	MessageViewStaffSupportRoles     MessageId = "commands.viewstaff.support.roles"
+	MessageViewStaffNoSupportRoles   MessageId = "commands.viewstaff.support.no_roles"
+
 	MessageJoinClosedTicket       MessageId = "button.join_thread.closed_ticket"
 	MessageJoinThreadNoPermission MessageId = "button.join_thread.no_permission"
 	MessageAlreadyJoinedThread    MessageId = "button.join_thread.already_joined"
