@@ -55,35 +55,36 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 		return err
 	}
 
-	// If newOverwrites = nil, no changes to permissions should be made
+	// Generate new channel name
+	newChannelName, err := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &userId)
+	if err != nil {
+		return err
+	}
+
+	// Fetch current channel to check if user has manually renamed it
+	currentChannel, err := cmd.Worker().GetChannel(*ticket.ChannelId)
+	if err != nil {
+		return err
+	}
+
+	// Always update the name to match the new claimed naming scheme
+	shouldUpdateName := true
+	// But skip if the user has manually renamed the channel (doesn't match old unclaimed name)
+	oldChannelName, _ := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
+	if currentChannel.Name != oldChannelName {
+		shouldUpdateName = false
+	}
+
+	// Update channel permissions and name
+	data := rest.ModifyChannelData{}
 	if newOverwrites != nil {
-		newChannelName, err := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &userId)
-		if err != nil {
-			return err
-		}
+		data.PermissionOverwrites = newOverwrites
+	}
+	if shouldUpdateName {
+		data.Name = newChannelName
+	}
 
-		// Fetch current channel to check if user has manually renamed it
-		currentChannel, err := cmd.Worker().GetChannel(*ticket.ChannelId)
-		if err != nil {
-			return err
-		}
-
-		// Always update the name to match the new claimed naming scheme
-		shouldUpdateName := true
-		// But skip if the user has manually renamed the channel (doesn't match old unclaimed name)
-		oldChannelName, _ := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
-		if currentChannel.Name != oldChannelName {
-			shouldUpdateName = false
-		}
-
-		// Update channel
-		data := rest.ModifyChannelData{
-			PermissionOverwrites: newOverwrites,
-		}
-		if shouldUpdateName {
-			data.Name = newChannelName
-		}
-
+	if newOverwrites != nil || shouldUpdateName {
 		if _, err = cmd.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
 			return err
 		}
