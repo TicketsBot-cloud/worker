@@ -172,20 +172,35 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 			fmt.Sprintf("**Weekly**: %s", formatNullableTime(ticketDuration.Weekly)),
 		}
 
-		innerComponents := []component.Component{
-			component.BuildSection(component.Section{
-				Accessory: component.BuildThumbnail(component.Thumbnail{
-					Media: component.UnfurledMediaItem{
-						Url: guildData.IconUrl(),
+		var topSection []component.Component
+
+		iconUrl := guildData.IconUrl()
+		if iconUrl == "" {
+			topSection = []component.Component{
+				component.BuildTextDisplay(component.TextDisplay{Content: "## Server Ticket Statistics"}),
+				component.BuildTextDisplay(component.TextDisplay{
+					Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+				}),
+			}
+		} else {
+			topSection = []component.Component{
+				component.BuildSection(component.Section{
+					Accessory: component.BuildThumbnail(component.Thumbnail{
+						Media: component.UnfurledMediaItem{
+							Url: iconUrl,
+						},
+					}),
+					Components: []component.Component{
+						component.BuildTextDisplay(component.TextDisplay{Content: "## Server Ticket Statistics"}),
+						component.BuildTextDisplay(component.TextDisplay{
+							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+						}),
 					},
 				}),
-				Components: []component.Component{
-					component.BuildTextDisplay(component.TextDisplay{Content: "## Server Ticket Statistics"}),
-					component.BuildTextDisplay(component.TextDisplay{
-						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-					}),
-				},
-			}),
+			}
+		}
+
+		innerComponents := append(topSection, []component.Component{
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
@@ -201,7 +216,7 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 					ticketVolumeTable,
 				),
 			}),
-		}
+		}...)
 
 		ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
 			Components: innerComponents,
