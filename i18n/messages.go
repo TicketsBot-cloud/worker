@@ -112,6 +112,7 @@ var (
 
 	MessageAddNoMembers    MessageId = "commands.add.no_members"
 	MessageAddNoPermission MessageId = "commands.add.no_permission"
+	MessageAddNoEveryone   MessageId = "commands.add.no_everyone"
 	MessageAddSuccess      MessageId = "commands.add.success"
 	MessageAddRoleThread   MessageId = "commands.add.role_thread"
 
