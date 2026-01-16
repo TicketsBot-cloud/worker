@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -59,6 +60,12 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 	// Verify that the user is allowed to modify the ticket
 	if permissionLevel == permcache.Everyone && ticket.UserId != ctx.UserId() {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageAddNoPermission)
+		return
+	}
+
+	if id == ctx.GuildId() {
+		sentry.ErrorWithContext(fmt.Errorf("user tried to add @everyone to ticket"), ctx.ToErrorContext())
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageErrorGeneral)
 		return
 	}
 
