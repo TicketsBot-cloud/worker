@@ -1115,7 +1115,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	}
 
 	// Clean up formatting issues from empty placeholders
-	name = CleanChannelName(name)
+	name = SanitizeChannelName(name)
 
 	// If name is empty, use fallback name (only possible with %claimed_by%)
 	if len(name) == 0 {
@@ -1130,10 +1130,10 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	return name, nil
 }
 
-// CleanChannelName cleans and sanitizes a channel name to match Discord's format.
+// SanitizeChannelName sanitizes a channel name to match Discord's format.
 // Discord converts channel names to lowercase, replaces spaces with hyphens,
 // and removes ASCII special characters that aren't allowed in channel names.
-func CleanChannelName(name string) string {
+func SanitizeChannelName(name string) string {
 	// Convert to lowercase
 	name = strings.ToLower(name)
 
