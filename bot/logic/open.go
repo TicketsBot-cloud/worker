@@ -1060,7 +1060,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	} else {
 		var err error
-		name, err = DoSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
+		name, err = DoSubstitutionsWithParams(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)
@@ -1106,6 +1106,79 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 				}
 
 				return nickname
+			}),
+		}, []ParameterizedSubstitutor{
+			// %date% or %date:FORMAT% (e.g., %date:yyyy-mm-dd%)
+			NewParameterizedSubstitutor("date", false, false, func(u user.User, m member.Member, params []string) string {
+				format := ""
+				if len(params) > 0 {
+					format = params[0]
+				}
+				return FormatPlainDate(time.Now(), format)
+			}),
+			// %date_days:N% or %date_days:N:FORMAT%
+			NewParameterizedSubstitutor("date_days", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				days, err := ParseOffset(params[0])
+				if err != nil {
+					return ""
+				}
+				targetTime := time.Now().AddDate(0, 0, days)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(targetTime, format)
+			}),
+			// %date_weeks:N% or %date_weeks:N:FORMAT%
+			NewParameterizedSubstitutor("date_weeks", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				weeks, err := ParseOffset(params[0])
+				if err != nil {
+					return ""
+				}
+				targetTime := time.Now().AddDate(0, 0, weeks*7)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(targetTime, format)
+			}),
+			// %date_months:N% or %date_months:N:FORMAT%
+			NewParameterizedSubstitutor("date_months", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				months, err := ParseOffset(params[0])
+				if err != nil {
+					return ""
+				}
+				targetTime := time.Now().AddDate(0, months, 0)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(targetTime, format)
+			}),
+			// %date_timestamp:UNIX% or %date_timestamp:UNIX:FORMAT%
+			NewParameterizedSubstitutor("date_timestamp", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				ts, err := ParseTimestamp(params[0])
+				if err != nil {
+					return ""
+				}
+				t := time.Unix(ts, 0)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(t, format)
 			}),
 		})
 
