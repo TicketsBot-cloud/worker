@@ -3,7 +3,9 @@ package tickets
 import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	discordpermission "github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -107,6 +109,50 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 	if err != nil {
 		ctx.HandleError(err)
 		return
+	}
+
+	// Handle claimer access based on SwitchPanelClaimBehavior setting
+	claimSettings, err := dbclient.Client.ClaimSettings.Get(ctx, ctx.GuildId())
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if claimSettings.SwitchPanelClaimBehavior == database.SwitchPanelKeepAccess ||
+		claimSettings.SwitchPanelClaimBehavior == database.SwitchPanelRemoveOnUnclaim {
+
+		claimerHasAccess, err := logic.HasPermissionForPanel(ctx.Context, ctx.Worker(), ctx.GuildId(), panel, whoClaimed)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if !claimerHasAccess {
+			filteredOverwrites := make([]channel.PermissionOverwrite, 0, len(overwrites))
+			for _, ow := range overwrites {
+				if ow.Id != whoClaimed || ow.Type != channel.PermissionTypeMember {
+					filteredOverwrites = append(filteredOverwrites, ow)
+				}
+			}
+			overwrites = filteredOverwrites
+
+			switch claimSettings.SwitchPanelClaimBehavior {
+			case database.SwitchPanelKeepAccess:
+				overwrites = append(overwrites, channel.PermissionOverwrite{
+					Id:    whoClaimed,
+					Type:  channel.PermissionTypeMember,
+					Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
+					Deny:  0,
+				})
+			case database.SwitchPanelRemoveOnUnclaim:
+				overwrites = append(overwrites, channel.PermissionOverwrite{
+					Id:    whoClaimed,
+					Type:  channel.PermissionTypeMember,
+					Allow: 0,
+					Deny:  discordpermission.BuildPermissions(discordpermission.ViewChannel),
+				})
+			}
+		}
 	}
 
 	// Generate new channel name

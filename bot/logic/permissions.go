@@ -126,6 +126,87 @@ func HasPermissionForTicket(ctx context.Context, worker *worker.Context, ticket 
 	return false, nil
 }
 
+func HasPermissionForPanel(ctx context.Context, worker *worker.Context, guildId uint64, panel *database.Panel, userId uint64) (bool, error) {
+	// Check if user is the guild owner
+	guild, err := worker.GetGuild(guildId)
+	if err != nil {
+		return false, err
+	}
+
+	if guild.OwnerId == userId {
+		return true, nil
+	}
+
+	// Get member object
+	member, err := worker.GetGuildMember(guildId, userId)
+	if err != nil {
+		return false, err
+	}
+
+	// Get admin users and roles
+	adminUsers, err := dbclient.Client.Permissions.GetAdmins(ctx, guildId)
+	if err != nil {
+		return false, err
+	}
+
+	adminRoles, err := dbclient.Client.RolePermissions.GetAdminRoles(ctx, guildId)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if user is admin
+	if utils.Contains(adminUsers, userId) {
+		return true, nil
+	}
+
+	// Check if user has admin role
+	for _, roleId := range member.Roles {
+		if utils.Contains(adminRoles, roleId) {
+			return true, nil
+		}
+	}
+
+	if panel == nil {
+		return IsInDefaultTeam(ctx, guildId, userId, member)
+	}
+
+	// Check default team, if assigned to panel
+	if panel.WithDefaultTeam {
+		hasPermission, err := IsInDefaultTeam(ctx, guildId, userId, member)
+		if err != nil {
+			return false, err
+		}
+
+		if hasPermission {
+			return true, nil
+		}
+	}
+
+	// Check whether user is part of a team directly
+	teamUsers, err := dbclient.Client.SupportTeamMembers.GetAllSupportMembersForPanel(ctx, panel.PanelId)
+	if err != nil {
+		return false, err
+	}
+
+	if utils.Contains(teamUsers, userId) {
+		return true, nil
+	}
+
+	// Check whether user has any of the roles
+	teamRoles, err := dbclient.Client.SupportTeamRoles.GetAllSupportRolesForPanel(ctx, panel.PanelId)
+	if err != nil {
+		return false, err
+	}
+
+	for _, roleId := range member.Roles {
+		if utils.Contains(teamRoles, roleId) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func IsInDefaultTeam(ctx context.Context, guildId, userId uint64, member member.Member) (bool, error) {
 	// Check users
 	supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, guildId)
