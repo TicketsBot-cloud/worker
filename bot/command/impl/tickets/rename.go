@@ -128,7 +128,7 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 	}
 	
 	// Clean up formatting issues from empty placeholders
-	processedName = logic.CleanChannelName(processedName)
+	processedName = logic.SanitizeChannelName(processedName)
 
 	// If name is empty, use fallback name (only possible with %claimed_by%)
 	if len(processedName) == 0 {

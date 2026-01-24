@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
@@ -1114,7 +1115,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	}
 
 	// Clean up formatting issues from empty placeholders
-	name = CleanChannelName(name)
+	name = SanitizeChannelName(name)
 
 	// If name is empty, use fallback name (only possible with %claimed_by%)
 	if len(name) == 0 {
@@ -1129,21 +1130,39 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	return name, nil
 }
 
-// CleanChannelName removes formatting issues caused by empty placeholders
-func CleanChannelName(name string) string {
+// SanitizeChannelName sanitizes a channel name to match Discord's format.
+// Discord converts channel names to lowercase, replaces spaces with hyphens,
+// and removes ASCII special characters that aren't allowed in channel names.
+func SanitizeChannelName(name string) string {
+	// Convert to lowercase
+	name = strings.ToLower(name)
+
+	// Replace spaces with hyphens
+	name = strings.ReplaceAll(name, " ", "-")
+
+	// Filter out ASCII special characters that Discord doesn't allow
+	// Discord allows: letters, numbers, hyphens, underscores, and emojis/unicode
+	// Discord removes: ASCII special characters like [ ] ( ) ! @ # $ % ^ & * etc.
+	var result strings.Builder
+	for _, r := range name {
+		// Always keep hyphens and underscores
+		if r == '-' || r == '_' {
+			result.WriteRune(r)
+			continue
+		}
+		// Remove ASCII special characters (non-alphanumeric ASCII)
+		if r < 128 && !unicode.IsLetter(r) && !unicode.IsNumber(r) {
+			continue
+		}
+		// Keep everything else (letters, numbers, emojis, unicode)
+		result.WriteRune(r)
+	}
+	name = result.String()
+
 	// Replace multiple consecutive hyphens with a single hyphen
 	for strings.Contains(name, "--") {
 		name = strings.ReplaceAll(name, "--", "-")
 	}
-
-	// Replace multiple consecutive spaces with a single space
-	for strings.Contains(name, "  ") {
-		name = strings.ReplaceAll(name, "  ", " ")
-	}
-
-	// Clean up space-hyphen combinations
-	name = strings.ReplaceAll(name, " -", "-")
-	name = strings.ReplaceAll(name, "- ", "-")
 
 	// Trim leading and trailing hyphens, spaces, and underscores
 	name = strings.Trim(name, "-_ ")

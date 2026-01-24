@@ -211,7 +211,7 @@ func checkUserTicketPermissions(ctx *context.ModalContext, guildId, ownerId, use
 					if roleName == "" {
 						roleName = "Unknown Role"
 					}
-					adminRoleNames = append(adminRoleNames, fmt.Sprintf("`%s` (<@&%d>)", roleName, roleId))
+					adminRoleNames = append(adminRoleNames, fmt.Sprintf("`%s` (%d)", roleName, roleId))
 					ticketPermLevel = "**Ticket Permission:** Admin"
 				}
 			}
@@ -230,7 +230,7 @@ func checkUserTicketPermissions(ctx *context.ModalContext, guildId, ownerId, use
 					if roleName == "" {
 						roleName = "Unknown Role"
 					}
-					supportRoleNames = append(supportRoleNames, fmt.Sprintf("`%s` (<@&%d>)", roleName, roleId))
+					supportRoleNames = append(supportRoleNames, fmt.Sprintf("`%s` (%d)", roleName, roleId))
 					ticketPermLevel = "**Ticket Permission:** Support"
 				}
 			}
@@ -347,5 +347,5 @@ func checkRoleTicketPermissions(ctx *context.ModalContext, guildId, roleId uint6
 		lines = append(lines, "*No ticket access*")
 	}
 
-	return fmt.Sprintf("**Role:** `%s` (<@&%d>)\n%s", roleName, roleId, strings.Join(lines, "\n"))
+	return fmt.Sprintf("**Role:** `%s` (%d)\n%s", roleName, roleId, strings.Join(lines, "\n"))
 }

@@ -28,24 +28,72 @@ type guildInfo struct {
 }
 
 func getOwnedGuildsWithTranscripts(ctx *cmdcontext.ButtonContext, userId uint64) ([]guildInfo, error) {
-	query := `SELECT DISTINCT guild_id FROM tickets WHERE has_transcript = true GROUP BY guild_id`
+	// Get guilds owned by the user from the cache database
+	cacheQuery := `SELECT guild_id FROM guilds WHERE data->>'owner_id' = $1`
+	cacheRows, err := ctx.Worker().Cache.Query(ctx, cacheQuery, fmt.Sprintf("%d", userId))
+	if err != nil {
+		return nil, err
+	}
+	defer cacheRows.Close()
 
-	rows, err := dbclient.Client.Tickets.Query(ctx, query)
+	var ownedGuildIds []uint64
+	for cacheRows.Next() {
+		var guildId uint64
+		if err := cacheRows.Scan(&guildId); err != nil {
+			continue
+		}
+		ownedGuildIds = append(ownedGuildIds, guildId)
+	}
+
+	if len(ownedGuildIds) == 0 {
+		return []guildInfo{}, nil
+	}
+
+	// Filter to only guilds with transcripts
+	placeholders := ""
+	params := make([]interface{}, len(ownedGuildIds))
+	for i, guildId := range ownedGuildIds {
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += fmt.Sprintf("$%d", i+1)
+		params[i] = guildId
+	}
+
+	transcriptQuery := fmt.Sprintf(`
+		SELECT DISTINCT guild_id
+		FROM tickets
+		WHERE has_transcript = true AND guild_id IN (%s)
+		GROUP BY guild_id`, placeholders)
+
+	rows, err := dbclient.Client.Tickets.Query(ctx, transcriptQuery, params...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var guildIds []uint64
+	var guildsWithTranscripts []guildInfo
 	for rows.Next() {
 		var guildId uint64
 		if err := rows.Scan(&guildId); err != nil {
 			continue
 		}
-		guildIds = append(guildIds, guildId)
+
+		guild, err := ctx.Worker().GetGuild(guildId)
+		var name string
+		if err != nil {
+			name = strconv.FormatUint(guildId, 10)
+		} else {
+			name = guild.Name
+		}
+
+		guildsWithTranscripts = append(guildsWithTranscripts, guildInfo{
+			GuildID: guildId,
+			Name:    name,
+		})
 	}
 
-	return batchFetchOwnedGuilds(ctx, guildIds, userId)
+	return guildsWithTranscripts, nil
 }
 
 func getGuildsWithUserMessages(ctx *cmdcontext.ButtonContext, userId uint64) ([]guildInfo, error) {

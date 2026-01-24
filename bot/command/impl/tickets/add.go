@@ -62,6 +62,11 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
+	if id == ctx.GuildId() {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageAddNoEveryone)
+		return
+	}
+
 	mentionableType, valid := context.DetermineMentionableType(ctx, id)
 	if !valid {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageAddNoMembers)
