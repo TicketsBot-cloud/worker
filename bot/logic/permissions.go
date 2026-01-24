@@ -16,12 +16,48 @@ import (
 )
 
 func HasPermissionForTicket(ctx context.Context, worker *worker.Context, ticket database.Ticket, userId uint64) (bool, error) {
+	// Check if user is the ticket opener
 	if ticket.UserId == userId {
 		return true, nil
 	}
 
+	// Check claim status
+	claimedBy, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	if err != nil {
+		return false, err
+	}
+
+	if claimedBy != 0 {
+		if claimedBy == userId {
+			return true, nil
+		}
+
+		// Ticket is claimed by someone else, only admins can access
+		return IsAdminForGuild(ctx, worker, ticket.GuildId, userId)
+	}
+
+	// Get panel for ticket
+	var panel *database.Panel
+	if ticket.PanelId != nil {
+		tmp, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			return false, err
+		}
+
+		if tmp.PanelId == 0 {
+			return false, errors.New("Panel not found")
+		}
+
+		panel = &tmp
+	}
+
+	return HasPermissionForPanel(ctx, worker, ticket.GuildId, panel, userId)
+}
+
+// IsAdminForGuild checks if a user is a guild owner or admin
+func IsAdminForGuild(ctx context.Context, worker *worker.Context, guildId uint64, userId uint64) (bool, error) {
 	// Check if user is the guild owner
-	guild, err := worker.GetGuild(ticket.GuildId)
+	guild, err := worker.GetGuild(guildId)
 	if err != nil {
 		return false, err
 	}
@@ -31,95 +67,29 @@ func HasPermissionForTicket(ctx context.Context, worker *worker.Context, ticket 
 	}
 
 	// Get member object
-	member, err := worker.GetGuildMember(ticket.GuildId, userId)
+	member, err := worker.GetGuildMember(guildId, userId)
 	if err != nil {
 		return false, err
 	}
 
 	// Get admin users and roles
-	adminUsers, err := dbclient.Client.Permissions.GetAdmins(ctx, ticket.GuildId)
+	adminUsers, err := dbclient.Client.Permissions.GetAdmins(ctx, guildId)
 	if err != nil {
 		return false, err
 	}
 
-	adminRoles, err := dbclient.Client.RolePermissions.GetAdminRoles(ctx, ticket.GuildId)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if user is admin
 	if utils.Contains(adminUsers, userId) {
 		return true, nil
 	}
 
-	// Check if user has admin role
-	for _, roleId := range member.Roles {
-		if utils.Contains(adminRoles, roleId) {
-			return true, nil
-		}
-	}
-
-	// Check claim
-	claimedBy, err := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+	adminRoles, err := dbclient.Client.RolePermissions.GetAdminRoles(ctx, guildId)
 	if err != nil {
 		return false, err
 	}
 
-	// If the ticket is claimed
-	if claimedBy != 0 {
-		if claimedBy == userId {
+	for _, roleId := range member.Roles {
+		if utils.Contains(adminRoles, roleId) {
 			return true, nil
-		}
-
-		// We have already checked admin users
-		return false, nil
-	}
-
-	if ticket.PanelId == nil {
-		return IsInDefaultTeam(ctx, ticket.GuildId, userId, member)
-	} else {
-		// Get panel for ticket
-		panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-		if err != nil {
-			return false, err
-		}
-
-		if panel.PanelId == 0 {
-			return false, errors.New("Panel not found")
-		}
-
-		// Check default team, if assigned to panel
-		if panel.WithDefaultTeam {
-			hasPermission, err := IsInDefaultTeam(ctx, ticket.GuildId, userId, member)
-			if err != nil {
-				return false, err
-			}
-
-			if hasPermission {
-				return true, nil
-			}
-		}
-
-		// Check whether user is part of a team directly
-		teamUsers, err := dbclient.Client.SupportTeamMembers.GetAllSupportMembersForPanel(ctx, panel.PanelId)
-		if err != nil {
-			return false, err
-		}
-
-		if utils.Contains(teamUsers, userId) {
-			return true, nil
-		}
-
-		// Check whether user has any of the roles
-		teamRoles, err := dbclient.Client.SupportTeamRoles.GetAllSupportRolesForPanel(ctx, panel.PanelId)
-		if err != nil {
-			return false, err
-		}
-
-		for _, roleId := range member.Roles {
-			if utils.Contains(teamRoles, roleId) {
-				return true, nil
-			}
 		}
 	}
 
