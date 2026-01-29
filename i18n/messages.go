@@ -208,9 +208,12 @@ var (
 	MessageCloseRequestAccept       MessageId = "commands.close_request.accept"
 	MessageCloseRequestDeny         MessageId = "commands.close_request.deny"
 
-	MessageSwitchPanelInvalidPanel      MessageId = "commands.switch_panel.invalid_panel"
-	MessageSwitchPanelSuccess           MessageId = "commands.switch_panel.success"
-	MessageSwitchPanelNonThreadToThread MessageId = "commands.switch_panel.non_thread_to_thread"
+	MessageSwitchPanelInvalidPanel         MessageId = "commands.switch_panel.invalid_panel"
+	MessageSwitchPanelSuccess              MessageId = "commands.switch_panel.success"
+	MessageSwitchPanelNonThreadToThread    MessageId = "commands.switch_panel.non_thread_to_thread"
+	MessageSwitchPanelClaimerNoAccessTitle MessageId = "commands.switch_panel.claimer_no_access_title"
+	MessageSwitchPanelClaimerNoAccess      MessageId = "commands.switch_panel.claimer_no_access"
+	MessageSwitchPanelAutoUnclaimed        MessageId = "commands.switch_panel.auto_unclaimed"
 
 	MessageAutoCloseConfigure MessageId = "commands.autoclose.configure"
 	MessageAutoCloseExclude   MessageId = "commands.autoclose.exclude.success"
