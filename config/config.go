@@ -41,6 +41,7 @@ type (
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
 			MonitoredBots       []uint64 `env:"MONITORED_BOTS"`
+			DevMode             bool     `env:"WORKER_BOT_DEV_MODE" envDefault:"false"`
 		}
 
 		PremiumProxy struct {

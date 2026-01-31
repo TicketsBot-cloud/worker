@@ -77,6 +77,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.RedeemVoteCreditsHandler),
 		new(handlers.ViewStaffHandler),
 		new(handlers.ViewSurveyHandler),
+		new(handlers.TestHandler),
 		new(server.AdminDebugServerRecacheHandler),
 		new(server.AdminDebugServerBlacklistReasonHandler),
 		new(server.AdminDebugServerEntitlementsHandler),

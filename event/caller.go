@@ -198,6 +198,9 @@ func callCommand(
 		}
 
 		v.Execute(ctx, arg0)
+	case general.TestCommand:
+
+		v.Execute(ctx)
 	case general.AboutCommand:
 
 		v.Execute(ctx)
