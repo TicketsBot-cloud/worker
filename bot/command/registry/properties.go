@@ -29,6 +29,7 @@ type Properties struct {
 	DisableAutoDefer bool
 	Timeout          time.Duration
 	IgnoreBlacklist  bool
+	DevBotOnly       bool
 
 	SetupFunc func()
 }
