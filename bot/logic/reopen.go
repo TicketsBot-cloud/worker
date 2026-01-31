@@ -10,37 +10,12 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int) {
-	// Check ticket limit
-	permLevel, err := cmd.UserPermissionLevel(ctx)
-	if err != nil {
-		cmd.HandleError(err)
-		return
-	}
-
-	if permLevel == permission.Everyone {
-		ticketLimit, err := dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
-		if err != nil {
-			cmd.HandleError(err)
-			return
-		}
-
-		// TODO: count()
-		openTickets, err := dbclient.Client.Tickets.GetOpenByUser(ctx, cmd.GuildId(), cmd.UserId())
-		if err != nil {
-			cmd.HandleError(err)
-			return
-		}
-
-		if len(openTickets) >= int(ticketLimit) {
-			cmd.Reply(customisation.Green, i18n.Error, i18n.MessageTicketLimitReached)
-			return
-		}
-	}
-
+	// Get the ticket first so we can check per-panel limits
 	ticket, err := dbclient.Client.Tickets.Get(ctx, ticketId, cmd.GuildId())
 	if err != nil {
 		cmd.HandleError(err)
@@ -50,6 +25,59 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 	if ticket.Id == 0 || ticket.GuildId != cmd.GuildId() {
 		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageReopenTicketNotFound)
 		return
+	}
+
+	// Check ticket limit
+	permLevel, err := cmd.UserPermissionLevel(ctx)
+	if err != nil {
+		cmd.HandleError(err)
+		return
+	}
+
+	if permLevel == permission.Everyone {
+		// Fetch panel if ticket has one for per-panel limit check
+		var panel *database.Panel
+		if ticket.PanelId != nil {
+			p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err != nil {
+				cmd.HandleError(err)
+				return
+			}
+			if p.PanelId != 0 {
+				panel = &p
+			}
+		}
+
+		var ticketLimit uint8
+		var openTicketCount int
+
+		if panel != nil && panel.TicketLimit != nil {
+			// Use per-panel limit and count only panel tickets
+			ticketLimit = *panel.TicketLimit
+			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
+			if err != nil {
+				cmd.HandleError(err)
+				return
+			}
+		} else {
+			// Use global limit and count all tickets
+			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
+			if err != nil {
+				cmd.HandleError(err)
+				return
+			}
+
+			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+			if err != nil {
+				cmd.HandleError(err)
+				return
+			}
+		}
+
+		if openTicketCount >= int(ticketLimit) {
+			cmd.Reply(customisation.Green, i18n.Error, i18n.MessageTicketLimitReached)
+			return
+		}
 	}
 
 	// Ensure user has permissino to reopen the ticket

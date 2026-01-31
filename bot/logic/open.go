@@ -66,7 +66,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Make sure ticket count is within ticket limit
 	// Check ticket limit before ratelimit token to prevent 1 person from stopping everyone opening tickets
-	violatesTicketLimit, limit := getTicketLimit(ctx, cmd)
+	violatesTicketLimit, limit := getTicketLimit(ctx, cmd, panel)
 	if violatesTicketLimit {
 		// Notify the user
 		ticketsPluralised := "ticket"
@@ -737,7 +737,7 @@ func refreshCachedChannels(ctx context.Context, worker *worker.Context, guildId 
 }
 
 // has hit ticket limit, ticket limit
-func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int) {
+func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *database.Panel) (bool, int) {
 	isStaff, err := cmd.UserPermissionLevel(ctx)
 	if err != nil {
 		sentry.ErrorWithContext(err, cmd.ToErrorContext())
@@ -748,28 +748,39 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int
 		return false, 50
 	}
 
-	var openedTickets []database.Ticket
+	var openTicketCount int
 	var ticketLimit uint8
 
 	group, _ := errgroup.WithContext(ctx)
 
-	// get ticket limit
-	group.Go(func() (err error) {
-		ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
-		return
-	})
+	// If panel has a per-panel limit, use it and count only panel tickets
+	if panel != nil && panel.TicketLimit != nil {
+		ticketLimit = *panel.TicketLimit
 
-	group.Go(func() (err error) {
-		openedTickets, err = dbclient.Client.Tickets.GetOpenByUser(ctx, cmd.GuildId(), cmd.UserId())
-		return
-	})
+		group.Go(func() (err error) {
+			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
+				ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
+			return
+		})
+	} else {
+		// Use global limit and count all tickets
+		group.Go(func() (err error) {
+			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
+			return
+		})
+
+		group.Go(func() (err error) {
+			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+			return
+		})
+	}
 
 	if err := group.Wait(); err != nil {
 		sentry.ErrorWithContext(err, cmd.ToErrorContext())
 		return true, 1
 	}
 
-	return len(openedTickets) >= int(ticketLimit), int(ticketLimit)
+	return openTicketCount >= int(ticketLimit), int(ticketLimit)
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
