@@ -268,7 +268,10 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 
 	var GlobalBlacklistReason string
 	if IsOwnerBlacklisted {
-		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, owner.Id)
+		globalBlacklist, _ := dbclient.Client.GlobalBlacklist.Get(ctx, owner.Id)
+		if globalBlacklist != nil && globalBlacklist.Reason != nil {
+			GlobalBlacklistReason = *globalBlacklist.Reason
+		}
 	}
 
 	// Check if owner was previously an owner of any blacklisted server (repeat offender)

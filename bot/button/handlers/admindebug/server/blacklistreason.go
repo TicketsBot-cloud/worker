@@ -54,7 +54,10 @@ func (h *AdminDebugServerBlacklistReasonHandler) Execute(ctx *context.ButtonCont
 	IsOwnerBlacklisted := blacklist.IsUserBlacklisted(guild.OwnerId)
 	var GlobalBlacklistReason string
 	if IsOwnerBlacklisted {
-		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, guild.OwnerId)
+		globalBlacklist, _ := dbclient.Client.GlobalBlacklist.Get(ctx, guild.OwnerId)
+		if globalBlacklist != nil && globalBlacklist.Reason != nil {
+			GlobalBlacklistReason = *globalBlacklist.Reason
+		}
 	}
 
 	// Check server blacklist
