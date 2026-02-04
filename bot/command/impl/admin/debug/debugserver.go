@@ -161,12 +161,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		return
 	}
 
-	importLogs, err := dbclient.Client.ImportLogs.GetRuns(ctx, guild.Id)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	featuresEnabled := []string{}
 
 	for i := range experiments.List {
@@ -293,18 +287,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		}
 		settingsInfo = append(settingsInfo, fmt.Sprintf("Enabled Integrations: %d (%s)", len(enabledIntegrations), strings.Join(enabledIntegrations, ", ")))
 	}
-
-	hasDataRun, hasTranscriptRun := false, false
-	for _, log := range importLogs {
-		switch log.RunType {
-		case "DATA":
-			hasDataRun = true
-		case "TRANSCRIPT":
-			hasTranscriptRun = true
-		}
-	}
-	settingsInfo = append(settingsInfo, fmt.Sprintf("Data Imported: `%t`", hasDataRun))
-	settingsInfo = append(settingsInfo, fmt.Sprintf("Transcripts Imported: `%t`", hasTranscriptRun))
 
 	debugResponse := []string{
 		fmt.Sprintf("**Server Info**\n- %s", strings.Join(guildInfo, "\n- ")),
