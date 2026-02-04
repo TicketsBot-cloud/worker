@@ -39,8 +39,8 @@ func (ctx *Context) GetChannel(channelId uint64) (channel.Channel, error) {
 	return channel, err
 }
 
-func (ctx *Context) ModifyChannel(channelId uint64, data rest.ModifyChannelData) (channel.Channel, error) {
-	channel, err := rest.ModifyChannel(context.Background(), ctx.Token, ctx.RateLimiter, channelId, data)
+func (ctx *Context) ModifyChannel(reqCtx context.Context, channelId uint64, data rest.ModifyChannelData) (channel.Channel, error) {
+	channel, err := rest.ModifyChannel(reqCtx, ctx.Token, ctx.RateLimiter, channelId, data)
 
 	if ctx.Cache.Options().Channels && err != nil {
 		go ctx.Cache.StoreChannel(context.Background(), channel)
@@ -49,8 +49,8 @@ func (ctx *Context) ModifyChannel(channelId uint64, data rest.ModifyChannelData)
 	return channel, err
 }
 
-func (ctx *Context) DeleteChannel(channelId uint64) (channel.Channel, error) {
-	return rest.DeleteChannel(context.Background(), ctx.Token, ctx.RateLimiter, channelId)
+func (ctx *Context) DeleteChannel(requestCtx context.Context, channelId uint64) (channel.Channel, error) {
+	return rest.DeleteChannel(requestCtx, ctx.Token, ctx.RateLimiter, channelId)
 }
 
 func (ctx *Context) GetChannelMessages(channelId uint64, options rest.GetChannelMessagesData) ([]message.Message, error) {
@@ -127,8 +127,8 @@ func (ctx *Context) BulkDeleteMessages(channelId uint64, messages []uint64) erro
 	return rest.BulkDeleteMessages(context.Background(), ctx.Token, ctx.RateLimiter, channelId, messages)
 }
 
-func (ctx *Context) EditChannelPermissions(channelId uint64, updated channel.PermissionOverwrite) error {
-	return rest.EditChannelPermissions(context.Background(), ctx.Token, ctx.RateLimiter, channelId, updated)
+func (ctx *Context) EditChannelPermissions(requestCtx context.Context, channelId uint64, updated channel.PermissionOverwrite) error {
+	return rest.EditChannelPermissions(requestCtx, ctx.Token, ctx.RateLimiter, channelId, updated)
 }
 
 func (ctx *Context) GetChannelInvites(channelId uint64) ([]invite.InviteMetadata, error) {
@@ -171,8 +171,8 @@ func (ctx *Context) LeaveThread(channelId uint64) error {
 	return rest.LeaveThread(context.Background(), ctx.Token, ctx.RateLimiter, channelId)
 }
 
-func (ctx *Context) RemoveThreadMember(channelId, userId uint64) error {
-	return rest.RemoveThreadMember(context.Background(), ctx.Token, ctx.RateLimiter, channelId, userId)
+func (ctx *Context) RemoveThreadMember(requestCtx context.Context, channelId, userId uint64) error {
+	return rest.RemoveThreadMember(requestCtx, ctx.Token, ctx.RateLimiter, channelId, userId)
 }
 
 func (ctx *Context) GetThreadMember(channelId, userId uint64) (channel.ThreadMember, error) {
@@ -217,7 +217,7 @@ func (ctx *Context) CreatePublicThread(channelId uint64, name string, autoArchiv
 	return rest.StartThreadWithoutMessage(context.Background(), ctx.Token, ctx.RateLimiter, channelId, data)
 }
 
-func (ctx *Context) CreatePrivateThread(channelId uint64, name string, autoArchiveDuration uint16, invitable bool) (channel.Channel, error) {
+func (ctx *Context) CreatePrivateThread(requestCtx context.Context, channelId uint64, name string, autoArchiveDuration uint16, invitable bool) (channel.Channel, error) {
 	data := rest.StartThreadWithoutMessageData{
 		Name:                name,
 		AutoArchiveDuration: autoArchiveDuration,
@@ -225,7 +225,7 @@ func (ctx *Context) CreatePrivateThread(channelId uint64, name string, autoArchi
 		Invitable:           invitable,
 	}
 
-	return rest.StartThreadWithoutMessage(context.Background(), ctx.Token, ctx.RateLimiter, channelId, data)
+	return rest.StartThreadWithoutMessage(requestCtx, ctx.Token, ctx.RateLimiter, channelId, data)
 }
 
 func (ctx *Context) ListGuildEmojis(guildId uint64) ([]emoji.Emoji, error) {
@@ -336,8 +336,8 @@ func (ctx *Context) GetGuildChannels(guildId uint64) ([]channel.Channel, error) 
 	return channels, err
 }
 
-func (ctx *Context) CreateGuildChannel(guildId uint64, data rest.CreateChannelData) (channel.Channel, error) {
-	return rest.CreateGuildChannel(context.Background(), ctx.Token, ctx.RateLimiter, guildId, data)
+func (ctx *Context) CreateGuildChannel(requestCtx context.Context, guildId uint64, data rest.CreateChannelData) (channel.Channel, error) {
+	return rest.CreateGuildChannel(requestCtx, ctx.Token, ctx.RateLimiter, guildId, data)
 }
 
 func (ctx *Context) ModifyGuildChannelPositions(guildId uint64, positions []rest.Position) error {
@@ -392,16 +392,16 @@ func (ctx *Context) ModifyCurrentUserNick(guildId uint64, nick string) error {
 	return rest.ModifyCurrentUserNick(context.Background(), ctx.Token, ctx.RateLimiter, guildId, nick)
 }
 
-func (ctx *Context) AddGuildMemberRole(guildId, userId, roleId uint64) error {
-	return rest.AddGuildMemberRole(context.Background(), ctx.Token, ctx.RateLimiter, guildId, userId, roleId)
+func (ctx *Context) AddGuildMemberRole(requestCtx context.Context, guildId, userId, roleId uint64) error {
+	return rest.AddGuildMemberRole(requestCtx, ctx.Token, ctx.RateLimiter, guildId, userId, roleId)
 }
 
-func (ctx *Context) RemoveGuildMemberRole(guildId, userId, roleId uint64) error {
-	return rest.RemoveGuildMemberRole(context.Background(), ctx.Token, ctx.RateLimiter, guildId, userId, roleId)
+func (ctx *Context) RemoveGuildMemberRole(requestCtx context.Context, guildId, userId, roleId uint64) error {
+	return rest.RemoveGuildMemberRole(requestCtx, ctx.Token, ctx.RateLimiter, guildId, userId, roleId)
 }
 
-func (ctx *Context) RemoveGuildMember(guildId, userId uint64) error {
-	return rest.RemoveGuildMember(context.Background(), ctx.Token, ctx.RateLimiter, guildId, userId)
+func (ctx *Context) RemoveGuildMember(requestCtx context.Context, guildId, userId uint64) error {
+	return rest.RemoveGuildMember(requestCtx, ctx.Token, ctx.RateLimiter, guildId, userId)
 }
 
 func (ctx *Context) GetGuildBans(guildId uint64, data rest.GetGuildBansData) ([]guild.Ban, error) {
@@ -452,8 +452,8 @@ func (ctx *Context) ModifyGuildRole(guildId, roleId uint64, data rest.GuildRoleD
 	return rest.ModifyGuildRole(context.Background(), ctx.Token, ctx.RateLimiter, guildId, roleId, data)
 }
 
-func (ctx *Context) DeleteGuildRole(guildId, roleId uint64) error {
-	return rest.DeleteGuildRole(context.Background(), ctx.Token, ctx.RateLimiter, guildId, roleId)
+func (ctx *Context) DeleteGuildRole(requestCtx context.Context, guildId, roleId uint64) error {
+	return rest.DeleteGuildRole(requestCtx, ctx.Token, ctx.RateLimiter, guildId, roleId)
 }
 
 func (ctx *Context) GetGuildPruneCount(guildId uint64, days int) (int, error) {
