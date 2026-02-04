@@ -84,6 +84,10 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 					answer = strings.Trim(strings.Join(actionRow.Component.Values, ", "), "<@&!>")
 				case component.ComponentChannelSelect:
 					answer = joinMentions(actionRow.Component.Values, "channel")
+				case component.ComponentRadioGroup:
+					answer = actionRow.Component.Value
+				case component.ComponentCheckboxGroup:
+					answer = strings.Join(actionRow.Component.Values, ", ")
 				}
 
 				questionData, ok := inputs[actionRow.Component.CustomId]
