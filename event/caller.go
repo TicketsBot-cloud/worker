@@ -56,8 +56,20 @@ func callCommand(
 			}
 			arg1 = &argValue
 		}
+		var arg2 *string
 
-		v.Execute(ctx, arg0, arg1)
+		opt2, ok2 := findOption(cmd.Properties().Arguments[2], options)
+		if !ok2 {
+			arg2 = nil
+		} else {
+			argValue, ok := opt2.Value.(string)
+			if !ok {
+				return fmt.Errorf("option %s was not a string", opt2.Name)
+			}
+			arg2 = &argValue
+		}
+
+		v.Execute(ctx, arg0, arg1, arg2)
 	case admin.AdminCommand:
 
 		v.Execute(ctx)

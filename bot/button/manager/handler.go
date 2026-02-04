@@ -17,7 +17,6 @@ import (
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	cmdregistry "github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
-	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
@@ -72,12 +71,7 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 
 	// Check for guild-wide blacklist
 	if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-		reason, _ := dbclient.Client.ServerBlacklist.GetReason(lookupCtx, data.GuildId.Value)
-		if reason != "" {
-			cc.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, i18n.MessageGuildBlacklisted)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
-		} else {
-			cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
-		}
+		cc.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
 		return false
 	}
 
