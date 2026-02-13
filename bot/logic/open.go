@@ -96,6 +96,38 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, nil
 	}
 
+	// Check per-user per-panel cooldown
+	if panel != nil && panel.CooldownSeconds > 0 {
+		span = sentry.StartSpan(rootSpan.Context(), "Check panel cooldown")
+
+		// Staff are exempt from cooldown
+		permLevel, err := cmd.UserPermissionLevel(ctx)
+		if err != nil {
+			cmd.HandleError(err)
+			span.Finish()
+			return database.Ticket{}, err
+		}
+
+		if permLevel < permcache.Support {
+			cooldownDuration := time.Duration(panel.CooldownSeconds) * time.Second
+			canOpen, remaining, err := redis.TakePanelCooldownToken(ctx, cmd.GuildId(), panel.PanelId, cmd.UserId(), cooldownDuration)
+			if err != nil {
+				cmd.HandleError(err)
+				span.Finish()
+				return database.Ticket{}, err
+			}
+
+			if !canOpen {
+				expiresAt := time.Now().Add(remaining).Unix()
+				cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelCooldown, fmt.Sprintf("<t:%d:R>", expiresAt))
+				span.Finish()
+				return database.Ticket{}, nil
+			}
+		}
+
+		span.Finish()
+	}
+
 	// Ensure that the panel isn't disabled
 	span = sentry.StartSpan(rootSpan.Context(), "Check if panel is disabled")
 	if panel != nil && panel.ForceDisabled {
