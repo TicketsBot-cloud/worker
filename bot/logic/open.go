@@ -382,25 +382,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return nil
 	})
 
-	// Send out-of-hours warning inside the ticket channel
-	if outOfHoursWarning != nil {
-		group.Go(func() error {
-			span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
-			defer span.Finish()
-
-			warningEmbed := utils.BuildEmbedRaw(
-				customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red),
-				cmd.GetMessage(i18n.Error),
-				*outOfHoursWarning,
-				nil,
-				cmd.PremiumTier(),
-			)
-
-			_, err := cmd.Worker().CreateMessageEmbed(ch.Id, warningEmbed)
-			return err
-		})
-	}
-
 	// WelcomeMessageId is modified in the welcome message goroutine
 	ticket := database.Ticket{
 		Id:               ticketId,
@@ -582,6 +563,26 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if err := group.Wait(); err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
+	}
+
+	// Send out-of-hours warning inside the ticket channel
+	if outOfHoursWarning != nil {
+		span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
+		defer span.Finish()
+
+		warningEmbed := utils.BuildEmbedRaw(
+			customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red),
+			cmd.GetMessage(i18n.Error),
+			*outOfHoursWarning,
+			nil,
+			cmd.PremiumTier(),
+		)
+
+		_, err := cmd.Worker().CreateMessageEmbed(ch.Id, warningEmbed)
+
+		if err != nil {
+			cmd.HandleError(err)
+		}
 	}
 
 	// Pin the welcome message as the last step after everything else is complete
