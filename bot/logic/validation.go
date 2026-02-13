@@ -13,30 +13,62 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-// ValidatePanelAccess checks if the user can access the given panel
-func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) (bool, error) {
+// ValidatePanelAccess checks if the user can access the given panel.
+// Returns (canProceed, outOfHoursWarning, error). outOfHoursWarning is non-nil
+// when the panel is outside support hours but the behaviour is allow_with_warning.
+func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) (bool, *string, error) {
 	// Check support hours
 	hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if hasSupportHours {
 		isActive, err := dbclient.Client.PanelSupportHours.IsActiveNow(ctx, panel.PanelId)
 		if err != nil {
-			return false, err
+			return false, nil, err
 		}
 
 		if !isActive {
-			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOutsideSupportHours)
-			return false, nil
+			// Fetch behaviour settings for this panel
+			settings, exists, err := dbclient.Client.PanelSupportHoursSettings.Get(ctx, panel.PanelId)
+			if err != nil {
+				return false, nil, err
+			}
+
+			// Determine the warning/error message
+			var outOfHoursMessage string
+			if exists && settings.OutOfHoursMessage != "" {
+				outOfHoursMessage = settings.OutOfHoursMessage
+			}
+
+			behaviour := database.OutOfHoursBehaviourBlockCreation
+			if exists {
+				behaviour = settings.OutOfHoursBehaviour
+			}
+
+			switch behaviour {
+			case database.OutOfHoursBehaviourAllowWithWarning:
+				// Allow ticket creation but pass warning through
+				if outOfHoursMessage == "" {
+					outOfHoursMessage = ctx.GetMessage(i18n.MessageOutsideSupportHours)
+				}
+				return true, &outOfHoursMessage, nil
+			default: // block_creation
+				if outOfHoursMessage != "" {
+					ctx.ReplyRaw(customisation.Red, ctx.GetMessage(i18n.Error), outOfHoursMessage)
+				} else {
+					ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOutsideSupportHours)
+				}
+				return false, nil, nil
+			}
 		}
 	}
 
 	// Check blacklist
 	blacklisted, err := ctx.IsBlacklisted(ctx)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if blacklisted {
@@ -49,13 +81,13 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 		}
 
 		ctx.Reply(customisation.Red, i18n.TitleBlacklisted, message)
-		return false, nil
+		return false, nil, nil
 	}
 
 	// Check access control
 	member, err := ctx.Member()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	matchedRole, action, err := dbclient.Client.PanelAccessControlRules.GetFirstMatched(
@@ -65,19 +97,19 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 	)
 
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if action == database.AccessControlActionDeny {
 		if err := sendAccessControlDeniedMessage(ctx, ctx, panel.PanelId, matchedRole); err != nil {
-			return false, err
+			return false, nil, err
 		}
-		return false, nil
+		return false, nil, nil
 	} else if action != database.AccessControlActionAllow {
-		return false, fmt.Errorf("invalid access control action %s", action)
+		return false, nil, fmt.Errorf("invalid access control action %s", action)
 	}
 
-	return true, nil
+	return true, nil, nil
 }
 
 func sendAccessControlDeniedMessage(ctx context.Context, cmd registry.InteractionContext, panelId int, matchedRole uint64) error {

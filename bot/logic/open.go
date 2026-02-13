@@ -36,7 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string) (database.Ticket, error) {
+func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursWarning *string) (database.Ticket, error) {
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
@@ -381,6 +381,25 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span.Finish()
 		return nil
 	})
+
+	// Send out-of-hours warning inside the ticket channel
+	if outOfHoursWarning != nil {
+		group.Go(func() error {
+			span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
+			defer span.Finish()
+
+			warningEmbed := utils.BuildEmbedRaw(
+				customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red),
+				cmd.GetMessage(i18n.Error),
+				*outOfHoursWarning,
+				nil,
+				cmd.PremiumTier(),
+			)
+
+			_, err := cmd.Worker().CreateMessageEmbed(ch.Id, warningEmbed)
+			return err
+		})
+	}
 
 	// WelcomeMessageId is modified in the welcome message goroutine
 	ticket := database.Ticket{
