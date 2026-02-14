@@ -123,7 +123,8 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 				formatted = append(formatted, registry.FormatHelp(cmd, ctx.GuildId(), commandId))
 			}
 
-			embed.AddField(string(category.(command.Category)), strings.Join(formatted, "\n"), false)
+			categoryName := string(category.(command.Category))
+			addFieldChunked(embed, categoryName, formatted)
 		}
 	}
 
@@ -133,4 +134,35 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 
 	// Explicitly ignore error to fix 403 (Cannot send messages to this user)
 	_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
+}
+
+const embedFieldCharLimit = 1024
+
+// addFieldChunked splits formatted command lines across multiple embed fields
+// if their combined length would exceed Discord's 1024-character field value limit.
+func addFieldChunked(embed *embed.Embed, categoryName string, lines []string) {
+	var chunk []string
+	chunkLen := 0
+
+	for _, line := range lines {
+		// +1 accounts for the newline separator between lines
+		lineLen := len(line)
+		if len(chunk) > 0 {
+			lineLen += 1 // \n separator
+		}
+
+		if chunkLen+lineLen > embedFieldCharLimit && len(chunk) > 0 {
+			embed.AddField(categoryName, strings.Join(chunk, "\n"), false)
+			categoryName = "\u200b" // zero-width space for continuation fields
+			chunk = chunk[:0]
+			chunkLen = 0
+		}
+
+		chunk = append(chunk, line)
+		chunkLen += lineLen
+	}
+
+	if len(chunk) > 0 {
+		embed.AddField(categoryName, strings.Join(chunk, "\n"), false)
+	}
 }
