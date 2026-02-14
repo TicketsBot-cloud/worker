@@ -210,6 +210,11 @@ func main() {
 		} else {
 			logger.Warn("Graceful shutdown timed out, exiting now")
 		}
+
+		// Flush any buffered sentry events before exit
+		if !sentry.Flush(2 * time.Second) {
+			logger.Warn("Sentry flush timed out, some events may be lost")
+		}
 	} else {
 		logger.Fatal("Invalid worker mode", zap.String("mode", string(config.Conf.WorkerMode)))
 	}
