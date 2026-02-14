@@ -36,7 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string) (database.Ticket, error) {
+func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int) (database.Ticket, error) {
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
@@ -570,8 +570,13 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
 		defer span.Finish()
 
+		colourHex := customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red)
+		if outOfHoursColour != nil {
+			colourHex = *outOfHoursColour
+		}
+
 		warningEmbed := utils.BuildEmbedRaw(
-			customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red),
+			colourHex,
 			*outOfHoursTitle,
 			*outOfHoursWarning,
 			nil,

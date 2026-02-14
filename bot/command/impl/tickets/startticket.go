@@ -74,6 +74,7 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 	var panel *database.Panel
 	var outOfHoursTitle *string
 	var outOfHoursWarning *string
+	var outOfHoursColour *int
 	if settings.ContextMenuPanel != nil {
 		p, err := dbclient.Client.Panel.GetById(ctx, *settings.ContextMenuPanel)
 		if err != nil {
@@ -84,7 +85,7 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 		panel = &p
 
 		// Validate panel access
-		canProceed, warningTitle, warning, err := logic.ValidatePanelAccess(interaction, p)
+		canProceed, warningTitle, warning, colour, err := logic.ValidatePanelAccess(interaction, p)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -96,9 +97,10 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 
 		outOfHoursTitle = warningTitle
 		outOfHoursWarning = warning
+		outOfHoursColour = colour
 	}
 
-	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil, outOfHoursTitle, outOfHoursWarning)
+	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 	if err != nil {
 		// Already handled
 		return
