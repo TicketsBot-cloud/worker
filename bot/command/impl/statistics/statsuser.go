@@ -1,7 +1,6 @@
 package statistics
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -47,30 +46,10 @@ func (c StatsUserCommand) GetExecutor() interface{} {
 }
 
 func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
-	startTime := time.Now()
 	span := sentry.StartTransaction(ctx, "/stats user")
 	span.SetTag("guild", strconv.FormatUint(ctx.GuildId(), 10))
 	span.SetTag("user", strconv.FormatUint(userId, 10))
-	span.SetTag("target_user", strconv.FormatUint(userId, 10))
-	defer func() {
-		totalDuration := time.Since(startTime)
-		span.SetTag("total_duration_ms", strconv.FormatInt(totalDuration.Milliseconds(), 10))
-
-		// Log warning if execution took more than 10 seconds
-		if totalDuration > 10*time.Second {
-			sentry.CaptureMessage(fmt.Sprintf("Stats command slow execution: %v for user %d in guild %d", totalDuration, userId, ctx.GuildId()))
-		}
-
-		// Check if context was cancelled (timeout)
-		if ctx.Err() != nil {
-			if ctx.Err() == context.DeadlineExceeded {
-				sentry.CaptureException(fmt.Errorf("stats command timeout after %v for user %d in guild %d", totalDuration, userId, ctx.GuildId()))
-				span.SetTag("timeout", "true")
-			}
-		}
-
-		span.Finish()
-	}()
+	defer span.Finish()
 
 	member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), userId)
 	if err != nil {
@@ -104,50 +83,18 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		// load totalTickets
 		group.Go(func() error {
-			queryStart := time.Now()
 			span := sentry.StartSpan(span.Context(), "GetAllByUser")
-			defer func() {
-				queryDuration := time.Since(queryStart)
-				span.SetTag("query_duration_ms", strconv.FormatInt(queryDuration.Milliseconds(), 10))
-				span.SetTag("ticket_count", strconv.Itoa(totalTickets))
-
-				// Log slow queries
-				if queryDuration > 5*time.Second {
-					sentry.WithScope(func(scope *sentry.Scope) {
-						scope.SetTag("query", "GetAllByUser")
-						scope.SetTag("guild_id", strconv.FormatUint(ctx.GuildId(), 10))
-						scope.SetTag("user_id", strconv.FormatUint(userId, 10))
-						scope.SetTag("duration_ms", strconv.FormatInt(queryDuration.Milliseconds(), 10))
-						scope.SetTag("ticket_count", strconv.Itoa(totalTickets))
-						sentry.CaptureMessage(fmt.Sprintf("Slow GetAllByUser query: %v for user %d (returned %d tickets)", queryDuration, userId, totalTickets))
-					})
-				}
-
-				span.Finish()
-			}()
+			defer span.Finish()
 
 			tickets, err := dbclient.Client.Tickets.GetAllByUser(ctx, ctx.GuildId(), userId)
-			if err != nil {
-				// Check if it's a timeout error
-				if ctx.Err() == context.DeadlineExceeded {
-					sentry.CaptureException(fmt.Errorf("GetAllByUser timeout for user %d in guild %d after %v", userId, ctx.GuildId(), time.Since(queryStart)))
-				}
-				return err
-			}
 			totalTickets = len(tickets)
-			return nil
+			return err
 		})
 
 		// load openTickets
 		group.Go(func() error {
-			queryStart := time.Now()
 			span := sentry.StartSpan(span.Context(), "GetOpenByUser")
-			defer func() {
-				queryDuration := time.Since(queryStart)
-				span.SetTag("query_duration_ms", strconv.FormatInt(queryDuration.Milliseconds(), 10))
-				span.SetTag("ticket_count", strconv.Itoa(openTickets))
-				span.Finish()
-			}()
+			defer span.Finish()
 
 			tickets, err := dbclient.Client.Tickets.GetOpenByUser(ctx, ctx.GuildId(), userId)
 			openTickets = len(tickets)
@@ -164,21 +111,6 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		})
 
 		if err := group.Wait(); err != nil {
-			// Add more context to the error
-			if ctx.Err() == context.DeadlineExceeded {
-				// Command timed out - capture details
-				sentry.WithScope(func(scope *sentry.Scope) {
-					scope.SetTag("command", "stats_user")
-					scope.SetTag("guild_id", strconv.FormatUint(ctx.GuildId(), 10))
-					scope.SetTag("user_id", strconv.FormatUint(userId, 10))
-					scope.SetTag("permission_level", "Everyone")
-					scope.SetTag("total_tickets_fetched", strconv.Itoa(totalTickets))
-					scope.SetTag("open_tickets_fetched", strconv.Itoa(openTickets))
-					scope.SetTag("timeout", "true")
-					scope.SetTag("elapsed_ms", strconv.FormatInt(time.Since(startTime).Milliseconds(), 10))
-					sentry.CaptureException(fmt.Errorf("stats user command timeout (regular user): %v", err))
-				})
-			}
 			ctx.HandleError(err)
 			return
 		}
@@ -271,26 +203,8 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		// totalAnswered
 		group.Go(func() (err error) {
-			queryStart := time.Now()
 			span := sentry.StartSpan(span.Context(), "GetParticipatedCount")
-			defer func() {
-				queryDuration := time.Since(queryStart)
-				span.SetTag("query_duration_ms", strconv.FormatInt(queryDuration.Milliseconds(), 10))
-				span.SetTag("ticket_count", strconv.Itoa(totalAnsweredTickets))
-
-				// Log slow queries
-				if queryDuration > 5*time.Second {
-					sentry.WithScope(func(scope *sentry.Scope) {
-						scope.SetTag("query", "GetParticipatedCount")
-						scope.SetTag("guild_id", strconv.FormatUint(ctx.GuildId(), 10))
-						scope.SetTag("user_id", strconv.FormatUint(userId, 10))
-						scope.SetTag("duration_ms", strconv.FormatInt(queryDuration.Milliseconds(), 10))
-						sentry.CaptureMessage(fmt.Sprintf("Slow GetParticipatedCount query: %v for user %d", queryDuration, userId))
-					})
-				}
-
-				span.Finish()
-			}()
+			defer span.Finish()
 
 			totalAnsweredTickets, err = dbclient.Client.Participants.GetParticipatedCount(ctx, ctx.GuildId(), userId)
 			return
@@ -351,19 +265,6 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		})
 
 		if err := group.Wait(); err != nil {
-			// Add more context to the error
-			if ctx.Err() == context.DeadlineExceeded {
-				// Command timed out - capture details
-				sentry.WithScope(func(scope *sentry.Scope) {
-					scope.SetTag("command", "stats_user")
-					scope.SetTag("guild_id", strconv.FormatUint(ctx.GuildId(), 10))
-					scope.SetTag("user_id", strconv.FormatUint(userId, 10))
-					scope.SetTag("permission_level", "Support/Admin")
-					scope.SetTag("timeout", "true")
-					scope.SetTag("elapsed_ms", strconv.FormatInt(time.Since(startTime).Milliseconds(), 10))
-					sentry.CaptureException(fmt.Errorf("stats user command timeout (support/admin user): %v", err))
-				})
-			}
 			ctx.HandleError(err)
 			return
 		}
