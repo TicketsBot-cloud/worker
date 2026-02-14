@@ -33,7 +33,7 @@ func (HelpCommand) Properties() registry.Properties {
 		Category:         command.General,
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,
-		Contexts: 	      []interaction.InteractionContextType{interaction.InteractionContextGuild,interaction.InteractionContextBotDM},
+		Contexts:         []interaction.InteractionContextType{interaction.InteractionContextGuild, interaction.InteractionContextBotDM},
 	}
 }
 
@@ -63,6 +63,11 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 
 	for _, cmd := range c.Registry {
 		properties := cmd.Properties()
+
+		// hide dev commands
+		if properties.DevBotOnly {
+			continue
+		}
 
 		// check bot admin / helper only commands
 		if (properties.AdminOnly && !utils.IsBotAdmin(ctx.UserId())) || (properties.HelperOnly && !utils.IsBotHelper(ctx.UserId())) {

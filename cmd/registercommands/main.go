@@ -19,12 +19,18 @@ var (
 	GuildId             = flag.Uint64("guild", 0, "Guild to create the commands for")
 	AdminCommandGuildId = flag.Uint64("admin-guild", 0, "Guild to create the admin commands in")
 	MergeGuildCommands  = flag.Bool("merge", true, "Merge new commands with existing ones instead of overwriting")
+	DevMode             = flag.Bool("dev", false, "Enable dev mode")
 )
 
 func main() {
+	devMode := false
 	flag.Parse()
 	if *Token == "" {
 		panic("no token")
+	}
+
+	if DevMode != nil {
+		devMode = *DevMode
 	}
 
 	applicationId := must(getApplicationId(*Token))
@@ -34,7 +40,7 @@ func main() {
 	commandManager := new(manager.CommandManager)
 	commandManager.RegisterCommands()
 
-	data, adminCommands := commandManager.BuildCreatePayload(false, AdminCommandGuildId)
+	data, adminCommands := commandManager.BuildCreatePayload(devMode, false, AdminCommandGuildId)
 
 	// Register commands globally or for a specific guild
 	if *GuildId == 0 {
