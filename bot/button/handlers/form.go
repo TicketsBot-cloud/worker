@@ -50,7 +50,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 		}
 
 		// Validate panel access
-		canProceed, err := logic.ValidatePanelAccess(ctx, panel)
+		canProceed, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, err := logic.ValidatePanelAccess(ctx, panel)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -123,7 +123,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 		}
 
 		ctx.Defer()
-		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, formAnswers)
+		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, formAnswers, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 
 		return
 	}

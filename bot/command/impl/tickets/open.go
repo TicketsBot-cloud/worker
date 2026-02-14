@@ -52,5 +52,5 @@ func (OpenCommand) Execute(ctx *context.SlashCommandContext, providedSubject *st
 		subject = *providedSubject
 	}
 
-	logic.OpenTicket(ctx.Context, ctx, nil, subject, nil)
+	logic.OpenTicket(ctx.Context, ctx, nil, subject, nil, nil, nil, nil)
 }
