@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
@@ -35,7 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string) (database.Ticket, error) {
+func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int) (database.Ticket, error) {
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
@@ -93,6 +94,38 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if !ok {
 		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenRatelimited)
 		return database.Ticket{}, nil
+	}
+
+	// Check per-user per-panel cooldown
+	if panel != nil && panel.CooldownSeconds > 0 {
+		span = sentry.StartSpan(rootSpan.Context(), "Check panel cooldown")
+
+		// Staff are exempt from cooldown
+		permLevel, err := cmd.UserPermissionLevel(ctx)
+		if err != nil {
+			cmd.HandleError(err)
+			span.Finish()
+			return database.Ticket{}, err
+		}
+
+		if permLevel < permcache.Support {
+			cooldownDuration := time.Duration(panel.CooldownSeconds) * time.Second
+			canOpen, remaining, err := redis.TakePanelCooldownToken(ctx, cmd.GuildId(), panel.PanelId, cmd.UserId(), cooldownDuration)
+			if err != nil {
+				cmd.HandleError(err)
+				span.Finish()
+				return database.Ticket{}, err
+			}
+
+			if !canOpen {
+				expiresAt := time.Now().Add(remaining).Unix()
+				cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelCooldown, fmt.Sprintf("<t:%d:R>", expiresAt))
+				span.Finish()
+				return database.Ticket{}, nil
+			}
+		}
+
+		span.Finish()
 	}
 
 	// Ensure that the panel isn't disabled
@@ -571,6 +604,31 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if err := group.Wait(); err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
+	}
+
+	// Send out-of-hours warning inside the ticket channel
+	if outOfHoursWarning != nil && outOfHoursTitle != nil {
+		span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
+		defer span.Finish()
+
+		colourHex := customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red)
+		if outOfHoursColour != nil {
+			colourHex = *outOfHoursColour
+		}
+
+		warningEmbed := utils.BuildEmbedRaw(
+			colourHex,
+			*outOfHoursTitle,
+			*outOfHoursWarning,
+			nil,
+			cmd.PremiumTier(),
+		)
+
+		_, err := cmd.Worker().CreateMessageEmbed(ch.Id, warningEmbed)
+
+		if err != nil {
+			cmd.HandleError(err)
+		}
 	}
 
 	// Pin the welcome message as the last step after everything else is complete
@@ -1123,7 +1181,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	}
 
 	// Clean up formatting issues from empty placeholders
-	name = CleanChannelName(name)
+	name = SanitizeChannelName(name)
 
 	// If name is empty, use fallback name (only possible with %claimed_by%)
 	if len(name) == 0 {
@@ -1138,21 +1196,39 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	return name, nil
 }
 
-// CleanChannelName removes formatting issues caused by empty placeholders
-func CleanChannelName(name string) string {
+// SanitizeChannelName sanitizes a channel name to match Discord's format.
+// Discord converts channel names to lowercase, replaces spaces with hyphens,
+// and removes ASCII special characters that aren't allowed in channel names.
+func SanitizeChannelName(name string) string {
+	// Convert to lowercase
+	name = strings.ToLower(name)
+
+	// Replace spaces with hyphens
+	name = strings.ReplaceAll(name, " ", "-")
+
+	// Filter out ASCII special characters that Discord doesn't allow
+	// Discord allows: letters, numbers, hyphens, underscores, and emojis/unicode
+	// Discord removes: ASCII special characters like [ ] ( ) ! @ # $ % ^ & * etc.
+	var result strings.Builder
+	for _, r := range name {
+		// Always keep hyphens and underscores
+		if r == '-' || r == '_' {
+			result.WriteRune(r)
+			continue
+		}
+		// Remove ASCII special characters (non-alphanumeric ASCII)
+		if r < 128 && !unicode.IsLetter(r) && !unicode.IsNumber(r) {
+			continue
+		}
+		// Keep everything else (letters, numbers, emojis, unicode)
+		result.WriteRune(r)
+	}
+	name = result.String()
+
 	// Replace multiple consecutive hyphens with a single hyphen
 	for strings.Contains(name, "--") {
 		name = strings.ReplaceAll(name, "--", "-")
 	}
-
-	// Replace multiple consecutive spaces with a single space
-	for strings.Contains(name, "  ") {
-		name = strings.ReplaceAll(name, "  ", " ")
-	}
-
-	// Clean up space-hyphen combinations
-	name = strings.ReplaceAll(name, " -", "-")
-	name = strings.ReplaceAll(name, "- ", "-")
 
 	// Trim leading and trailing hyphens, spaces, and underscores
 	name = strings.Trim(name, "-_ ")

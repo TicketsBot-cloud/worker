@@ -92,9 +92,11 @@ var (
 
 	MessageOpenThreadAnnouncementChannel MessageId = "open.thread_in_announcement_channel"
 	MessageOpenRatelimited               MessageId = "open.ratelimited"
+	MessageOpenPanelCooldown             MessageId = "open.panel_cooldown"
 	MessageOpenPanelForceDisabled        MessageId = "open.panel_force_disabled"
 	MessageOpenPanelDisabled             MessageId = "open.panel_disabled"
-	MessageOutsideSupportHours           MessageId = "open.outside_support_hours"
+	MessageOutsideSupportHoursTitle      MessageId = "open.outside_support_hours.title"
+	MessageOutsideSupportHours           MessageId = "open.outside_support_hours.message"
 	MessageTicketOpened                  MessageId = "open.success"
 
 	MessageOpenAclNoAllowRules           MessageId = "open.acl.no_allow_rules"
@@ -112,6 +114,7 @@ var (
 
 	MessageAddNoMembers    MessageId = "commands.add.no_members"
 	MessageAddNoPermission MessageId = "commands.add.no_permission"
+	MessageAddNoEveryone   MessageId = "commands.add.no_everyone"
 	MessageAddSuccess      MessageId = "commands.add.success"
 	MessageAddRoleThread   MessageId = "commands.add.role_thread"
 
@@ -254,8 +257,8 @@ var (
 	MessageAlreadyJoinedThread    MessageId = "button.join_thread.already_joined"
 	MessageJoinThreadSuccess      MessageId = "button.join_thread.success"
 
-	HelpAdminBlacklist    MessageId = "help.admin.blacklist"
-	HelpAdminUnblacklist  MessageId = "help.admin.unblacklist"
+	HelpAdminBlacklist   MessageId = "help.admin.blacklist"
+	HelpAdminUnblacklist MessageId = "help.admin.unblacklist"
 
 	SetupAutoRolesSuccess             MessageId = "setup.auto.roles.success"
 	SetupAutoRolesFailure             MessageId = "setup.auto.roles.failure"
