@@ -180,6 +180,38 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 				MaxValues: maxLength,
 				Required:  utils.Ptr(isRequired),
 			})
+		// Radio Group
+		case int(component.ComponentRadioGroup):
+			opts := make([]component.RadioGroupOption, len(options))
+			for j, option := range options {
+				opts[j] = component.RadioGroupOption{
+					Label:       option.Label,
+					Value:       option.Value,
+					Description: option.Description,
+				}
+			}
+			innerComponent = component.BuildRadioGroup(component.RadioGroup{
+				CustomId: input.CustomId,
+				Options:  opts,
+				Required: utils.Ptr(input.Required),
+			})
+		// Checkbox Group
+		case int(component.ComponentCheckboxGroup):
+			opts := make([]component.CheckboxGroupOption, len(options))
+			for j, option := range options {
+				opts[j] = component.CheckboxGroupOption{
+					Label:       option.Label,
+					Value:       option.Value,
+					Description: option.Description,
+				}
+			}
+			innerComponent = component.BuildCheckboxGroup(component.CheckboxGroup{
+				CustomId:  input.CustomId,
+				Options:   opts,
+				MinValues: minLength,
+				MaxValues: maxLength,
+				Required:  utils.Ptr(input.Required),
+			})
 		}
 
 		label := component.Label{
