@@ -50,7 +50,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 		}
 
 		// Validate panel access
-		canProceed, err := logic.ValidatePanelAccess(ctx, panel)
+		canProceed, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, err := logic.ValidatePanelAccess(ctx, panel)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -84,6 +84,10 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 					answer = strings.Trim(strings.Join(actionRow.Component.Values, ", "), "<@&!>")
 				case component.ComponentChannelSelect:
 					answer = joinMentions(actionRow.Component.Values, "channel")
+				case component.ComponentRadioGroup:
+					answer = actionRow.Component.Value
+				case component.ComponentCheckboxGroup:
+					answer = strings.Join(actionRow.Component.Values, ", ")
 				}
 
 				questionData, ok := inputs[actionRow.Component.CustomId]
@@ -123,7 +127,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 		}
 
 		ctx.Defer()
-		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, formAnswers)
+		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, formAnswers, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 
 		return
 	}
