@@ -45,7 +45,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		}
 
 		// Validate panel access
-		canProceed, err := logic.ValidatePanelAccess(ctx, panel)
+		canProceed, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, err := logic.ValidatePanelAccess(ctx, panel)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -56,7 +56,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		}
 
 		if panel.FormId == nil {
-			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
+			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 		} else {
 			form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
 			if err != nil {
@@ -82,7 +82,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 			}
 
 			if len(inputs) == 0 { // Don't open a blank form
-				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
+				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 			} else {
 				modal := buildForm(panel, form, inputs, inputOptions)
 				ctx.Modal(modal)
@@ -179,6 +179,38 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 				MinValues: minLength,
 				MaxValues: maxLength,
 				Required:  utils.Ptr(isRequired),
+			})
+		// Radio Group
+		case int(component.ComponentRadioGroup):
+			opts := make([]component.RadioGroupOption, len(options))
+			for j, option := range options {
+				opts[j] = component.RadioGroupOption{
+					Label:       option.Label,
+					Value:       option.Value,
+					Description: option.Description,
+				}
+			}
+			innerComponent = component.BuildRadioGroup(component.RadioGroup{
+				CustomId: input.CustomId,
+				Options:  opts,
+				Required: utils.Ptr(input.Required),
+			})
+		// Checkbox Group
+		case int(component.ComponentCheckboxGroup):
+			opts := make([]component.CheckboxGroupOption, len(options))
+			for j, option := range options {
+				opts[j] = component.CheckboxGroupOption{
+					Label:       option.Label,
+					Value:       option.Value,
+					Description: option.Description,
+				}
+			}
+			innerComponent = component.BuildCheckboxGroup(component.CheckboxGroup{
+				CustomId:  input.CustomId,
+				Options:   opts,
+				MinValues: minLength,
+				MaxValues: maxLength,
+				Required:  utils.Ptr(input.Required),
 			})
 		}
 
