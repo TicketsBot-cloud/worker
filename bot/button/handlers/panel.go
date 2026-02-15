@@ -45,7 +45,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		}
 
 		// Validate panel access
-		canProceed, err := logic.ValidatePanelAccess(ctx, panel)
+		canProceed, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, err := logic.ValidatePanelAccess(ctx, panel)
 		if err != nil {
 			ctx.HandleError(err)
 			return
@@ -56,7 +56,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		}
 
 		if panel.FormId == nil {
-			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
+			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 		} else {
 			form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
 			if err != nil {
@@ -82,7 +82,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 			}
 
 			if len(inputs) == 0 { // Don't open a blank form
-				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil)
+				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 			} else {
 				modal := buildForm(panel, form, inputs, inputOptions)
 				ctx.Modal(modal)
