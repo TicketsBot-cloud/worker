@@ -92,6 +92,7 @@ var (
 
 	MessageOpenThreadAnnouncementChannel MessageId = "open.thread_in_announcement_channel"
 	MessageOpenRatelimited               MessageId = "open.ratelimited"
+	MessageOpenPanelCooldown             MessageId = "open.panel_cooldown"
 	MessageOpenPanelForceDisabled        MessageId = "open.panel_force_disabled"
 	MessageOpenPanelDisabled             MessageId = "open.panel_disabled"
 	MessageOutsideSupportHoursTitle      MessageId = "open.outside_support_hours.title"
