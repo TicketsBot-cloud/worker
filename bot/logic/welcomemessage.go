@@ -70,13 +70,13 @@ func SendWelcomeMessage(
 		embeds = append(embeds, formAnswersEmbed)
 	}
 
-	hideClaim := settings.HideClaimButton
 	hideClose := settings.HideCloseButton
 	hideCloseWithReason := settings.HideCloseWithReasonButton
+	hideClaim := settings.HideClaimButton
 	if panel != nil {
-		hideClaim = hideClaim || panel.HideClaimButton
 		hideClose = hideClose || panel.HideCloseButton
 		hideCloseWithReason = hideCloseWithReason || panel.HideCloseWithReasonButton
+		hideClaim = hideClaim || panel.HideClaimButton
 	}
 
 	var buttons []component.Component
