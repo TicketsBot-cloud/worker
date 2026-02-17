@@ -74,9 +74,9 @@ func SendWelcomeMessage(
 	hideClose := settings.HideCloseButton
 	hideCloseWithReason := settings.HideCloseWithReasonButton
 	if panel != nil {
-		hideClaim = panel.HideClaimButton
-		hideClose = panel.HideCloseButton
-		hideCloseWithReason = panel.HideCloseWithReasonButton
+		hideClaim = hideClaim || panel.HideClaimButton
+		hideClose = hideClose || panel.HideCloseButton
+		hideCloseWithReason = hideCloseWithReason || panel.HideCloseWithReasonButton
 	}
 
 	var buttons []component.Component
