@@ -70,9 +70,11 @@ func SendWelcomeMessage(
 		embeds = append(embeds, formAnswersEmbed)
 	}
 
+	hideClaim := settings.HideClaimButton
 	hideClose := settings.HideCloseButton
 	hideCloseWithReason := settings.HideCloseWithReasonButton
 	if panel != nil {
+		hideClaim = panel.HideClaimButton
 		hideClose = panel.HideCloseButton
 		hideCloseWithReason = panel.HideCloseWithReasonButton
 	}
@@ -95,7 +97,7 @@ func SendWelcomeMessage(
 		}))
 	}
 
-	if !settings.HideClaimButton && !ticket.IsThread {
+	if !hideClaim && !ticket.IsThread {
 		buttons = append(buttons, component.BuildButton(component.Button{
 			Label:    cmd.GetMessage(i18n.TitleClaim),
 			CustomId: "claim",
