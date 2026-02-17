@@ -811,7 +811,7 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *dat
 	group, _ := errgroup.WithContext(ctx)
 
 	// If panel has a per-panel limit, use it and count only panel tickets
-	if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > uint8(8) {
+	if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
 		ticketLimit = *panel.TicketLimit
 
 		group.Go(func() (err error) {
