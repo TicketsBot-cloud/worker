@@ -102,14 +102,36 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 
 	guild, err := worker.GetGuild(guildId)
 	if err != nil {
-		// Check if the server is blacklisted if the bot is not in the guild
+		// Check if blacklisted
 		if blacklist.IsGuildBlacklisted(guildId) {
-			var reason string
-			reason, _ = dbclient.Client.ServerBlacklist.GetReason(ctx, guildId)
-			if reason != "" {
-				reason = "No reason provided"
+			serverBlacklist, _ := dbclient.Client.ServerBlacklist.Get(ctx, guildId)
+			reason := "No reason provided"
+			if serverBlacklist != nil && serverBlacklist.Reason != nil && *serverBlacklist.Reason != "" {
+				reason = *serverBlacklist.Reason
 			}
-			message := fmt.Sprintf("\n**Reason:** %s\n**Server ID:** `%d`", reason, guildId)
+			message := fmt.Sprintf("**Server ID:** `%d`\n**Reason:** %s", guildId, reason)
+			if serverBlacklist != nil && serverBlacklist.OwnerId != nil {
+				message += fmt.Sprintf("\n**Owner at time of blacklist:** <@%d> (`%d`)", *serverBlacklist.OwnerId, *serverBlacklist.OwnerId)
+			}
+			if serverBlacklist != nil && serverBlacklist.RealOwnerId != nil {
+				message += fmt.Sprintf("\n**Real Owner at time of blacklist:** <@%d> (`%d`)", *serverBlacklist.RealOwnerId, *serverBlacklist.RealOwnerId)
+			}
+			// Show blacklist counts
+			if serverBlacklist != nil && (serverBlacklist.OwnerId != nil || serverBlacklist.RealOwnerId != nil) {
+				var countUserId uint64
+				if serverBlacklist.OwnerId != nil {
+					countUserId = *serverBlacklist.OwnerId
+				} else {
+					countUserId = *serverBlacklist.RealOwnerId
+				}
+				serverCount, realCount, _ := dbclient.Client.ServerBlacklist.GetUserBlacklistedOwnerCounts(ctx, countUserId)
+				if serverCount > 0 {
+					message += fmt.Sprintf("\nServer Owner of Blacklisted Servers: `%d`", serverCount)
+				}
+				if realCount > 0 {
+					message += fmt.Sprintf("\nReal Owner of Blacklisted Servers: `%d`", realCount)
+				}
+			}
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
 				utils.BuildContainerRaw(
 					ctx,
@@ -246,13 +268,25 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 
 	var GlobalBlacklistReason string
 	if IsOwnerBlacklisted {
-		GlobalBlacklistReason, _ = dbclient.Client.GlobalBlacklist.GetReason(ctx, owner.Id)
+		globalBlacklist, _ := dbclient.Client.GlobalBlacklist.Get(ctx, owner.Id)
+		if globalBlacklist != nil && globalBlacklist.Reason != nil {
+			GlobalBlacklistReason = *globalBlacklist.Reason
+		}
 	}
+
+	// Check if owner was previously an owner of any blacklisted server (repeat offender)
+	serverOwnerCount, realOwnerCount, _ := dbclient.Client.ServerBlacklist.GetUserBlacklistedOwnerCounts(ctx, owner.Id)
 
 	// Calculate the shard ID
 	shardId := int((guild.Id >> 22) % uint64(config.Conf.Discord.SharderTotal))
 	guildInfo = append(guildInfo, fmt.Sprintf("Shard ID: `%d`", shardId))
 	guildInfo = append(guildInfo, fmt.Sprintf("Owner Blacklisted: `%t`", IsOwnerBlacklisted))
+	if serverOwnerCount > 0 {
+		guildInfo = append(guildInfo, fmt.Sprintf("Server Owner of Blacklisted Servers: `%d`", serverOwnerCount))
+	}
+	if realOwnerCount > 0 {
+		guildInfo = append(guildInfo, fmt.Sprintf("Real Owner of Blacklisted Servers: `%d`", realOwnerCount))
+	}
 	guildInfo = append(guildInfo, fmt.Sprintf("Server Blacklisted: `%t`", IsGuildBlacklisted))
 
 	// Count panels with per-panel thread mode override
