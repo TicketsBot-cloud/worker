@@ -310,6 +310,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			{
 				TranscriptLinkElement(settings.StoreTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
+				EditCloseReasonElement(),
 			},
 		}
 

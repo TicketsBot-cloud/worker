@@ -196,6 +196,17 @@ func BuildCloseEmbed(
 	return closeEmbed, rows
 }
 
+func EditCloseReasonElement() CloseEmbedElement {
+	return func(worker *worker.Context, ticket database.Ticket) []component.Component {
+		return utils.Slice(component.BuildButton(component.Button{
+			Label:    "Edit Reason",
+			CustomId: fmt.Sprintf("edit_close_reason_%d_%d", ticket.GuildId, ticket.Id),
+			Style:    component.ButtonStyleSecondary,
+			Emoji:    utils.BuildEmoji("✏️"),
+		}))
+	}
+}
+
 func formatTitle(s string, emoji customisation.CustomEmoji, isWhitelabel bool) string {
 	if !isWhitelabel {
 		return fmt.Sprintf("%s %s", emoji, s)
@@ -228,6 +239,7 @@ func EditGuildArchiveMessageIfExists(
 			TranscriptLinkElement(settings.StoreTranscripts),
 			ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 			ViewFeedbackElement(viewFeedbackButton),
+			EditCloseReasonElement(),
 		},
 	}
 
