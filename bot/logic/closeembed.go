@@ -2,9 +2,11 @@ package logic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
@@ -12,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -205,6 +208,78 @@ func EditCloseReasonElement() CloseEmbedElement {
 			Emoji:    utils.BuildEmoji("✏️"),
 		}))
 	}
+}
+
+func EditDMMessageIfExists(
+	ctx context.Context,
+	w *worker.Context,
+	ticket database.Ticket,
+	settings database.Settings,
+	closedBy uint64,
+	reason *string,
+	rating *uint8,
+) error {
+	dmMessage, ok, err := dbclient.Client.DmMessages.Get(ctx, ticket.GuildId, ticket.Id)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return nil
+	}
+
+	feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, ticket.GuildId)
+	if err != nil {
+		return err
+	}
+
+	hasSentMessage, err := dbclient.Client.Participants.HasParticipated(ctx, ticket.GuildId, ticket.Id, ticket.UserId)
+	if err != nil {
+		return err
+	}
+
+	openerMember, err := w.GetGuildMember(ticket.GuildId, ticket.UserId)
+	if err != nil {
+		var restErr request.RestError
+		if !errors.As(err, &restErr) || restErr.StatusCode != 404 {
+			return err
+		}
+	}
+
+	permLevel, err := permission.GetPermissionLevel(ctx, utils.ToRetriever(w), openerMember, ticket.GuildId)
+	if err != nil {
+		return err
+	}
+
+	guild, err := w.GetGuild(ticket.GuildId)
+	if err != nil {
+		return err
+	}
+
+	componentBuilders := [][]CloseEmbedElement{
+		{
+			TranscriptLinkElement(settings.StoreTranscripts),
+			ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
+		},
+		{
+			FeedbackRowElement(feedbackEnabled && hasSentMessage && permLevel == permission.Everyone),
+		},
+	}
+
+	dmChannel, err := w.CreateDM(ticket.UserId)
+	if err != nil {
+		return err
+	}
+
+	closeEmbed, closeComponents := BuildCloseEmbed(ctx, w, ticket, closedBy, reason, rating, componentBuilders)
+	closeEmbed.SetAuthor(guild.Name, "", fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon))
+
+	_, err = w.EditMessage(dmChannel.Id, dmMessage.MessageId, rest.EditMessageData{
+		Embeds:     utils.Slice(closeEmbed),
+		Components: closeComponents,
+	})
+
+	return err
 }
 
 func formatTitle(s string, emoji customisation.CustomEmoji, isWhitelabel bool) string {

@@ -408,8 +408,12 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			Components: closeComponents,
 		}
 
-		if _, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
+		if msg, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
 			sentry.ErrorWithContext(err, errorContext)
+		} else {
+			if err := dbclient.Client.DmMessages.Set(ctx, ticket.GuildId, ticket.Id, msg.Id); err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+			}
 		}
 	}
 }

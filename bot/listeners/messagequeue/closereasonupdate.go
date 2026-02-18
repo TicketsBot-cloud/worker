@@ -82,6 +82,10 @@ func ListenCloseReasonUpdate() {
 			if err := logic.EditGuildArchiveMessageIfExists(ctx, workerCtx, ticket, settings, hasFeedback, closedBy, closeMetadata.Reason, rating); err != nil {
 				sentry.Error(err)
 			}
+
+			if err := logic.EditDMMessageIfExists(ctx, workerCtx, ticket, settings, closedBy, closeMetadata.Reason, rating); err != nil {
+				sentry.Error(err)
+			}
 		}()
 	}
 }

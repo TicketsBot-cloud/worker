@@ -126,4 +126,8 @@ func (h *EditCloseReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 	if err := logic.EditGuildArchiveMessageIfExists(ctx.Context, ctx.Worker(), ticket, settings, hasFeedback, closedBy, &reason, rating); err != nil {
 		ctx.HandleError(err)
 	}
+
+	if err := logic.EditDMMessageIfExists(ctx.Context, ctx.Worker(), ticket, settings, closedBy, &reason, rating); err != nil {
+		ctx.HandleError(err)
+	}
 }
