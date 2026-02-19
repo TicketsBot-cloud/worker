@@ -411,7 +411,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 		if msg, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
 			sentry.ErrorWithContext(err, errorContext)
 		} else {
-			if err := dbclient.Client.DmMessages.Set(ctx, ticket.GuildId, ticket.Id, msg.Id); err != nil {
+			if err := dbclient.Client.ArchiveDmMessages.Set(ctx, ticket.GuildId, ticket.Id, msg.Id); err != nil {
 				sentry.ErrorWithContext(err, errorContext)
 			}
 		}

@@ -219,7 +219,7 @@ func EditDMMessageIfExists(
 	reason *string,
 	rating *uint8,
 ) error {
-	dmMessage, ok, err := dbclient.Client.DmMessages.Get(ctx, ticket.GuildId, ticket.Id)
+	dmMessage, ok, err := dbclient.Client.ArchiveDmMessages.Get(ctx, ticket.GuildId, ticket.Id)
 	if err != nil {
 		return err
 	}
