@@ -38,6 +38,7 @@ type (
 			PoweredBy           string   `env:"POWEREDBY" envDefault:"tickets.bot"`
 			IconUrl             string   `env:"ICON_URL" envDefault:"https://tickets.bot/assets/img/logo.png"`
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
+			InviteUrl           string   `env:"INVITE_URL" envDefault:"https://invite.tickets.bot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
 			MonitoredBots       []uint64 `env:"MONITORED_BOTS"`

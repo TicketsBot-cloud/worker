@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -33,5 +34,5 @@ func (c AboutCommand) GetExecutor() interface{} {
 }
 
 func (AboutCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitleAbout, i18n.MessageAbout)
+	ctx.Reply(customisation.Green, i18n.TitleAbout, i18n.MessageAbout, config.Conf.Bot.SupportServerInvite)
 }
