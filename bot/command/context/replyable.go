@@ -217,7 +217,7 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 							message += fmt.Sprintf("* `%s`\n", perm.String())
 						}
 
-						message += "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, config.Conf.Bot.DocsUrl+"/miscellaneous/permissions-explained")
+						message += "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl))
 					} else {
 						message = r.formatDiscordError(restError, eventId)
 					}

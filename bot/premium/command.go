@@ -119,7 +119,7 @@ func BuildPatreonNotLinkedMessage(ctx registry.CommandContext) command.MessageRe
 			Label: ctx.GetMessage(i18n.MessagePremiumLinkPatreonAccount),
 			Style: component.ButtonStyleLink,
 			Emoji: ctx.SelectValidEmoji(customisation.EmojiPatreon, "🔗"),
-			Url:   utils.Ptr("https://support.patreon.com/hc/en-us/articles/212052266-Get-my-Discord-role"), // TODO: Localised link
+			Url:   utils.Ptr("https://support.patreon.com/hc/en-us/articles/212052266-Get-my-Discord-role"),
 		}),
 		component.BuildButton(component.Button{
 			Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
@@ -129,7 +129,7 @@ func BuildPatreonNotLinkedMessage(ctx registry.CommandContext) command.MessageRe
 		}),
 	))
 
-	embed := utils.BuildEmbed(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumNoSubscription, nil)
+	embed := utils.BuildEmbed(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumNoSubscription, nil, "https://support.patreon.com/hc/en-us/articles/212052266-Get-my-Discord-role")
 	return command.NewEphemeralEmbedMessageResponseWithComponents(embed, components)
 }
 

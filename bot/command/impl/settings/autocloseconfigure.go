@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -8,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -31,5 +33,5 @@ func (c AutoCloseConfigureCommand) GetExecutor() interface{} {
 }
 
 func (AutoCloseConfigureCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitleAutoclose, i18n.MessageAutoCloseConfigure, ctx.GuildId())
+	ctx.Reply(customisation.Green, i18n.TitleAutoclose, i18n.MessageAutoCloseConfigure, fmt.Sprintf("%s/manage/%d/settings", config.Conf.Bot.DashboardUrl, ctx.GuildId()))
 }

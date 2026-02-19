@@ -16,6 +16,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/schollz/progressbar/v3"
 )
@@ -68,7 +69,7 @@ func (c *LanguageCommand) Execute(ctx registry.CommandContext) {
 
 	languageList = strings.TrimSuffix(languageList, "\n")
 
-	helpWanted := utils.EmbedField(ctx.GuildId(), "ℹ️ Help Wanted", i18n.MessageLanguageHelpWanted, true)
+	helpWanted := utils.EmbedField(ctx.GuildId(), "ℹ️ Help Wanted", i18n.MessageLanguageHelpWanted, true, config.Conf.Bot.SupportServerInvite)
 	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleLanguage, i18n.MessageLanguageCommand, utils.ToSlice(helpWanted), languageList)
 	res := command.NewEphemeralEmbedMessageResponseWithComponents(e, buildComponents(ctx))
 
