@@ -70,22 +70,34 @@ func SendWelcomeMessage(
 		embeds = append(embeds, formAnswersEmbed)
 	}
 
-	buttons := []component.Component{
-		component.BuildButton(component.Button{
+	hideClose := settings.HideCloseButton
+	hideCloseWithReason := settings.HideCloseWithReasonButton
+	hideClaim := settings.HideClaimButton
+	if panel != nil {
+		hideClose = hideClose || panel.HideCloseButton
+		hideCloseWithReason = hideCloseWithReason || panel.HideCloseWithReasonButton
+		hideClaim = hideClaim || panel.HideClaimButton
+	}
+
+	var buttons []component.Component
+	if !hideClose {
+		buttons = append(buttons, component.BuildButton(component.Button{
 			Label:    cmd.GetMessage(i18n.TitleClose),
 			CustomId: "close",
 			Style:    component.ButtonStyleDanger,
 			Emoji:    &emoji.Emoji{Name: "🔒"},
-		}),
-		component.BuildButton(component.Button{
+		}))
+	}
+	if !hideCloseWithReason {
+		buttons = append(buttons, component.BuildButton(component.Button{
 			Label:    cmd.GetMessage(i18n.TitleCloseWithReason),
 			CustomId: "close_with_reason",
 			Style:    component.ButtonStyleDanger,
 			Emoji:    &emoji.Emoji{Name: "🔒"},
-		}),
+		}))
 	}
 
-	if !settings.HideClaimButton && !ticket.IsThread {
+	if !hideClaim && !ticket.IsThread {
 		buttons = append(buttons, component.BuildButton(component.Button{
 			Label:    cmd.GetMessage(i18n.TitleClaim),
 			CustomId: "claim",
@@ -96,9 +108,12 @@ func SendWelcomeMessage(
 
 	data := rest.CreateMessageData{
 		Embeds: embeds,
-		Components: []component.Component{
+	}
+
+	if len(buttons) > 0 {
+		data.Components = []component.Component{
 			component.BuildActionRow(buttons...),
-		},
+		}
 	}
 
 	// Should never happen

@@ -4,6 +4,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers"
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers/admindebug/server"
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers/admindebug/server/modals"
+	"github.com/TicketsBot-cloud/worker/bot/button/handlers/tickets/edit"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 )
@@ -85,6 +86,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(server.AdminDebugServerPermissionsHandler),
 		new(server.AdminDebugServerTicketPermissionsHandler),
 		new(server.AdminDebugServerUserTicketsHandler),
+		new(edit.EditLabelsButtonHandler),
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
@@ -102,6 +104,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.GDPRModalAllMessagesHandler),
 		new(handlers.GDPRModalSpecificMessagesHandler),
 		new(handlers.PremiumKeySubmitHandler),
+		new(edit.LabelChangeSubmitHandler),
 		new(modals.AdminDebugServerPanelSettingsModalHandler),
 		new(modals.AdminDebugServerPermissionsModalSubmitHandler),
 		new(modals.AdminDebugServerTicketPermissionsModalSubmitHandler),
