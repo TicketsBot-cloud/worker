@@ -56,6 +56,7 @@ func (cm *CommandManager) RegisterCommands() {
 	cm.registry["add"] = tickets.AddCommand{}
 	cm.registry["claim"] = tickets.ClaimCommand{}
 	cm.registry["close"] = tickets.CloseCommand{}
+	cm.registry["edit"] = tickets.EditCommand{}
 	cm.registry["closerequest"] = tickets.CloseRequestCommand{}
 	cm.registry["notes"] = tickets.NotesCommand{}
 	cm.registry["on-call"] = tickets.OnCallCommand{}

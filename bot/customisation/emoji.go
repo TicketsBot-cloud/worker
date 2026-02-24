@@ -3,9 +3,9 @@ package customisation
 import (
 	"fmt"
 
-	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/gdl/objects"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
+	"github.com/TicketsBot-cloud/worker/config"
 )
 
 type CustomEmoji struct {

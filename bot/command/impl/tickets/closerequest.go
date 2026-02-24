@@ -117,7 +117,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		},
 		Components: []component.Component{components},
 	}
-	
+
 	// If command is run in the ticket channel, send as reply
 	// If command is run outside the ticket channel, send as new message in ticket channel
 	ticketChannelId := *ticket.ChannelId
@@ -139,7 +139,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 			ctx.HandleError(err)
 			return
 		}
-		
+
 		ctx.ReplyPlain(ctx.GetMessage(i18n.MessageCloseRequested))
 	}
 
