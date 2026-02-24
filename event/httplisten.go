@@ -130,7 +130,9 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 				return
 			}
 
-			responseCh := make(chan interaction.ApplicationCommandCallbackData, 1)
+			responseCh := make(chan command.Response, 1)
+
+			timeToDefer := calculateTimeToDefer(interactionData.Id)
 
 			disableAutoDefer, defaultEphemeral, err := executeCommand(ctx, worker, commandManager.GetCommands(), interactionData, responseCh)
 			if err != nil {
@@ -139,18 +141,20 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 				return
 			}
 
-			// If fisableAutoDefer is true, wait for command to respond quickly
+			// If disableAutoDefer is true, wait for command to respond quickly
 			// Otherwise, auto-defer immediately
 			if disableAutoDefer {
 				select {
 				case data := <-responseCh:
 					if defaultEphemeral {
-						data.Flags = message.SumFlags(message.FlagEphemeral)
+						if msg, ok := data.(command.ResponseMessage); ok {
+							msg.Data.Flags = message.SumFlags(message.FlagEphemeral)
+							data = msg
+						}
 					}
-					res := interaction.NewResponseChannelMessage(data)
-					ctx.JSON(200, res)
+					ctx.JSON(200, data.Build())
 					ctx.Writer.Flush()
-				case <-time.After(time.Second * 2):
+				case <-time.After(timeToDefer):
 					// Command is taking too long - fallback to auto-defer
 					var flags uint
 					if defaultEphemeral {
@@ -278,7 +282,7 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 	}
 }
 
-func handleApplicationCommandResponseAfterDefer(interactionData interaction.ApplicationCommandInteraction, worker *worker.Context, responseCh chan interaction.ApplicationCommandCallbackData) {
+func handleApplicationCommandResponseAfterDefer(interactionData interaction.ApplicationCommandInteraction, worker *worker.Context, responseCh chan command.Response) {
 	deferredAt := time.Now()
 	hasReplied := false
 
@@ -293,7 +297,7 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 		select {
 		case <-time.After(time.Second * 15):
 			return
-		case data, ok := <-responseCh:
+		case resp, ok := <-responseCh:
 			if !ok {
 				return
 			}
@@ -303,34 +307,42 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 				return
 			}
 
-			if hasReplied {
-				restData := rest.WebhookBody{
-					Content:         data.Content,
-					Embeds:          data.Embeds,
-					AllowedMentions: data.AllowedMentions,
-					Components:      data.Components,
-					Flags:           data.Flags,
-				}
+			switch resp.CommandResponseType() {
+			case command.CommandResponseTypeMessage:
+				data := resp.(command.ResponseMessage).Data
 
-				if _, err := rest.CreateFollowupMessage(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
-					sentry.ErrorWithContext(err, NewApplicationCommandInteractionErrorContext(interactionData))
-					return
-				}
-			} else {
-				hasReplied = true
+				if hasReplied {
+					restData := rest.WebhookBody{
+						Content:         data.Content,
+						Embeds:          data.Embeds,
+						AllowedMentions: data.AllowedMentions,
+						Components:      data.Components,
+						Flags:           data.Flags,
+					}
 
-				restData := rest.WebhookEditBody{
-					Content:         data.Content,
-					Embeds:          data.Embeds,
-					AllowedMentions: data.AllowedMentions,
-					Components:      data.Components,
-					Flags:           data.Flags,
-				}
+					if _, err := rest.CreateFollowupMessage(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
+						sentry.ErrorWithContext(err, NewApplicationCommandInteractionErrorContext(interactionData))
+						return
+					}
+				} else {
+					hasReplied = true
 
-				if _, err := rest.EditOriginalInteractionResponse(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
-					sentry.ErrorWithContext(err, NewApplicationCommandInteractionErrorContext(interactionData))
-					return
+					restData := rest.WebhookEditBody{
+						Content:         data.Content,
+						Embeds:          data.Embeds,
+						AllowedMentions: data.AllowedMentions,
+						Components:      data.Components,
+						Flags:           data.Flags,
+					}
+
+					if _, err := rest.EditOriginalInteractionResponse(context.Background(), interactionData.Token, worker.RateLimiter, worker.BotId, restData); err != nil {
+						sentry.ErrorWithContext(err, NewApplicationCommandInteractionErrorContext(interactionData))
+						return
+					}
 				}
+			case command.CommandResponseTypeModal:
+				// Modals cannot be sent after a defer — they must be the immediate interaction response
+				sentry.ErrorWithContext(fmt.Errorf("attempted to send modal after defer"), NewApplicationCommandInteractionErrorContext(interactionData))
 			}
 		}
 	}
