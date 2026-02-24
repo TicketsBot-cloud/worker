@@ -43,11 +43,15 @@ func main() {
 	cm.RegisterCommands()
 
 	allCmds := make([]registry.Command, 0, len(cm.GetCommands()))
-	for _, cmd := range cm.GetCommands() {
+	var collectCommands func(cmd registry.Command)
+	collectCommands = func(cmd registry.Command) {
 		allCmds = append(allCmds, cmd)
 		for _, sub := range cmd.Properties().Children {
-			allCmds = append(allCmds, sub)
+			collectCommands(sub)
 		}
+	}
+	for _, cmd := range cm.GetCommands() {
+		collectCommands(cmd)
 	}
 
 	var packagePaths []string

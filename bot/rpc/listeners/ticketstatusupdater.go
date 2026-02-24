@@ -1,9 +1,9 @@
 package listeners
 
 import (
-	"fmt"
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/TicketsBot-cloud/common/rpc"
 	"github.com/TicketsBot-cloud/common/rpc/model"
