@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	discordpermission "github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -181,7 +184,14 @@ func (h *UnclaimHandler) Execute(ctx *context.ButtonContext) {
 		data.Name = newChannelName
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ctx.ChannelId(), data); err != nil {
+	member, err := ctx.Member()
+	auditReason := fmt.Sprintf("Unclaimed ticket %d", ticket.Id)
+	if err == nil {
+		auditReason = fmt.Sprintf("Unclaimed ticket %d by %s", ticket.Id, member.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(ctx, auditReason)
+	if _, err := ctx.Worker().ModifyChannel(reasonCtx, ctx.ChannelId(), data); err != nil {
 		ctx.HandleError(err)
 		return
 	}

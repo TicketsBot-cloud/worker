@@ -1,12 +1,15 @@
 package tickets
 
 import (
+	"fmt"
+
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	discordpermission "github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -177,7 +180,14 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		data.Name = newChannelName
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ticketChannelId, data); err != nil {
+	member, err := ctx.Member()
+	auditReason := fmt.Sprintf("Unclaimed ticket %d", ticket.Id)
+	if err == nil {
+		auditReason = fmt.Sprintf("Unclaimed ticket %d by %s", ticket.Id, member.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(ctx, auditReason)
+	if _, err := ctx.Worker().ModifyChannel(reasonCtx, ticketChannelId, data); err != nil {
 		ctx.HandleError(err)
 		return
 	}

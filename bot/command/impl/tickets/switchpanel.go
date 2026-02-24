@@ -13,6 +13,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -227,7 +228,14 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			data.Name = newChannelName
 		}
 
-		if _, err := ctx.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
+		member, err := ctx.Member()
+		auditReason := fmt.Sprintf("Switched ticket %d to panel '%s'", ticket.Id, newPanel.Title)
+		if err == nil {
+			auditReason = fmt.Sprintf("Switched ticket %d to panel '%s' by %s", ticket.Id, newPanel.Title, member.User.Username)
+		}
+
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		if _, err := ctx.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}
@@ -297,7 +305,14 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		data.Name = newChannelName
 	}
 
-	if _, err = ctx.Worker().ModifyChannel(*ticket.ChannelId, data); err != nil {
+	member, err := ctx.Member()
+	auditReason := fmt.Sprintf("Switched ticket %d to panel '%s'", ticket.Id, newPanel.Title)
+	if err == nil {
+		auditReason = fmt.Sprintf("Switched ticket %d to panel '%s' by %s", ticket.Id, newPanel.Title, member.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(ctx, auditReason)
+	if _, err = ctx.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 		ctx.HandleError(err)
 		return
 	}
