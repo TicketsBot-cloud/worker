@@ -92,9 +92,11 @@ var (
 
 	MessageOpenThreadAnnouncementChannel MessageId = "open.thread_in_announcement_channel"
 	MessageOpenRatelimited               MessageId = "open.ratelimited"
+	MessageOpenPanelCooldown             MessageId = "open.panel_cooldown"
 	MessageOpenPanelForceDisabled        MessageId = "open.panel_force_disabled"
 	MessageOpenPanelDisabled             MessageId = "open.panel_disabled"
-	MessageOutsideSupportHours           MessageId = "open.outside_support_hours"
+	MessageOutsideSupportHoursTitle      MessageId = "open.outside_support_hours.title"
+	MessageOutsideSupportHours           MessageId = "open.outside_support_hours.message"
 	MessageTicketOpened                  MessageId = "open.success"
 
 	MessageOpenAclNoAllowRules           MessageId = "open.acl.no_allow_rules"
@@ -255,8 +257,8 @@ var (
 	MessageAlreadyJoinedThread    MessageId = "button.join_thread.already_joined"
 	MessageJoinThreadSuccess      MessageId = "button.join_thread.success"
 
-	HelpAdminBlacklist    MessageId = "help.admin.blacklist"
-	HelpAdminUnblacklist  MessageId = "help.admin.unblacklist"
+	HelpAdminBlacklist   MessageId = "help.admin.blacklist"
+	HelpAdminUnblacklist MessageId = "help.admin.unblacklist"
 
 	SetupAutoRolesSuccess             MessageId = "setup.auto.roles.success"
 	SetupAutoRolesFailure             MessageId = "setup.auto.roles.failure"
@@ -356,6 +358,7 @@ var (
 	HelpJumpToTop          MessageId = "help.jump_to_top"
 	HelpOnCall             MessageId = "help.on_call"
 	HelpGdpr               MessageId = "help.gdpr"
+	HelpEdit               MessageId = "help.edit"
 
 	GdprIntro                     MessageId = "gdpr.intro"
 	GdprTranscriptSectionTitle    MessageId = "gdpr.section.transcript"
@@ -407,4 +410,12 @@ var (
 	GdprErrorServerNotFound   MessageId = "gdpr.error.server_not_found"
 	GdprErrorQueueFailed      MessageId = "gdpr.error.queue_failed"
 	GdprErrorWorkerOffline    MessageId = "gdpr.error.worker_offline"
+
+	MessageEditTitle                      MessageId = "commands.edit.title"
+	MessageEditDescription                MessageId = "commands.edit.description"
+	MessageEditLabelsTitle                MessageId = "commands.edit.labels.title"
+	MessageEditLabelsDescription          MessageId = "commands.edit.labels.description"
+	MessageEditLabelsModalTitle           MessageId = "commands.edit.labels.update_modal.title"
+	MessageEditLabelsModalSelectMenuTitle MessageId = "commands.edit.labels.update_modal.select_menu_title"
+	MessageEditLabelsModalSuccess         MessageId = "commands.edit.labels.update_modal.success"
 )
