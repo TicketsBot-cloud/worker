@@ -361,6 +361,7 @@ var (
 	HelpJumpToTop          MessageId = "help.jump_to_top"
 	HelpOnCall             MessageId = "help.on_call"
 	HelpGdpr               MessageId = "help.gdpr"
+	HelpEdit               MessageId = "help.edit"
 
 	GdprIntro                     MessageId = "gdpr.intro"
 	GdprTranscriptSectionTitle    MessageId = "gdpr.section.transcript"
@@ -412,4 +413,12 @@ var (
 	GdprErrorServerNotFound   MessageId = "gdpr.error.server_not_found"
 	GdprErrorQueueFailed      MessageId = "gdpr.error.queue_failed"
 	GdprErrorWorkerOffline    MessageId = "gdpr.error.worker_offline"
+
+	MessageEditTitle                      MessageId = "commands.edit.title"
+	MessageEditDescription                MessageId = "commands.edit.description"
+	MessageEditLabelsTitle                MessageId = "commands.edit.labels.title"
+	MessageEditLabelsDescription          MessageId = "commands.edit.labels.description"
+	MessageEditLabelsModalTitle           MessageId = "commands.edit.labels.update_modal.title"
+	MessageEditLabelsModalSelectMenuTitle MessageId = "commands.edit.labels.update_modal.select_menu_title"
+	MessageEditLabelsModalSuccess         MessageId = "commands.edit.labels.update_modal.success"
 )
