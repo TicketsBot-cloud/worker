@@ -31,10 +31,10 @@ func BuildContainerRaw(ctx registry.CommandContext, colour customisation.Colour,
 func BuildContainerWithComponents[T string | i18n.MessageId](ctx registry.CommandContext, colour customisation.Colour, title T, innerComponents []component.Component) component.Component {
 	var titleStr string
 	switch t := any(title).(type) {
-		case string:
-			titleStr = t
-		case i18n.MessageId:
-			titleStr = ctx.GetMessage(t)
+	case string:
+		titleStr = t
+	case i18n.MessageId:
+		titleStr = ctx.GetMessage(t)
 	}
 
 	components := append(Slice(

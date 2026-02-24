@@ -126,7 +126,7 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		ctx.HandleError(err)
 		return
 	}
-	
+
 	// Clean up formatting issues from empty placeholders
 	processedName = logic.SanitizeChannelName(processedName)
 
