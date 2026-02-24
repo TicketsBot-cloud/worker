@@ -110,7 +110,22 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 			// ticket.ChannelId cannot be nil, as we get by channel id
 			data := logic.BuildUserOverwrite(id, additionalPermissions)
-			if err := ctx.Worker().EditChannelPermissions(*ticket.ChannelId, data); err != nil {
+
+			member, err := ctx.Member()
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			user, err := ctx.Worker().GetUser(id)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			auditReason := fmt.Sprintf("Added %s to ticket %d by %s", user.Username, ticket.Id, member.User.Username)
+			reasonCtx := request.WithAuditReason(ctx, auditReason)
+			if err := ctx.Worker().EditChannelPermissions(reasonCtx, *ticket.ChannelId, data); err != nil {
 				ctx.HandleError(err)
 				return
 			}
@@ -125,7 +140,16 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 		// ticket.ChannelId cannot be nil, as we get by channel id
 		data := logic.BuildRoleOverwrite(id, additionalPermissions)
-		if err := ctx.Worker().EditChannelPermissions(*ticket.ChannelId, data); err != nil {
+
+		member, err := ctx.Member()
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		auditReason := fmt.Sprintf("Added role to ticket %d by %s", ticket.Id, member.User.Username)
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		if err := ctx.Worker().EditChannelPermissions(reasonCtx, *ticket.ChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}

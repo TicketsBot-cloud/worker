@@ -85,7 +85,7 @@ func (h *LabelChangeSubmitHandler) Execute(ctx *commandcontext.ModalContext) {
 	}
 
 	if !ticket.IsThread {
-		if _, err := ctx.Worker().ModifyChannel(*ticket.ChannelId, rest.ModifyChannelData{
+		if _, err := ctx.Worker().ModifyChannel(ctx, *ticket.ChannelId, rest.ModifyChannelData{
 			Topic: fmt.Sprintf("%s%s", topicMsg, strings.Join(labelNames, ", ")),
 		}); err != nil {
 			ctx.HandleError(err)
