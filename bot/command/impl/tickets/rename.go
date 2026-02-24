@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/objects/user"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -231,7 +232,14 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		Name: processedName,
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ticketChannelId, data); err != nil {
+	member, err := ctx.Member()
+	auditReason := fmt.Sprintf("Renamed ticket %d to '%s'", ticket.Id, name)
+	if err == nil {
+		auditReason = fmt.Sprintf("Renamed ticket %d to '%s' by %s", ticket.Id, name, member.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(ctx, auditReason)
+	if _, err := ctx.Worker().ModifyChannel(reasonCtx, ticketChannelId, data); err != nil {
 		ctx.HandleError(err)
 		return
 	}
