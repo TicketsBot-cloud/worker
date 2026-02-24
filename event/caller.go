@@ -5,8 +5,6 @@ package event
 
 import (
 	"fmt"
-	"strconv"
-
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -20,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tickets"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/pkg/errors"
+	"strconv"
 )
 
 var ErrArgumentNotFound = errors.New("argument not found")
@@ -195,21 +194,9 @@ func callCommand(
 		}
 
 		v.Execute(ctx, arg0)
-	case debug.AdminDebugServerCommand:
-		var arg0 string
+	case debug.AdminDebugCommand:
 
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a string", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
+		v.Execute(ctx)
 	case general.AboutCommand:
 
 		v.Execute(ctx)
@@ -590,6 +577,9 @@ func callCommand(
 		}
 
 		v.Execute(ctx, arg0, arg1)
+	case tickets.EditCommand:
+
+		v.Execute(ctx)
 	case tickets.NotesCommand:
 
 		v.Execute(ctx)

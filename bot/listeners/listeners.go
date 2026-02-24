@@ -6,10 +6,10 @@ package listeners
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/TicketsBot-cloud/worker"
-	"github.com/getsentry/sentry-go"
 	"github.com/TicketsBot-cloud/gdl/gateway/payloads"
 	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/getsentry/sentry-go"
 )
 
 var (

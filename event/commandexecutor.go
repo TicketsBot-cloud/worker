@@ -34,7 +34,7 @@ func executeCommand(
 	worker *worker.Context,
 	registry cmdregistry.Registry,
 	data interaction.ApplicationCommandInteraction,
-	responseCh chan interaction.ApplicationCommandCallbackData,
+	responseCh chan command.Response,
 ) (bool, bool, error) {
 	cmd, ok := registry[data.Data.Name]
 	if !ok {
@@ -97,21 +97,21 @@ func executeCommand(
 
 		if !allowed {
 			if currentContext == interaction.InteractionContextBotDM {
-				responseCh <- interaction.ApplicationCommandCallbackData{
+				responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 					Content: "This command can only be used in servers.",
-				}
+				}}
 			} else {
-				responseCh <- interaction.ApplicationCommandCallbackData{
+				responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 					Content: "This command can only be used in DMs.",
-				}
+				}}
 			}
 			return false, false, nil
 		}
 	} else {
 		if currentContext == interaction.InteractionContextBotDM {
-			responseCh <- interaction.ApplicationCommandCallbackData{
+			responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 				Content: "This command can only be used in servers.",
-			}
+			}}
 			return false, false, nil
 		}
 	}
@@ -159,11 +159,12 @@ func executeCommand(
 
 			if err := group.Wait(); err != nil {
 				errorId := sentry.Error(err)
-				responseCh <- interaction.ApplicationCommandCallbackData{
+				responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 					Content: fmt.Sprintf("An error occurred while processing this request (Error ID `%s`)", errorId),
-				}
+				}}
 				return
 			}
+
 		}
 
 		if premiumLevel == premium.None && config.Conf.PremiumOnly {
@@ -237,12 +238,12 @@ func executeCommand(
 					content := `This command registration is outdated. Please ask the server administrators to visit the whitelabel dashboard and press "Create Slash Commands" again.`
 					embed := utils.BuildEmbedRaw(customisation.GetDefaultColour(customisation.Red), "Outdated Command", content, nil, premium.Whitelabel)
 					res := command.NewEphemeralEmbedMessageResponse(embed)
-					responseCh <- res.IntoApplicationCommandData()
+					responseCh <- command.ResponseMessage{Data: res.IntoApplicationCommandData()}
 
 					return
 				} else {
 					res := command.NewEphemeralTextMessageResponse("argument is missing")
-					responseCh <- res.IntoApplicationCommandData()
+					responseCh <- command.ResponseMessage{Data: res.IntoApplicationCommandData()}
 				}
 			} else {
 				interactionContext.HandleError(err)
