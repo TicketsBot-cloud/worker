@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/objects/user"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -75,7 +76,7 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 	}
 
 	// Process placeholders in the name
-	processedName, err := logic.DoSubstitutions(ctx.Worker(), name, ticket.UserId, ctx.GuildId(), []logic.Substitutor{
+	processedName, err := logic.DoSubstitutionsWithParams(ctx.Worker(), name, ticket.UserId, ctx.GuildId(), []logic.Substitutor{
 		// %id%
 		logic.NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 			return strconv.Itoa(ticket.Id)
@@ -121,6 +122,79 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 			}
 			return nickname
 		}),
+	}, []logic.ParameterizedSubstitutor{
+		// %date% or %date:FORMAT%
+		logic.NewParameterizedSubstitutor("date", false, false, func(u user.User, m member.Member, params []string) string {
+			format := ""
+			if len(params) > 0 {
+				format = params[0]
+			}
+			return logic.FormatPlainDate(time.Now(), format)
+		}),
+		// %date_days:N% or %date_days:N:FORMAT%
+		logic.NewParameterizedSubstitutor("date_days", false, false, func(u user.User, m member.Member, params []string) string {
+			if len(params) < 1 {
+				return ""
+			}
+			days, err := logic.ParseOffset(params[0])
+			if err != nil {
+				return ""
+			}
+			targetTime := time.Now().AddDate(0, 0, days)
+			format := ""
+			if len(params) >= 2 {
+				format = params[1]
+			}
+			return logic.FormatPlainDate(targetTime, format)
+		}),
+		// %date_weeks:N% or %date_weeks:N:FORMAT%
+		logic.NewParameterizedSubstitutor("date_weeks", false, false, func(u user.User, m member.Member, params []string) string {
+			if len(params) < 1 {
+				return ""
+			}
+			weeks, err := logic.ParseOffset(params[0])
+			if err != nil {
+				return ""
+			}
+			targetTime := time.Now().AddDate(0, 0, weeks*7)
+			format := ""
+			if len(params) >= 2 {
+				format = params[1]
+			}
+			return logic.FormatPlainDate(targetTime, format)
+		}),
+		// %date_months:N% or %date_months:N:FORMAT%
+		logic.NewParameterizedSubstitutor("date_months", false, false, func(u user.User, m member.Member, params []string) string {
+			if len(params) < 1 {
+				return ""
+			}
+			months, err := logic.ParseOffset(params[0])
+			if err != nil {
+				return ""
+			}
+			targetTime := time.Now().AddDate(0, months, 0)
+			format := ""
+			if len(params) >= 2 {
+				format = params[1]
+			}
+			return logic.FormatPlainDate(targetTime, format)
+		}),
+		// %date_timestamp:UNIX% or %date_timestamp:UNIX:FORMAT%
+		logic.NewParameterizedSubstitutor("date_timestamp", false, false, func(u user.User, m member.Member, params []string) string {
+			if len(params) < 1 {
+				return ""
+			}
+			ts, err := logic.ParseTimestamp(params[0])
+			if err != nil {
+				return ""
+			}
+			t := time.Unix(ts, 0)
+			format := ""
+			if len(params) >= 2 {
+				format = params[1]
+			}
+			return logic.FormatPlainDate(t, format)
+		}),
 	})
 	if err != nil {
 		ctx.HandleError(err)
@@ -158,7 +232,14 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		Name: processedName,
 	}
 
-	if _, err := ctx.Worker().ModifyChannel(ticketChannelId, data); err != nil {
+	member, err := ctx.Member()
+	auditReason := fmt.Sprintf("Renamed ticket %d to '%s'", ticket.Id, name)
+	if err == nil {
+		auditReason = fmt.Sprintf("Renamed ticket %d to '%s' by %s", ticket.Id, name, member.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(ctx, auditReason)
+	if _, err := ctx.Worker().ModifyChannel(reasonCtx, ticketChannelId, data); err != nil {
 		ctx.HandleError(err)
 		return
 	}

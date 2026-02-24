@@ -1,6 +1,7 @@
 package listeners
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 
@@ -9,7 +10,9 @@ import (
 	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"go.uber.org/zap"
@@ -78,7 +81,20 @@ func (u *TicketStatusUpdater) HandleMessage(ctx context.Context, message []byte)
 		return
 	}
 
-	if _, err := worker.ModifyChannel(event.ChannelId, rest.ModifyChannelData{
+	ticket, ok, err := dbclient.Client.Tickets.GetByChannel(ctx, event.ChannelId)
+	if err != nil || !ok {
+		u.logger.Error(
+			"Failed to get ticket by channel",
+			zap.Error(err),
+			zap.Uint64("channel_id", event.ChannelId),
+			zap.Uint64("guild_id", event.GuildId),
+		)
+		return
+	}
+
+	auditReason := fmt.Sprintf("Ticket %d moved to awaiting response category", ticket.Id)
+	reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+	if _, err := worker.ModifyChannel(reasonCtx, event.ChannelId, rest.ModifyChannelData{
 		ParentId: event.NewCategoryId,
 	}); err != nil {
 		u.logger.Error(
