@@ -8,6 +8,7 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	commandcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -68,6 +69,27 @@ func (h *LabelChangeSubmitHandler) Execute(ctx *commandcontext.ModalContext) {
 			if label.LabelId == labelId {
 				labelNames = append(labelNames, label.Name)
 			}
+		}
+	}
+
+	topicMsg := ""
+	if ticket.PanelId != nil {
+		panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+		if panel.PanelId != 0 {
+			topicMsg = fmt.Sprintf("%s | ", panel.Title)
+		}
+	}
+
+	if !ticket.IsThread {
+		if _, err := ctx.Worker().ModifyChannel(*ticket.ChannelId, rest.ModifyChannelData{
+			Topic: fmt.Sprintf("%s%s", topicMsg, strings.Join(labelNames, ", ")),
+		}); err != nil {
+			ctx.HandleError(err)
+			return
 		}
 	}
 
