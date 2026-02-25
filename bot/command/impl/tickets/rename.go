@@ -233,9 +233,9 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 	}
 
 	member, err := ctx.Member()
-	auditReason := fmt.Sprintf("Renamed ticket %d to '%s'", ticket.Id, name)
+	auditReason := fmt.Sprintf("Renamed ticket %d to '%s'", ticket.Id, processedName)
 	if err == nil {
-		auditReason = fmt.Sprintf("Renamed ticket %d to '%s' by %s", ticket.Id, name, member.User.Username)
+		auditReason = fmt.Sprintf("Renamed ticket %d to '%s' by %s", ticket.Id, processedName, member.User.Username)
 	}
 
 	reasonCtx := request.WithAuditReason(ctx, auditReason)
