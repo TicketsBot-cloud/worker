@@ -15,6 +15,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -45,7 +46,7 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	if !settings.UseThreads {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode)
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode, fmt.Sprintf("%s/features/thread-mode", config.Conf.Bot.DocsUrl))
 		return
 	}
 

@@ -203,7 +203,7 @@ func executeCommand(
 		}
 
 		if properties.PremiumOnly && premiumLevel == premium.None {
-			interactionContext.Reply(customisation.Red, i18n.TitlePremiumOnly, i18n.MessagePremium)
+			interactionContext.Reply(customisation.Red, i18n.TitlePremiumOnly, i18n.MessagePremium, "https://www.patreon.com/ticketsbot-cloud", config.Conf.Bot.VoteUrl)
 			return
 		}
 

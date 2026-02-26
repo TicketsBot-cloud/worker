@@ -2,6 +2,7 @@ package tags
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/model"
@@ -17,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -57,7 +59,7 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 	}
 
 	if !ok {
-		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagInvalidTag, utils.ToSlice(usageEmbed))
+		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagInvalidTag, utils.ToSlice(usageEmbed), fmt.Sprintf("%s/tags", config.Conf.Bot.FrontpageUrl))
 		return
 	}
 
