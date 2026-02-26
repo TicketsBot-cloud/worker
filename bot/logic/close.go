@@ -314,6 +314,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			{
 				TranscriptLinkElement(settings.StoreTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
+				EditCloseReasonElement(),
 			},
 		}
 
@@ -411,8 +412,12 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			Components: closeComponents,
 		}
 
-		if _, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
+		if msg, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
 			sentry.ErrorWithContext(err, errorContext)
+		} else {
+			if err := dbclient.Client.ArchiveDmMessages.Set(ctx, ticket.GuildId, ticket.Id, msg.Id); err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+			}
 		}
 	}
 }

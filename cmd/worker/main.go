@@ -156,6 +156,7 @@ func main() {
 	go messagequeue.ListenTicketClose()
 	go messagequeue.ListenAutoClose(logger.With(zap.String("service", "autoclose")))
 	go messagequeue.ListenCloseRequestTimer(logger.With(zap.String("service", "close-request-timer")))
+	go messagequeue.ListenCloseReasonUpdate()
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
 
