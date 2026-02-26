@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -32,6 +33,7 @@ func (AdminBlacklistCommand) Properties() registry.Properties {
 		Arguments: command.Arguments(
 			command.NewRequiredArgument("guild_id", "ID of the guild to blacklist", interaction.OptionTypeString, i18n.MessageInvalidArgument),
 			command.NewOptionalArgument("reason", "Reason for blacklisting the guild", interaction.OptionTypeString, i18n.MessageInvalidArgument),
+			command.NewOptionalArgument("real_owner_id", "ID of the real owner (if different from Discord server owner)", interaction.OptionTypeString, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}
@@ -41,11 +43,22 @@ func (c AdminBlacklistCommand) GetExecutor() any {
 	return c.Execute
 }
 
-func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, raw string, reason *string) {
-	guildId, err := strconv.ParseUint(raw, 10, 64)
+func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, guildIdRaw string, reason *string, realOwnerIdRaw *string) {
+	guildId, err := strconv.ParseUint(guildIdRaw, 10, 64)
 	if err != nil {
 		ctx.ReplyRaw(customisation.Red, ctx.GetMessage(i18n.Error), "Invalid guild ID provided")
 		return
+	}
+
+	// Parse real owner ID
+	var realOwnerId *uint64
+	if realOwnerIdRaw != nil && *realOwnerIdRaw != "" {
+		parsed, err := strconv.ParseUint(*realOwnerIdRaw, 10, 64)
+		if err != nil {
+			ctx.ReplyRaw(customisation.Red, ctx.GetMessage(i18n.Error), "Invalid real owner ID provided")
+			return
+		}
+		realOwnerId = &parsed
 	}
 
 	if isBlacklisted, blacklistReason, _ := dbclient.Client.ServerBlacklist.IsBlacklisted(ctx, guildId); isBlacklisted {
@@ -61,33 +74,15 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, raw string, re
 		return
 	}
 
-	if err := dbclient.Client.ServerBlacklist.Add(ctx, guildId, reason); err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	// Add to cache
-	blacklist.AddGuildToCache(guildId)
-
-	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
-			ctx,
-			customisation.Orange,
-			"Admin - Blacklist",
-			fmt.Sprintf("Guild has been blacklisted successfully.\n\n**Guild ID:** `%d`\n**Reason:** %s", guildId, utils.ValueOrDefault(reason, "No reason provided")),
-		),
-	}))
-
-	// Check if whitelabel
-	botId, ok, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
+	// Check for whitelabel
+	botId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
 	var w *worker.Context
-	if ok { // Whitelabel bot
-		// Get bot
+	if isWhitelabel {
 		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
 		if err != nil {
 			ctx.HandleError(err)
@@ -101,12 +96,55 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, raw string, re
 			Cache:        ctx.Worker().Cache,
 			RateLimiter:  nil, // Use http-proxy ratelimit functionality
 		}
-	} else { // Public bot
+	} else {
 		w = ctx.Worker()
 	}
 
-	if err := w.LeaveGuild(guildId); err != nil {
+	// Try to get owner
+	var ownerId *uint64
+	var botInGuild bool
+	guild, err := w.GetGuild(guildId)
+	if err == nil {
+		ownerId = &guild.OwnerId
+		botInGuild = true
+	}
+
+	// Add to blacklist
+	if err := dbclient.Client.ServerBlacklist.Add(ctx, guildId, reason, ownerId, realOwnerId); err != nil {
 		ctx.HandleError(err)
 		return
+	}
+
+	// Update cache
+	blacklist.AddGuildToCache(guildId)
+
+	// Build response
+	var messageLines []string
+	messageLines = append(messageLines, fmt.Sprintf("**Guild ID:** `%d`", guildId))
+	messageLines = append(messageLines, fmt.Sprintf("**Reason:** %s", utils.ValueOrDefault(reason, "No reason provided")))
+	if ownerId != nil {
+		messageLines = append(messageLines, fmt.Sprintf("**Server Owner:** <@%d> (`%d`)", *ownerId, *ownerId))
+	} else {
+		messageLines = append(messageLines, "**Server Owner:** Unknown (bot not in server)")
+	}
+	if realOwnerId != nil {
+		messageLines = append(messageLines, fmt.Sprintf("**Real Owner:** <@%d> (`%d`)", *realOwnerId, *realOwnerId))
+	}
+
+	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
+		utils.BuildContainerRaw(
+			ctx,
+			customisation.Orange,
+			"Admin - Blacklist",
+			fmt.Sprintf("Guild has been blacklisted successfully.\n\n%s", strings.Join(messageLines, "\n")),
+		),
+	}))
+
+	// Leave guild
+	if botInGuild {
+		if err := w.LeaveGuild(guildId); err != nil {
+			ctx.HandleError(err)
+			return
+		}
 	}
 }

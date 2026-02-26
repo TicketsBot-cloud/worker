@@ -178,12 +178,7 @@ func executeCommand(
 
 		// Check if the guild is globally blacklisted
 		if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-			reason, _ := dbclient.Client.ServerBlacklist.GetReason(lookupCtx, data.GuildId.Value)
-			if reason != "" {
-				interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, i18n.MessageGuildBlacklisted)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
-			} else {
-				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
-			}
+			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
 			return
 		}
 
