@@ -12,6 +12,7 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
@@ -42,6 +43,16 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 	ticket, isTicket, err := getTicket(span.Context(), e.ChannelId)
 	if err != nil {
 		sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+		return
+	}
+
+	// Delete pin notification messages in ticket channels
+	if isTicket && ticket.Id != 0 && e.Type == message.MessageTypeDefault && e.Author.Id == worker.BotId && e.Content == "" && e.MessageReference.MessageId != 0 && !e.Pinned {
+		sentry.WithSpan0(span.Context(), "Delete pin notification", func(span *sentry.Span) {
+			if err := worker.DeleteMessage(e.ChannelId, e.Id); err != nil {
+				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+			}
+		})
 		return
 	}
 
