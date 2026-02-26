@@ -1043,7 +1043,7 @@ func GetAllowedStaffUsersAndRoles(ctx context.Context, guildId uint64, panel *da
 			return nil, nil, err
 		}
 
-		allowedRoles = append(allowedUsers, supportRoles...)
+		allowedRoles = append(allowedRoles, supportRoles...)
 	}
 
 	// Add other support teams
