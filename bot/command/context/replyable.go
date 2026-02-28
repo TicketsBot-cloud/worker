@@ -204,10 +204,13 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 			message = r.GetMessage(i18n.MessageErrorUnknownInteraction)
 		} else if restError.ApiError.Code == 30007 { // Maximum number of webhooks reached
 			message = r.GetMessage(i18n.MessageErrorMaxWebhooks)
+		} else if restError.ApiError.Code == 30013 { // Maximum number of guild channels reached
+			message = r.GetMessage(i18n.MessageErrorMaxChannels)
 		} else if restError.ApiError.Code == 40060 { // Interaction has already been acknowledged
 			message = r.GetMessage(i18n.MessageErrorInteractionAcknowledged)
 		} else if restError.ApiError.Code == 50001 || restError.ApiError.Code == 50013 { // Missing permissions / Missing access
 			interactionCtx, ok := r.ctx.(registry.InteractionContext)
+			docsUrl := fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl)
 			if ok {
 				missingPermissions, err := findMissingPermissions(interactionCtx)
 				if err == nil {
@@ -217,16 +220,16 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 							message += fmt.Sprintf("* `%s`\n", perm.String())
 						}
 
-						message += "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl))
+						message += "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, docsUrl)
 					} else {
-						message = r.formatDiscordError(restError, eventId)
+						message = r.GetMessage(i18n.MessageErrorMissingAccess, docsUrl)
 					}
 				} else {
 					sentry.ErrorWithContext(err, r.ctx.ToErrorContext())
-					message = r.formatDiscordError(restError, eventId)
+					message = r.GetMessage(i18n.MessageErrorMissingAccess, docsUrl)
 				}
 			} else {
-				message = r.formatDiscordError(restError, eventId)
+				message = r.GetMessage(i18n.MessageErrorMissingAccess, docsUrl)
 			}
 		} else if restError.ApiError.Code == 50035 { // Invalid Form Body
 			// Check for specific form validation errors
@@ -248,6 +251,12 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 				message = r.GetMessage(i18n.MessageErrorInvalidForm) + "\n\n" +
 					r.formatDiscordError(restError, eventId)
 			}
+		} else if restError.ApiError.Code == 160005 { // Thread is locked
+			message = r.GetMessage(i18n.MessageErrorThreadLocked)
+		} else if restError.ApiError.Code == 160006 { // Maximum number of active threads reached
+			message = r.GetMessage(i18n.MessageErrorMaxActiveThreads)
+		} else if restError.ApiError.Code == 160007 { // Maximum number of active announcement threads reached
+			message = r.GetMessage(i18n.MessageErrorMaxActiveAnnouncementThreads)
 		} else if restError.StatusCode == http.StatusTooManyRequests {
 			// Rate limit error - parse raw response to extract retry_after and global flag
 			var rateLimit rateLimitResponse
