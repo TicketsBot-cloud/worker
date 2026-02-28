@@ -369,12 +369,12 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 		tmp, err := cmd.Worker().CreateGuildChannel(reasonCtx, cmd.GuildId(), data)
 		if err != nil { // Bot likely doesn't have permission
+			cmd.HandleError(err)
+
 			// To prevent tickets getting in a glitched state, we should mark it as closed (or delete it completely?)
 			if err := dbclient.Client.Tickets.Close(ctx, ticketId, cmd.GuildId()); err != nil {
 				cmd.HandleError(err)
 			}
-
-			cmd.HandleError(err)
 
 			var restError request.RestError
 			if errors.As(err, &restError) && restError.ApiError.FirstErrorCode() == "CHANNEL_PARENT_MAX_CHANNELS" {
