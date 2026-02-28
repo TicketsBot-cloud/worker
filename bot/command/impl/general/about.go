@@ -34,5 +34,5 @@ func (c AboutCommand) GetExecutor() interface{} {
 }
 
 func (AboutCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitleAbout, i18n.MessageAbout, config.Conf.Bot.SupportServerInvite)
+	ctx.Reply(customisation.Green, i18n.TitleAbout, i18n.MessageAbout, config.Conf.Bot.SupportServerInvite, "/help", "/setup")
 }
