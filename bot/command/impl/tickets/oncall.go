@@ -46,7 +46,7 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	if !settings.UseThreads {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode, fmt.Sprintf("%s/features/thread-mode", config.Conf.Bot.DocsUrl))
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode, "/on-call", fmt.Sprintf("%s/features/thread-mode", config.Conf.Bot.DocsUrl))
 		return
 	}
 

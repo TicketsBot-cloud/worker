@@ -43,7 +43,7 @@ func (OpenCommand) Execute(ctx *context.SlashCommandContext, providedSubject *st
 	}
 
 	if settings.DisableOpenCommand {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCommandDisabled)
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCommandDisabled, "/open")
 		return
 	}
 
