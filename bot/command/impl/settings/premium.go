@@ -49,11 +49,11 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 			return
 		}
 
-		var content i18n.MessageId
+		var premiumEmbed *embed.Embed
 		if premiumTier == premium.Whitelabel {
-			content = i18n.MessagePremiumLinkAlreadyActivatedWhitelabel
+			premiumEmbed = utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, i18n.MessagePremiumLinkAlreadyActivatedWhitelabel, nil, fmt.Sprintf("%s/premium/whitelabel-setup-guide", config.Conf.Bot.DocsUrl))
 		} else {
-			content = i18n.MessagePremiumLinkAlreadyActivated
+			premiumEmbed = utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, i18n.MessagePremiumLinkAlreadyActivated, nil)
 		}
 
 		buttons := []component.Component{
@@ -85,7 +85,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 		}
 
 		ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(
-			utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, content, nil),
+			premiumEmbed,
 			utils.Slice(component.BuildActionRow(buttons...)),
 		))
 
@@ -104,7 +104,7 @@ func (PremiumCommand) Execute(ctx registry.CommandContext) {
 		})
 
 		ctx.ReplyWith(command.NewEphemeralEmbedMessageResponseWithComponents(
-			utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, i18n.MessagePremiumAbout, fields),
+			utils.BuildEmbed(ctx, customisation.Green, i18n.TitlePremium, i18n.MessagePremiumAbout, fields, fmt.Sprintf("%s/premium", config.Conf.Bot.FrontpageUrl)),
 			utils.Slice(
 				component.BuildActionRow(
 					component.BuildSelectMenu(component.SelectMenu{

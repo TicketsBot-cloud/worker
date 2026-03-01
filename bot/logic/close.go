@@ -210,10 +210,6 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		}
 
 		auditReason := fmt.Sprintf("Ticket %d closed by %s", ticket.Id, member.User.Username)
-		if reason != nil && *reason != "" {
-			auditReason = fmt.Sprintf("%s - Reason: %s", auditReason, *reason)
-		}
-
 		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 		if _, err := cmd.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 			cmd.HandleError(err)
@@ -230,10 +226,6 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		}
 
 		auditReason := fmt.Sprintf("Ticket %d closed by %s", ticket.Id, member.User.Username)
-		if reason != nil && *reason != "" {
-			auditReason = fmt.Sprintf("%s - Reason: %s", auditReason, *reason)
-		}
-
 		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 		if _, err := cmd.Worker().DeleteChannel(reasonCtx, *ticket.ChannelId); err != nil {
 			// Check if we should exclude this from autoclose

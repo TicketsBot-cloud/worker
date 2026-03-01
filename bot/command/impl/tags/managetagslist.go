@@ -46,5 +46,5 @@ func (ManageTagsListCommand) Execute(ctx registry.CommandContext) {
 	}
 	joined = strings.TrimSuffix(joined, "\n")
 
-	ctx.Reply(customisation.Green, i18n.TitleTags, i18n.MessageTagList, joined, "/")
+	ctx.Reply(customisation.Green, i18n.TitleTags, i18n.MessageTagList, joined, "/tag <TagID>")
 }
