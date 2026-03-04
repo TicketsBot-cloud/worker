@@ -111,7 +111,7 @@ func FeedbackRowElement(condition bool) CloseEmbedElement {
 				CustomId: fmt.Sprintf("rate_%d_%d_%d", ticket.GuildId, ticket.Id, i),
 				Style:    style,
 				Emoji: &emoji.Emoji{
-					Name: "⭐",
+					Name: utils.Ptr("⭐"),
 				},
 			})
 		}

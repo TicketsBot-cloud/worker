@@ -31,7 +31,7 @@ func (AdminRecacheCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		HelperOnly:      true,
 		Arguments: command.Arguments(
-			command.NewOptionalArgument("guildid", "ID of the guild to recache", interaction.OptionTypeString, i18n.MessageInvalidArgument),
+			command.NewOptionalArgument("guildid", "ID of the guild to recache", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}

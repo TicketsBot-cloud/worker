@@ -185,7 +185,7 @@ func getChannelMemberPermissions(ctx *worker.Context, userId, channelId uint64, 
 	}
 
 	for _, overwrite := range ch.PermissionOverwrites {
-		if overwrite.Type == channel.PermissionTypeMember && overwrite.Id == userId {
+		if overwrite.Type == channel.PermissionOverwriteTypeMember && overwrite.Id == userId {
 			initialPermissions &= ^overwrite.Deny
 			initialPermissions |= overwrite.Allow
 		}
@@ -216,7 +216,7 @@ func getChannelTotalRolePermissions(ctx *worker.Context, guildId, userId, channe
 		for _, role := range roles {
 			if memberRole == role.Id {
 				for _, overwrite := range ch.PermissionOverwrites {
-					if overwrite.Type == channel.PermissionTypeRole && overwrite.Id == role.Id {
+					if overwrite.Type == channel.PermissionOverwriteTypeRole && overwrite.Id == role.Id {
 						allow |= overwrite.Allow
 						deny |= overwrite.Deny
 						break
@@ -256,7 +256,7 @@ func getChannelBasePermissions(ctx *worker.Context, guildId, channelId uint64, i
 	}
 
 	for _, overwrite := range ch.PermissionOverwrites {
-		if overwrite.Type == channel.PermissionTypeRole && overwrite.Id == publicRole.Id {
+		if overwrite.Type == channel.PermissionOverwriteTypeRole && overwrite.Id == publicRole.Id {
 			initialPermissions &= ^overwrite.Deny
 			initialPermissions |= overwrite.Allow
 			break

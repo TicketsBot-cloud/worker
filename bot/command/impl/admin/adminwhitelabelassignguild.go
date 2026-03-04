@@ -28,8 +28,8 @@ func (AdminWhitelabelAssignGuildCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		HelperOnly:      true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("bot_id", "ID of the bot to assign to the guild", interaction.OptionTypeString, i18n.MessageInvalidArgument),
-			command.NewRequiredArgument("guild_id", "ID of the guild to assign the bot to", interaction.OptionTypeString, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("bot_id", "ID of the bot to assign to the guild", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("guild_id", "ID of the guild to assign the bot to", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}

@@ -24,19 +24,24 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 		return
 	}
 
-	settings, err := dbclient.Client.Settings.Get(ctx, e.GuildId)
+	if e.GuildId == nil {
+		return
+	}
+	guildId := *e.GuildId
+
+	settings, err := dbclient.Client.Settings.Get(ctx, guildId)
 	if err != nil {
-		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 		return
 	}
 
-	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, e.Id, e.GuildId)
+	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, e.Id, guildId)
 	if err != nil {
-		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 		return
 	}
 
-	if ticket.Id == 0 || ticket.GuildId != e.GuildId {
+	if ticket.Id == 0 || ticket.GuildId != guildId {
 		return
 	}
 
@@ -50,32 +55,32 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 	if ticket.PanelId != nil {
 		tmp, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
 		if err != nil {
-			sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+			sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 			return
 		}
 
-		if tmp.PanelId != 0 && e.GuildId == tmp.GuildId {
+		if tmp.PanelId != 0 && guildId == tmp.GuildId {
 			panel = &tmp
 		}
 	}
 
-	premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, e.GuildId, true, worker.Token, worker.RateLimiter)
+	premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, guildId, true, worker.Token, worker.RateLimiter)
 	if err != nil {
-		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 		return
 	}
 
 	// Handle thread being unarchived
 	if !ticket.Open && !e.ThreadMetadata.Archived {
 		if err := dbclient.Client.Tickets.SetOpen(ctx, ticket.GuildId, ticket.Id); err != nil {
-			sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+			sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 			return
 		}
 
 		if settings.TicketNotificationChannel != nil {
 			staffCount, err := logic.GetStaffInThread(ctx, worker, ticket, e.Id)
 			if err != nil {
-				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 				return
 			}
 
@@ -83,12 +88,12 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 			data := logic.BuildThreadReopenMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, staffCount, premiumTier)
 			msg, err := worker.CreateMessageComplex(*settings.TicketNotificationChannel, data.IntoCreateMessageData())
 			if err != nil {
-				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 				return
 			}
 
 			if err := dbclient.Client.Tickets.SetJoinMessageId(ctx, ticket.GuildId, ticket.Id, &msg.Id); err != nil {
-				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
+				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: guildId})
 				return
 			}
 		}

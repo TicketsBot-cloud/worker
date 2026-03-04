@@ -239,9 +239,13 @@ func updateChannelPermissions(ctx cmdregistry.CommandContext, id uint64, mention
 			Deny:  0,
 		})
 
+		pos := 0
+		if ch.Position != nil {
+			pos = *ch.Position
+		}
 		data := rest.ModifyChannelData{
 			PermissionOverwrites: overwrites,
-			Position:             ch.Position,
+			Position:             pos,
 		}
 
 		ticketAuditReason := fmt.Sprintf("Added support to ticket %d", ticket.Id)

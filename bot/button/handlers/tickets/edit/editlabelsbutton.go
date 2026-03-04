@@ -65,7 +65,7 @@ func (h *EditLabelsButtonHandler) Execute(ctx *context.ButtonContext) {
 			Label:   labels[i].Name,
 			Value:   fmt.Sprintf("%d", labels[i].LabelId),
 			Default: utils.Contains(ticketLabelIds, labels[i].LabelId),
-			Emoji:   &emoji.Emoji{Name: colourEmoji},
+			Emoji:   &emoji.Emoji{Name: utils.Ptr(colourEmoji)},
 		})
 	}
 

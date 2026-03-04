@@ -393,7 +393,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 		}
 
 		closeEmbed, closeComponents := BuildCloseEmbed(ctx, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
-		closeEmbed.SetAuthor(guild.Name, "", fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon))
+		closeEmbed.SetAuthor(guild.Name, "", guild.IconUrl())
 
 		// Use message content to tell users why they can't rate a ticket
 		var content string

@@ -30,9 +30,9 @@ func (c AdminGenPremiumCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		AdminOnly:       true,
 		Arguments: command.Arguments(
-			command.NewRequiredAutocompleteableArgument("sku", "SKU for the key to grant", interaction.OptionTypeString, i18n.MessageInvalidArgument, c.AutoCompleteHandler),
-			command.NewRequiredArgument("length", "Length in days of the key", interaction.OptionTypeInteger, i18n.MessageInvalidArgument),
-			command.NewOptionalArgument("amount", "Amount of keys to generate", interaction.OptionTypeInteger, i18n.MessageInvalidArgument),
+			command.NewRequiredAutocompleteableArgument("sku", "SKU for the key to grant", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument, c.AutoCompleteHandler),
+			command.NewRequiredArgument("length", "Length in days of the key", interaction.ApplicationCommandOptionTypeInteger, i18n.MessageInvalidArgument),
+			command.NewOptionalArgument("amount", "Amount of keys to generate", interaction.ApplicationCommandOptionTypeInteger, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}

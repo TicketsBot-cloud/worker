@@ -6,15 +6,22 @@ import (
 
 	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/gdl/objects/auditlog"
+	"github.com/TicketsBot-cloud/gdl/objects/automoderation"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
+	"github.com/TicketsBot-cloud/gdl/objects/guild/scheduledevent"
+	"github.com/TicketsBot-cloud/gdl/objects/guild/sticker"
 	"github.com/TicketsBot-cloud/gdl/objects/integration"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/invite"
 	"github.com/TicketsBot-cloud/gdl/objects/member"
+	"github.com/TicketsBot-cloud/gdl/objects/sku"
+	"github.com/TicketsBot-cloud/gdl/objects/soundboard"
+	"github.com/TicketsBot-cloud/gdl/objects/stage"
+	"github.com/TicketsBot-cloud/gdl/objects/subscription"
 	"github.com/TicketsBot-cloud/gdl/objects/user"
 	"github.com/TicketsBot-cloud/gdl/rest"
 )
@@ -180,7 +187,7 @@ func (ctx *Context) GetThreadMember(channelId, userId uint64) (channel.ThreadMem
 }
 
 func (ctx *Context) ListThreadMembers(channelId uint64) ([]channel.ThreadMember, error) {
-	return rest.ListThreadMembers(context.Background(), ctx.Token, ctx.RateLimiter, channelId)
+	return rest.ListThreadMembers(context.Background(), ctx.Token, ctx.RateLimiter, channelId, rest.ListThreadMembersData{})
 }
 
 func (ctx *Context) ListActiveThreads(channelId uint64) (rest.ThreadsResponse, error) {
@@ -211,7 +218,7 @@ func (ctx *Context) CreatePublicThread(channelId uint64, name string, autoArchiv
 	data := rest.StartThreadWithoutMessageData{
 		Name:                name,
 		AutoArchiveDuration: autoArchiveDuration,
-		Type:                channel.ChannelTypeGuildPublicThread,
+		Type:                channel.ChannelTypePublicThread,
 	}
 
 	return rest.StartThreadWithoutMessage(context.Background(), ctx.Token, ctx.RateLimiter, channelId, data)
@@ -221,7 +228,7 @@ func (ctx *Context) CreatePrivateThread(requestCtx context.Context, channelId ui
 	data := rest.StartThreadWithoutMessageData{
 		Name:                name,
 		AutoArchiveDuration: autoArchiveDuration,
-		Type:                channel.ChannelTypeGuildPrivateThread,
+		Type:                channel.ChannelTypePrivateThread,
 		Invitable:           invitable,
 	}
 
@@ -461,8 +468,8 @@ func (ctx *Context) GetGuildPruneCount(guildId uint64, days int) (int, error) {
 }
 
 // computePruneCount = whether 'pruned' is returned, discouraged for large guilds
-func (ctx *Context) BeginGuildPrune(guildId uint64, days int, computePruneCount bool) error {
-	return rest.BeginGuildPrune(context.Background(), ctx.Token, ctx.RateLimiter, guildId, days, computePruneCount)
+func (ctx *Context) BeginGuildPrune(guildId uint64, data rest.BeginGuildPruneData) error {
+	return rest.BeginGuildPrune(context.Background(), ctx.Token, ctx.RateLimiter, guildId, data)
 }
 
 func (ctx *Context) GetGuildVoiceRegions(guildId uint64) ([]guild.VoiceRegion, error) {
@@ -506,8 +513,8 @@ func (ctx *Context) GetGuildVanityUrl(guildId uint64) (invite.Invite, error) {
 	return rest.GetGuildVanityURL(context.Background(), ctx.Token, ctx.RateLimiter, guildId)
 }
 
-func (ctx *Context) GetInvite(inviteCode string, withCounts bool) (invite.Invite, error) {
-	return rest.GetInvite(context.Background(), ctx.Token, ctx.RateLimiter, inviteCode, withCounts)
+func (ctx *Context) GetInvite(inviteCode string, withCounts bool, guildScheduledEventId *uint64) (invite.Invite, error) {
+	return rest.GetInvite(context.Background(), ctx.Token, ctx.RateLimiter, inviteCode, withCounts, guildScheduledEventId)
 }
 
 func (ctx *Context) DeleteInvite(inviteCode string) (invite.Invite, error) {
@@ -611,7 +618,7 @@ func (ctx *Context) GetGuildAuditLog(guildId uint64, data rest.GetGuildAuditLogD
 }
 
 func (ctx *Context) GetGlobalCommands(applicationId uint64) ([]interaction.ApplicationCommand, error) {
-	return rest.GetGlobalCommands(context.Background(), ctx.Token, ctx.RateLimiter, applicationId)
+	return rest.GetGlobalCommands(context.Background(), ctx.Token, ctx.RateLimiter, applicationId, false)
 }
 
 func (ctx *Context) CreateGlobalCommand(applicationId uint64, data rest.CreateCommandData) (interaction.ApplicationCommand, error) {
@@ -627,7 +634,7 @@ func (ctx *Context) DeleteGlobalCommand(applicationId, commandId uint64) error {
 }
 
 func (ctx *Context) GetGuildCommands(applicationId, guildId uint64) ([]interaction.ApplicationCommand, error) {
-	return rest.GetGuildCommands(context.Background(), ctx.Token, ctx.RateLimiter, applicationId, guildId)
+	return rest.GetGuildCommands(context.Background(), ctx.Token, ctx.RateLimiter, applicationId, guildId, false)
 }
 
 func (ctx *Context) CreateGuildCommand(applicationId, guildId uint64, data rest.CreateCommandData) (interaction.ApplicationCommand, error) {
@@ -656,4 +663,180 @@ func (ctx *Context) EditCommandPermissions(applicationId, guildId, commandId uin
 
 func (ctx *Context) EditBulkCommandPermissions(applicationId, guildId uint64, data []rest.CommandWithPermissionsData) ([]rest.CommandWithPermissionsData, error) {
 	return rest.EditBulkCommandPermissions(context.Background(), ctx.Token, ctx.RateLimiter, applicationId, guildId, data)
+}
+
+func (ctx *Context) ModifyGlobalCommands(applicationId uint64, data []rest.CreateCommandData) ([]interaction.ApplicationCommand, error) {
+	return rest.ModifyGlobalCommands(context.Background(), ctx.Token, ctx.RateLimiter, applicationId, data)
+}
+
+func (ctx *Context) ModifyGuildCommands(applicationId, guildId uint64, data []rest.CreateCommandData) ([]interaction.ApplicationCommand, error) {
+	return rest.ModifyGuildCommands(context.Background(), ctx.Token, ctx.RateLimiter, applicationId, guildId, data)
+}
+
+func (ctx *Context) EditWebhookMessage(webhookId uint64, webhookToken string, messageId uint64, data rest.WebhookEditBody) (message.Message, error) {
+	return rest.EditWebhookMessage(context.Background(), webhookToken, ctx.RateLimiter, webhookId, messageId, data)
+}
+
+func (ctx *Context) AddGuildMember(guildId, userId uint64, data rest.AddGuildMemberData) (*member.Member, error) {
+	return rest.AddGuildMember(context.Background(), ctx.Token, ctx.RateLimiter, guildId, userId, data)
+}
+
+func (ctx *Context) GetGuildWelcomeScreen(guildId uint64) (guild.WelcomeScreen, error) {
+	return rest.GetGuildWelcomeScreen(context.Background(), ctx.Token, ctx.RateLimiter, guildId)
+}
+
+func (ctx *Context) ModifyGuildWelcomeScreen(guildId uint64, data rest.ModifyGuildWelcomeScreenData) (guild.WelcomeScreen, error) {
+	return rest.ModifyGuildWelcomeScreen(context.Background(), ctx.Token, ctx.RateLimiter, guildId, data)
+}
+
+// Auto-moderation
+
+func (ctx *Context) ListAutoModerationRules(guildId uint64) ([]automoderation.Rule, error) {
+	return rest.ListAutoModerationRules(context.Background(), ctx.Token, ctx.RateLimiter, guildId)
+}
+
+func (ctx *Context) GetAutoModerationRule(guildId, ruleId uint64) (automoderation.Rule, error) {
+	return rest.GetAutoModerationRule(context.Background(), ctx.Token, ctx.RateLimiter, guildId, ruleId)
+}
+
+func (ctx *Context) CreateAutoModerationRule(guildId uint64, data rest.CreateAutoModerationRuleData) (automoderation.Rule, error) {
+	return rest.CreateAutoModerationRule(context.Background(), ctx.Token, ctx.RateLimiter, guildId, data)
+}
+
+func (ctx *Context) ModifyAutoModerationRule(guildId, ruleId uint64, data rest.ModifyAutoModerationRuleData) (automoderation.Rule, error) {
+	return rest.ModifyAutoModerationRule(context.Background(), ctx.Token, ctx.RateLimiter, guildId, ruleId, data)
+}
+
+func (ctx *Context) DeleteAutoModerationRule(guildId, ruleId uint64) error {
+	return rest.DeleteAutoModerationRule(context.Background(), ctx.Token, ctx.RateLimiter, guildId, ruleId)
+}
+
+// Scheduled events
+
+func (ctx *Context) ListGuildScheduledEvents(guildId uint64, withUserCount bool) ([]scheduledevent.GuildScheduledEvent, error) {
+	return rest.ListGuildScheduledEvents(context.Background(), ctx.Token, ctx.RateLimiter, guildId, withUserCount)
+}
+
+func (ctx *Context) GetGuildScheduledEvent(guildId, eventId uint64, withUserCount bool) (scheduledevent.GuildScheduledEvent, error) {
+	return rest.GetGuildScheduledEvent(context.Background(), ctx.Token, ctx.RateLimiter, guildId, eventId, withUserCount)
+}
+
+func (ctx *Context) CreateGuildScheduledEvent(guildId uint64, data rest.CreateGuildScheduledEventData) (scheduledevent.GuildScheduledEvent, error) {
+	return rest.CreateGuildScheduledEvent(context.Background(), ctx.Token, ctx.RateLimiter, guildId, data)
+}
+
+func (ctx *Context) ModifyGuildScheduledEvent(guildId, eventId uint64, data rest.ModifyGuildScheduledEventData) (scheduledevent.GuildScheduledEvent, error) {
+	return rest.ModifyGuildScheduledEvent(context.Background(), ctx.Token, ctx.RateLimiter, guildId, eventId, data)
+}
+
+func (ctx *Context) DeleteGuildScheduledEvent(guildId, eventId uint64) error {
+	return rest.DeleteGuildScheduledEvent(context.Background(), ctx.Token, ctx.RateLimiter, guildId, eventId)
+}
+
+func (ctx *Context) GetGuildScheduledEventUsers(guildId, eventId uint64, data rest.GetGuildScheduledEventUsersData) ([]rest.GuildScheduledEventUser, error) {
+	return rest.GetGuildScheduledEventUsers(context.Background(), ctx.Token, ctx.RateLimiter, guildId, eventId, data)
+}
+
+// Stage instances
+
+func (ctx *Context) CreateStageInstance(data rest.CreateStageInstanceData) (stage.StageInstance, error) {
+	return rest.CreateStageInstance(context.Background(), ctx.Token, ctx.RateLimiter, data)
+}
+
+func (ctx *Context) GetStageInstance(channelId uint64) (stage.StageInstance, error) {
+	return rest.GetStageInstance(context.Background(), ctx.Token, ctx.RateLimiter, channelId)
+}
+
+func (ctx *Context) ModifyStageInstance(channelId uint64, data rest.ModifyStageInstanceData) (stage.StageInstance, error) {
+	return rest.ModifyStageInstance(context.Background(), ctx.Token, ctx.RateLimiter, channelId, data)
+}
+
+func (ctx *Context) DeleteStageInstance(channelId uint64) error {
+	return rest.DeleteStageInstance(context.Background(), ctx.Token, ctx.RateLimiter, channelId)
+}
+
+// Soundboard
+
+func (ctx *Context) SendSoundboardSound(channelId uint64, data rest.SendSoundboardSoundData) error {
+	return rest.SendSoundboardSound(context.Background(), ctx.Token, ctx.RateLimiter, channelId, data)
+}
+
+func (ctx *Context) GetDefaultSoundboardSounds() ([]soundboard.SoundboardSound, error) {
+	return rest.GetDefaultSoundboardSounds(context.Background(), ctx.Token, ctx.RateLimiter)
+}
+
+func (ctx *Context) ListGuildSoundboardSounds(guildId uint64) ([]soundboard.SoundboardSound, error) {
+	return rest.ListGuildSoundboardSounds(context.Background(), ctx.Token, ctx.RateLimiter, guildId)
+}
+
+func (ctx *Context) GetGuildSoundboardSound(guildId, soundId uint64) (soundboard.SoundboardSound, error) {
+	return rest.GetGuildSoundboardSound(context.Background(), ctx.Token, ctx.RateLimiter, guildId, soundId)
+}
+
+func (ctx *Context) CreateGuildSoundboardSound(guildId uint64, data rest.CreateGuildSoundboardSoundData) (soundboard.SoundboardSound, error) {
+	return rest.CreateGuildSoundboardSound(context.Background(), ctx.Token, ctx.RateLimiter, guildId, data)
+}
+
+func (ctx *Context) ModifyGuildSoundboardSound(guildId, soundId uint64, data rest.ModifyGuildSoundboardSoundData) (soundboard.SoundboardSound, error) {
+	return rest.ModifyGuildSoundboardSound(context.Background(), ctx.Token, ctx.RateLimiter, guildId, soundId, data)
+}
+
+func (ctx *Context) DeleteGuildSoundboardSound(guildId, soundId uint64) error {
+	return rest.DeleteGuildSoundboardSound(context.Background(), ctx.Token, ctx.RateLimiter, guildId, soundId)
+}
+
+// Poll
+
+func (ctx *Context) GetPollAnswerVoters(channelId, messageId uint64, answerId int, data rest.GetPollAnswerVotersData) ([]user.User, error) {
+	return rest.GetPollAnswerVoters(context.Background(), ctx.Token, ctx.RateLimiter, channelId, messageId, answerId, data)
+}
+
+func (ctx *Context) EndPoll(channelId, messageId uint64) (message.Message, error) {
+	return rest.EndPoll(context.Background(), ctx.Token, ctx.RateLimiter, channelId, messageId)
+}
+
+// SKU
+
+func (ctx *Context) ListSKUs(applicationId uint64) ([]sku.SKU, error) {
+	return rest.ListSKUs(context.Background(), ctx.Token, ctx.RateLimiter, applicationId)
+}
+
+// Subscriptions
+
+func (ctx *Context) ListSKUSubscriptions(skuId uint64, data rest.ListSKUSubscriptionsData) ([]subscription.Subscription, error) {
+	return rest.ListSKUSubscriptions(context.Background(), ctx.Token, ctx.RateLimiter, skuId, data)
+}
+
+func (ctx *Context) GetSKUSubscription(skuId, subscriptionId uint64) (subscription.Subscription, error) {
+	return rest.GetSKUSubscription(context.Background(), ctx.Token, ctx.RateLimiter, skuId, subscriptionId)
+}
+
+// Stickers
+
+func (ctx *Context) GetSticker(stickerId uint64) (sticker.Sticker, error) {
+	return rest.GetSticker(context.Background(), ctx.Token, ctx.RateLimiter, stickerId)
+}
+
+func (ctx *Context) GetStickerPacks() ([]rest.StickerPack, error) {
+	return rest.GetStickerPacks(context.Background(), ctx.Token, ctx.RateLimiter)
+}
+
+func (ctx *Context) GetStickerPack(packId uint64) (rest.StickerPack, error) {
+	return rest.GetStickerPack(context.Background(), ctx.Token, ctx.RateLimiter, packId)
+}
+
+func (ctx *Context) ListGuildStickers(guildId uint64) ([]sticker.Sticker, error) {
+	return rest.ListGuildStickers(context.Background(), ctx.Token, ctx.RateLimiter, guildId)
+}
+
+func (ctx *Context) GetGuildSticker(guildId, stickerId uint64) (sticker.Sticker, error) {
+	return rest.GetGuildSticker(context.Background(), ctx.Token, ctx.RateLimiter, guildId, stickerId)
+}
+
+func (ctx *Context) ModifyGuildSticker(guildId, stickerId uint64, data rest.ModifyGuildStickerData) (sticker.Sticker, error) {
+	return rest.ModifyGuildSticker(context.Background(), ctx.Token, ctx.RateLimiter, guildId, stickerId, data)
+}
+
+func (ctx *Context) DeleteGuildSticker(guildId, stickerId uint64) error {
+	return rest.DeleteGuildSticker(context.Background(), ctx.Token, ctx.RateLimiter, guildId, stickerId)
 }

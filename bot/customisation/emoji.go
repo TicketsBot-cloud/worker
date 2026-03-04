@@ -32,7 +32,7 @@ func (e CustomEmoji) String() string {
 func (e CustomEmoji) BuildEmoji() *emoji.Emoji {
 	return &emoji.Emoji{
 		Id:       objects.NewNullableSnowflake(e.Id),
-		Name:     e.Name,
+		Name:     &e.Name,
 		Animated: e.Animated,
 	}
 }

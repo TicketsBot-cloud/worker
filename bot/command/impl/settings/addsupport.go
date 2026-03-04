@@ -28,7 +28,7 @@ func (AddSupportCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		InteractionOnly: true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("role", "Role to apply the support representative permission to", interaction.OptionTypeMentionable, i18n.MessageAddSupportNoMembers),
+			command.NewRequiredArgument("role", "Role to apply the support representative permission to", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageAddSupportNoMembers),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 3,

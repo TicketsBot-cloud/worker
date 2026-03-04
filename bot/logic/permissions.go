@@ -233,7 +233,7 @@ func FilterStaffMembers(
 				return err
 			}
 
-			if excludeBots && member.User.Bot {
+			if excludeBots && member.User != nil && member.User.Bot {
 				return nil
 			}
 
@@ -291,9 +291,11 @@ func GetStaffInThread(ctx context.Context, worker *worker.Context, ticket databa
 		return nil, err
 	}
 
-	memberIds := make([]uint64, len(members))
-	for i, member := range members {
-		memberIds[i] = member.UserId
+	memberIds := make([]uint64, 0, len(members))
+	for _, member := range members {
+		if member.UserId != nil {
+			memberIds = append(memberIds, *member.UserId)
+		}
 	}
 
 	staffIds, err := FilterStaffMembers(ctx, worker, ticket.GuildId, ticket, memberIds, true, true)

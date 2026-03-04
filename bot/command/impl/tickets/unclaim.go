@@ -122,7 +122,7 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 	// Always update the name to match the new panel's naming scheme
 	shouldUpdateName := true
 	claimedChannelName, _ := logic.GenerateChannelName(ctx.Context, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &whoClaimed)
-	if ch.Name != claimedChannelName {
+	if ch.Name == nil || *ch.Name != claimedChannelName {
 		shouldUpdateName = false
 	}
 

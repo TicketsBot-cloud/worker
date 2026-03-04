@@ -27,7 +27,7 @@ func (AddCommand) Properties() registry.Properties {
 		PermissionLevel: permcache.Everyone,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to add to the ticket", interaction.OptionTypeMentionable, i18n.MessageAddNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to add to the ticket", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageAddNoMembers),
 		),
 		Timeout: constants.TimeoutOpenTicket,
 	}
@@ -88,7 +88,7 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 		if ticket.IsThread {
 			if err := ctx.Worker().AddThreadMember(*ticket.ChannelId, id); err != nil {
 				if err, ok := err.(request.RestError); ok && (err.ApiError.Code == 50001 || err.ApiError.Code == 50013) {
-					ch, err := ctx.Channel()
+					ch, err := ctx.Worker().GetChannel(ctx.ChannelId())
 					if err != nil {
 						ctx.HandleError(err)
 						return

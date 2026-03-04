@@ -26,7 +26,7 @@ func (c ReopenCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Everyone,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredAutocompleteableArgument("ticket_id", "ID of the ticket to reopen", interaction.OptionTypeInteger, i18n.MessageInvalidArgument, c.AutoCompleteHandler),
+			command.NewRequiredAutocompleteableArgument("ticket_id", "ID of the ticket to reopen", interaction.ApplicationCommandOptionTypeInteger, i18n.MessageInvalidArgument, c.AutoCompleteHandler),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 10,

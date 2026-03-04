@@ -46,7 +46,7 @@ func main() {
 	// Handle admin commands for a specific guild, merging if requested
 	if *AdminCommandGuildId != 0 {
 		if *MergeGuildCommands {
-			existingCmds := must(rest.GetGuildCommands(context.Background(), *Token, nil, applicationId, *AdminCommandGuildId))
+			existingCmds := must(rest.GetGuildCommands(context.Background(), *Token, nil, applicationId, *AdminCommandGuildId, false))
 			for _, cmd := range existingCmds {
 				var found bool
 				for _, newCmd := range adminCommands {
@@ -71,7 +71,7 @@ func main() {
 	}
 
 	// Output all global commands as JSON
-	cmds := must(rest.GetGlobalCommands(context.Background(), *Token, nil, applicationId))
+	cmds := must(rest.GetGlobalCommands(context.Background(), *Token, nil, applicationId, false))
 	marshalled := must(json.MarshalIndent(cmds, "", "    "))
 	fmt.Println(string(marshalled))
 }
