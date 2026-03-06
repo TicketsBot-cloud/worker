@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -89,7 +90,7 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 	ctx.ReplyWithEmbed(embed)
 
 	// create transcripts channel
-	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
+	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
 	case nil:
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelSuccess, transcriptChannel.Id))
 
@@ -114,7 +115,7 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 		Type: channel.ChannelTypeGuildCategory,
 	}
 
-	switch category, err := ctx.Worker().CreateGuildChannel(ctx.GuildId(), categoryData); err {
+	switch category, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), categoryData); err {
 	case nil: // ok
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategorySuccess))
 
@@ -125,8 +126,8 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategoryFailure))
 	}
 
-	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCompleted, ctx.GuildId(), adminRoleId, supportRoleId))
-	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoDocs))
+	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCompleted, fmt.Sprintf("%s/manage/%d/panels", config.Conf.Bot.DashboardUrl, ctx.GuildId()), adminRoleId, supportRoleId))
+	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoDocs, config.Conf.Bot.DocsUrl))
 
 	// update status
 	if shouldEdit {

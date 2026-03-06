@@ -33,7 +33,7 @@ func (HelpCommand) Properties() registry.Properties {
 		Category:         command.General,
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,
-		Contexts: 	      []interaction.InteractionContextType{interaction.InteractionContextGuild,interaction.InteractionContextBotDM},
+		Contexts:         []interaction.InteractionContextType{interaction.InteractionContextGuild, interaction.InteractionContextBotDM},
 	}
 }
 

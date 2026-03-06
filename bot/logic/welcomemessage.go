@@ -176,6 +176,22 @@ func DoPlaceholderSubstitutions(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) string {
+	// Handle escaped placeholders first: \%...\% -> temporary marker
+	escapedPlaceholderRegex := regexp.MustCompile(`\\%([a-z_]+(?::[^%\\]+)?)\\%`)
+	escapedPlaceholders := make(map[string]string)
+	counter := 0
+	message = escapedPlaceholderRegex.ReplaceAllStringFunc(message, func(match string) string {
+		marker := fmt.Sprintf("\x00ESCAPED_%d\x00", counter)
+		// Extract the content between \% and \%
+		content := escapedPlaceholderRegex.FindStringSubmatch(match)[1]
+		escapedPlaceholders[marker] = fmt.Sprintf("%%%s%%", content)
+		counter++
+		return marker
+	})
+
+	// Process parameterized placeholders first (e.g., %date_days:30%)
+	message = doParameterizedSubstitutions(ctx, message, worker, ticket)
+
 	var lock sync.Mutex
 
 	// do DB lookups in parallel
@@ -255,10 +271,10 @@ func DoPlaceholderSubstitutions(
 		sentry.Error(err)
 	}
 
-	// Escape placeholders
-	// \%placeholder\% becomes %placeholder%
-	escapedPlaceholderRegex := regexp.MustCompile(`\\%([a-z_]+)\\%`)
-	message = escapedPlaceholderRegex.ReplaceAllString(message, `%$1%`)
+	// Restore escaped placeholders
+	for marker, literal := range escapedPlaceholders {
+		message = strings.Replace(message, marker, literal, -1)
+	}
 
 	return message
 }
@@ -346,7 +362,135 @@ func fetchCustomIntegrationPlaceholders(
 // TODO: Error handling
 type PlaceholderSubstitutionFunc func(context.Context, *worker.Context, database.Ticket) string
 
+// ParameterizedPlaceholderFunc handles placeholders with optional parameters
+// params will be empty slice for non-parameterized usage
+type ParameterizedPlaceholderFunc func(ctx context.Context, worker *worker.Context, ticket database.Ticket, params []string) string
+
 const substitutionTimeout = time.Millisecond * 1500
+
+// Regex to match parameterized placeholders: %name% or %name:param% or %name:param1:param2%
+var parameterizedPlaceholderRegex = regexp.MustCompile(`%([a-z_]+):([^%]+)%`)
+
+// parameterizedSubstitutions maps placeholder base names to parameterized functions
+var parameterizedSubstitutions = map[string]ParameterizedPlaceholderFunc{
+	// %date_days:N% or %date_days:N:FORMAT%
+	"date_days": func(ctx context.Context, worker *worker.Context, ticket database.Ticket, params []string) string {
+		if len(params) < 1 {
+			return ""
+		}
+		days, err := ParseOffset(params[0])
+		if err != nil {
+			return ""
+		}
+		targetTime := time.Now().AddDate(0, 0, days)
+		format := DiscordFormatShortDate
+		if len(params) >= 2 {
+			format = ValidateDiscordFormat(params[1])
+		}
+		return FormatDiscordTimestamp(targetTime.Unix(), format)
+	},
+
+	// %date_weeks:N% or %date_weeks:N:FORMAT%
+	"date_weeks": func(ctx context.Context, worker *worker.Context, ticket database.Ticket, params []string) string {
+		if len(params) < 1 {
+			return ""
+		}
+		weeks, err := ParseOffset(params[0])
+		if err != nil {
+			return ""
+		}
+		targetTime := time.Now().AddDate(0, 0, weeks*7)
+		format := DiscordFormatShortDate
+		if len(params) >= 2 {
+			format = ValidateDiscordFormat(params[1])
+		}
+		return FormatDiscordTimestamp(targetTime.Unix(), format)
+	},
+
+	// %date_months:N% or %date_months:N:FORMAT%
+	"date_months": func(ctx context.Context, worker *worker.Context, ticket database.Ticket, params []string) string {
+		if len(params) < 1 {
+			return ""
+		}
+		months, err := ParseOffset(params[0])
+		if err != nil {
+			return ""
+		}
+		targetTime := time.Now().AddDate(0, months, 0)
+		format := DiscordFormatShortDate
+		if len(params) >= 2 {
+			format = ValidateDiscordFormat(params[1])
+		}
+		return FormatDiscordTimestamp(targetTime.Unix(), format)
+	},
+
+	// %date_timestamp:UNIX% or %date_timestamp:UNIX:FORMAT%
+	"date_timestamp": func(ctx context.Context, worker *worker.Context, ticket database.Ticket, params []string) string {
+		if len(params) < 1 {
+			return ""
+		}
+		ts, err := ParseTimestamp(params[0])
+		if err != nil {
+			return ""
+		}
+		format := DiscordFormatShortDate
+		if len(params) >= 2 {
+			format = ValidateDiscordFormat(params[1])
+		}
+		return FormatDiscordTimestamp(ts, format)
+	},
+
+	// %timestamp_days:N% - Raw timestamp N days from now
+	"timestamp_days": func(ctx context.Context, worker *worker.Context, ticket database.Ticket, params []string) string {
+		if len(params) < 1 {
+			return strconv.FormatInt(time.Now().Unix(), 10)
+		}
+		days, err := ParseOffset(params[0])
+		if err != nil {
+			return ""
+		}
+		targetTime := time.Now().AddDate(0, 0, days)
+		return strconv.FormatInt(targetTime.Unix(), 10)
+	},
+}
+
+// doParameterizedSubstitutions processes parameterized placeholders in the message
+func doParameterizedSubstitutions(
+	ctx context.Context,
+	message string,
+	worker *worker.Context,
+	ticket database.Ticket,
+) string {
+	// Find all parameterized placeholder matches
+	matches := parameterizedPlaceholderRegex.FindAllStringSubmatchIndex(message, -1)
+	if len(matches) == 0 {
+		return message
+	}
+
+	// Process matches in reverse order to preserve indices
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
+		placeholderName := message[match[2]:match[3]]
+
+		// Check if this is a parameterized placeholder we handle
+		handler, exists := parameterizedSubstitutions[placeholderName]
+		if !exists {
+			continue
+		}
+
+		// Extract parameters
+		paramString := message[match[4]:match[5]]
+		params := strings.Split(paramString, ":")
+
+		// Call the handler
+		replacement := handler(ctx, worker, ticket, params)
+
+		// Replace in message
+		message = message[:match[0]] + replacement + message[match[1]:]
+	}
+
+	return message
+}
 
 var substitutions = map[string]PlaceholderSubstitutionFunc{
 	"user_id": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
@@ -412,6 +556,9 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 	},
 	"datetime": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		return fmt.Sprintf("<t:%d:f>", time.Now().Unix())
+	},
+	"timestamp": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
+		return strconv.FormatInt(time.Now().Unix(), 10)
 	},
 	"first_response_time_weekly": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		if !worker.IsWhitelabel { // If whitelabel, the bot must be premium, so we don't need to do extra checks

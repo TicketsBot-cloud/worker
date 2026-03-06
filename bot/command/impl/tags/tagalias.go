@@ -79,8 +79,8 @@ func (c TagAliasCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	data := command.MessageResponse{
-		Content:         content,
-		Embeds:          embeds,
+		Content: content,
+		Embeds:  embeds,
 		AllowedMentions: message.AllowedMention{
 			Parse: []message.AllowedMentionType{
 				message.EVERYONE,
