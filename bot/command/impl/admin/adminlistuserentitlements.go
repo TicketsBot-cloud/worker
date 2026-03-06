@@ -27,7 +27,7 @@ func (AdminListUserEntitlementsCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		HelperOnly:      true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user", "User to fetch entitlements for", interaction.OptionTypeUser, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("user", "User to fetch entitlements for", interaction.ApplicationCommandOptionTypeUser, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 15,
 	}

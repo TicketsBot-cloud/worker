@@ -30,7 +30,7 @@ func (RemoveCommand) Properties() registry.Properties {
 		PermissionLevel: permcache.Everyone,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to remove from the current ticket", interaction.OptionTypeMentionable, i18n.MessageRemoveAdminNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to remove from the current ticket", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageRemoveAdminNoMembers),
 		),
 		Timeout: time.Second * 8,
 	}
@@ -236,7 +236,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 		} else {
 			data := channel.PermissionOverwrite{
 				Id:    id,
-				Type:  channel.PermissionTypeMember,
+				Type:  channel.PermissionOverwriteTypeMember,
 				Allow: 0,
 				Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 			}
@@ -320,7 +320,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 		// Handle role removal
 		data := channel.PermissionOverwrite{
 			Id:    id,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: 0,
 			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 		}

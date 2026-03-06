@@ -117,7 +117,7 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 
 		switch input.Type {
 		// String Select
-		case int(component.ComponentSelectMenu):
+		case int(component.ComponentStringSelect):
 			opts := make([]component.SelectOption, len(options))
 			for j, option := range options {
 				opts[j] = component.SelectOption{

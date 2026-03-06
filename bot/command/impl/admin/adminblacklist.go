@@ -31,9 +31,9 @@ func (AdminBlacklistCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		AdminOnly:       true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("guild_id", "ID of the guild to blacklist", interaction.OptionTypeString, i18n.MessageInvalidArgument),
-			command.NewOptionalArgument("reason", "Reason for blacklisting the guild", interaction.OptionTypeString, i18n.MessageInvalidArgument),
-			command.NewOptionalArgument("real_owner_id", "ID of the real owner (if different from Discord server owner)", interaction.OptionTypeString, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("guild_id", "ID of the guild to blacklist", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
+			command.NewOptionalArgument("reason", "Reason for blacklisting the guild", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
+			command.NewOptionalArgument("real_owner_id", "ID of the real owner (if different from Discord server owner)", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}

@@ -31,7 +31,7 @@ func (AdminWhitelabelDataCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		HelperOnly:      true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_id", "ID of the user who has the whitelabel subscription", interaction.OptionTypeUser, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("user_id", "ID of the user who has the whitelabel subscription", interaction.ApplicationCommandOptionTypeUser, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}

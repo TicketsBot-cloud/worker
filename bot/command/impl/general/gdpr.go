@@ -45,7 +45,7 @@ func (c GDPRCommand) Properties() registry.Properties {
 		Contexts:        []interaction.InteractionContextType{interaction.InteractionContextBotDM},
 		IgnoreBlacklist: true,
 		Arguments: command.Arguments(
-			command.NewOptionalAutocompleteableArgument("lang", "Language for GDPR messages", interaction.OptionTypeString, i18n.GdprLanguageOption, c.LanguageAutoCompleteHandler),
+			command.NewOptionalAutocompleteableArgument("lang", "Language for GDPR messages", interaction.ApplicationCommandOptionTypeString, i18n.GdprLanguageOption, c.LanguageAutoCompleteHandler),
 		),
 	}
 }

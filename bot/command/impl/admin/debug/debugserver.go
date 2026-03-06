@@ -39,7 +39,7 @@ func (AdminDebugServerCommand) Properties() registry.Properties {
 		HelperOnly:       true,
 		DisableAutoDefer: true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("guild_id", "ID of the guild", interaction.OptionTypeString, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("guild_id", "ID of the guild", interaction.ApplicationCommandOptionTypeString, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}
@@ -203,7 +203,11 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		if settings.UseThreads && settings.TicketNotificationChannel != nil {
 			ch, err := worker.GetChannel(*settings.TicketNotificationChannel)
 			if err == nil {
-				return ch.Name, strconv.FormatUint(ch.Id, 10)
+				name := ""
+				if ch.Name != nil {
+					name = *ch.Name
+				}
+				return name, strconv.FormatUint(ch.Id, 10)
 			}
 		}
 		return "Disabled", "Disabled"
@@ -254,8 +258,8 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		fmt.Sprintf("Name: `%s`", guild.Name),
 		fmt.Sprintf("Owner: `%s` - <@%s> (%s) ", owner.Username, ownerId, ownerId),
 	}
-	if guild.VanityUrlCode != "" {
-		guildInfo = append(guildInfo, fmt.Sprintf("Vanity URL: `.gg/%s`", guild.VanityUrlCode))
+	if guild.VanityUrlCode != nil && *guild.VanityUrlCode != "" {
+		guildInfo = append(guildInfo, fmt.Sprintf("Vanity URL: `.gg/%s`", *guild.VanityUrlCode))
 	}
 
 	// Add blacklist information

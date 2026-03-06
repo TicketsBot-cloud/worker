@@ -197,7 +197,7 @@ func (c *ModalContext) User() (user.User, error) {
 
 func (c *ModalContext) InteractionUser() user.User {
 	if c.Interaction.Member != nil {
-		return c.Interaction.Member.User
+		return *c.Interaction.Member.User
 	} else if c.Interaction.User != nil {
 		return *c.Interaction.User
 	} else { // Infallible

@@ -214,9 +214,13 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			Deny:  0,
 		})
 
+		pos := 0
+		if ch.Position != nil {
+			pos = *ch.Position
+		}
 		data := rest.ModifyChannelData{
 			PermissionOverwrites: overwrites,
-			Position:             ch.Position,
+			Position:             pos,
 		}
 
 		ticketAuditReason := fmt.Sprintf("Added admin to ticket %d", ticket.Id)

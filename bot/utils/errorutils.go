@@ -6,8 +6,12 @@ import (
 )
 
 func MessageCreateErrorContext(e events.MessageCreate) errorcontext.WorkerErrorContext {
+	var guildId uint64
+	if e.GuildId != nil {
+		guildId = *e.GuildId
+	}
 	return errorcontext.WorkerErrorContext{
-		Guild:   e.GuildId,
+		Guild:   guildId,
 		User:    e.Author.Id,
 		Channel: e.ChannelId,
 	}

@@ -35,8 +35,8 @@ func (c CloseRequestCommand) Properties() registry.Properties {
 		InteractionOnly:  true,
 		DisableAutoDefer: true,
 		Arguments: command.Arguments(
-			command.NewOptionalArgument("close_delay", "Hours to close the ticket in if the user does not respond", interaction.OptionTypeInteger, "infallible"),
-			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.OptionTypeString, "infallible", c.ReasonAutoCompleteHandler),
+			command.NewOptionalArgument("close_delay", "Hours to close the ticket in if the user does not respond", interaction.ApplicationCommandOptionTypeInteger, "infallible"),
+			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.ApplicationCommandOptionTypeString, "infallible", c.ReasonAutoCompleteHandler),
 		),
 		Timeout: time.Second * 5,
 	}

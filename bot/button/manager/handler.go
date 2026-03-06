@@ -59,7 +59,7 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 	switch data.Data.Type() {
 	case component.ComponentButton:
 		cc = cmdcontext.NewButtonContext(ctx, worker, data, premiumTier, responseCh)
-	case component.ComponentSelectMenu:
+	case component.ComponentStringSelect:
 		cc = cmdcontext.NewSelectMenuContext(ctx, worker, data, premiumTier, responseCh)
 	default:
 		sentry.ErrorWithContext(fmt.Errorf("invalid message component type: %d", data.Data.ComponentType), errorcontext.WorkerErrorContext{
@@ -137,7 +137,7 @@ func HandleInteraction(ctx context.Context, manager *ComponentInteractionManager
 		}
 
 		return canEdit
-	case component.ComponentSelectMenu:
+	case component.ComponentStringSelect:
 		handler := manager.MatchSelect(data.Data.AsSelectMenu().CustomId)
 		if handler == nil {
 			return false

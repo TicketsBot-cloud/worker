@@ -29,7 +29,7 @@ func (BlacklistCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Support,
 		Category:        command.Settings,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to blacklist or unblacklist", interaction.OptionTypeMentionable, i18n.MessageBlacklistNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to blacklist or unblacklist", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageBlacklistNoMembers),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,

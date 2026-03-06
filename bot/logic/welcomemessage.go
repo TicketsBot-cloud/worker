@@ -85,7 +85,7 @@ func SendWelcomeMessage(
 			Label:    cmd.GetMessage(i18n.TitleClose),
 			CustomId: "close",
 			Style:    component.ButtonStyleDanger,
-			Emoji:    &emoji.Emoji{Name: "🔒"},
+			Emoji:    &emoji.Emoji{Name: utils.Ptr("🔒")},
 		}))
 	}
 	if !hideCloseWithReason {
@@ -93,7 +93,7 @@ func SendWelcomeMessage(
 			Label:    cmd.GetMessage(i18n.TitleCloseWithReason),
 			CustomId: "close_with_reason",
 			Style:    component.ButtonStyleDanger,
-			Emoji:    &emoji.Emoji{Name: "🔒"},
+			Emoji:    &emoji.Emoji{Name: utils.Ptr("🔒")},
 		}))
 	}
 
@@ -102,7 +102,7 @@ func SendWelcomeMessage(
 			Label:    cmd.GetMessage(i18n.TitleClaim),
 			CustomId: "claim",
 			Style:    component.ButtonStyleSuccess,
-			Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+			Emoji:    &emoji.Emoji{Name: utils.Ptr("🙋‍♂️")},
 		}))
 	}
 
@@ -511,7 +511,13 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 	},
 	"nickname": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		member, _ := worker.GetGuildMember(ticket.GuildId, ticket.UserId)
-		return member.Nick
+		if member.Nick != nil && len(*member.Nick) > 0 {
+			return *member.Nick
+		}
+		if member.User != nil {
+			return member.User.Username
+		}
+		return ""
 	},
 	"server": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		guild, _ := worker.GetGuild(ticket.GuildId)

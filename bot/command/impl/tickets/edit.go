@@ -49,7 +49,7 @@ func (EditCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	ctx.ReplyWith(command.MessageResponse{
-		Flags: message.SumFlags(message.FlagComponentsV2),
+		Flags: message.SumFlags(message.FlagIsComponentsV2),
 		Components: []component.Component{
 			component.BuildContainer(component.Container{
 				Components: []component.Component{
@@ -69,7 +69,7 @@ func (EditCommand) Execute(ctx registry.CommandContext) {
 						},
 						Accessory: component.BuildButton(component.Button{
 							Emoji: &emoji.Emoji{
-								Name: "⚙️",
+								Name: utils.Ptr("⚙️"),
 							},
 							CustomId: "update-ticket-labels-button",
 							Style:    component.ButtonStyleSecondary,

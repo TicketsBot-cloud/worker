@@ -72,7 +72,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 				answer := ""
 
 				switch actionRow.Component.Type {
-				case component.ComponentSelectMenu:
+				case component.ComponentStringSelect:
 					answer = strings.Join(actionRow.Component.Values, ", ")
 				case component.ComponentInputText:
 					answer = actionRow.Component.Value

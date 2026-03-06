@@ -29,7 +29,7 @@ func (RemoveAdminCommand) Properties() registry.Properties {
 		PermissionLevel: permcache.Admin,
 		Category:        command.Settings,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to remove the administrator permission from", interaction.OptionTypeMentionable, i18n.MessageRemoveAdminNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to remove the administrator permission from", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageRemoveAdminNoMembers),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,

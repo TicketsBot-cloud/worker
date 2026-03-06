@@ -33,7 +33,7 @@ func (RenameCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Support,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("name", "New name for the ticket", interaction.OptionTypeString, i18n.MessageRenameMissingName),
+			command.NewRequiredArgument("name", "New name for the ticket", interaction.ApplicationCommandOptionTypeString, i18n.MessageRenameMissingName),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,
@@ -117,10 +117,10 @@ func (RenameCommand) Execute(ctx registry.CommandContext, name string) {
 		// %nickname%
 		logic.NewSubstitutor("nickname", false, true, func(user user.User, member member.Member) string {
 			nickname := member.Nick
-			if len(nickname) == 0 {
-				nickname = member.User.Username
+			if len(*nickname) == 0 {
+				nickname = &member.User.Username
 			}
-			return nickname
+			return *nickname
 		}),
 	}, []logic.ParameterizedSubstitutor{
 		// %date% or %date:FORMAT%

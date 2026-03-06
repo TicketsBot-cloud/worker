@@ -27,15 +27,15 @@ type executorData struct {
 var callerTemplate string
 
 var typeMap = map[interaction.ApplicationCommandOptionType]reflect.Type{
-	interaction.OptionTypeString:      reflect.TypeOf(""),                   // string
-	interaction.OptionTypeInteger:     reflect.TypeOf(int(0)),               // int
-	interaction.OptionTypeBoolean:     reflect.TypeOf(false),                // bool
-	interaction.OptionTypeUser:        reflect.TypeOf(uint64(0)),            // snowflake
-	interaction.OptionTypeChannel:     reflect.TypeOf(uint64(0)),            // snowflake
-	interaction.OptionTypeRole:        reflect.TypeOf(uint64(0)),            // snowflake
-	interaction.OptionTypeMentionable: reflect.TypeOf(uint64(0)),            // snowflake
-	interaction.OptionTypeNumber:      reflect.TypeOf(float64(0)),           // float64
-	interaction.OptionTypeAttachment:  reflect.TypeOf(channel.Attachment{}), // attachment
+	interaction.ApplicationCommandOptionTypeString:      reflect.TypeOf(""),                   // string
+	interaction.ApplicationCommandOptionTypeInteger:     reflect.TypeOf(int(0)),               // int
+	interaction.ApplicationCommandOptionTypeBoolean:     reflect.TypeOf(false),                // bool
+	interaction.ApplicationCommandOptionTypeUser:        reflect.TypeOf(uint64(0)),            // snowflake
+	interaction.ApplicationCommandOptionTypeChannel:     reflect.TypeOf(uint64(0)),            // snowflake
+	interaction.ApplicationCommandOptionTypeRole:        reflect.TypeOf(uint64(0)),            // snowflake
+	interaction.ApplicationCommandOptionTypeMentionable: reflect.TypeOf(uint64(0)),            // snowflake
+	interaction.ApplicationCommandOptionTypeNumber:      reflect.TypeOf(float64(0)),           // float64
+	interaction.ApplicationCommandOptionTypeAttachment:  reflect.TypeOf(channel.Attachment{}), // attachment
 }
 
 func main() {

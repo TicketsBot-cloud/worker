@@ -48,7 +48,7 @@ func NewMessageComponentInteractionErrorContext(data interaction.InteractionMeta
 	/*
 		if data.Data.Type() == component.ComponentButton {
 			m["custom_id"] = data.Data.AsButton().CustomId
-		} else if data.Data.Type() == component.ComponentSelectMenu {
+		} else if data.Data.Type() == component.ComponentStringSelect {
 			m["custom_id"] = data.Data.AsSelectMenu().CustomId
 		}
 	*/

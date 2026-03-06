@@ -28,14 +28,19 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 	span := sentry.StartTransaction(ctx, "OnMessage")
 	defer span.Finish()
 
-	if e.GuildId != 0 {
-		span.SetTag("guild_id", strconv.FormatUint(e.GuildId, 10))
+	var guildId uint64
+	if e.GuildId != nil {
+		guildId = *e.GuildId
+	}
+
+	if guildId != 0 {
+		span.SetTag("guild_id", strconv.FormatUint(guildId, 10))
 	}
 
 	statsd.Client.IncrementKey(statsd.KeyMessages)
 
 	// ignore DMs
-	if e.GuildId == 0 {
+	if guildId == 0 {
 		return
 	}
 
@@ -56,7 +61,7 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 	if e.Author.Id != worker.BotId && !e.Author.Bot {
 		// set participants, for logging
 		sentry.WithSpan0(span.Context(), "Add participant", func(span *sentry.Span) {
-			if err := dbclient.Client.Participants.Set(ctx, e.GuildId, ticket.Id, e.Author.Id); err != nil {
+			if err := dbclient.Client.Participants.Set(ctx, guildId, ticket.Id, e.Author.Id); err != nil {
 				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 			}
 		})
@@ -81,7 +86,7 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			if *isStaffCached { // check the user is staff
 				// We don't have to check for previous responses due to ON CONFLICT DO NOTHING
 				sentry.WithSpan0(span.Context(), "Set first response time", func(span *sentry.Span) {
-					if err := dbclient.Client.FirstResponseTime.Set(ctx, e.GuildId, e.Author.Id, ticket.Id, time.Now().Sub(ticket.OpenTime)); err != nil {
+					if err := dbclient.Client.FirstResponseTime.Set(ctx, guildId, e.Author.Id, ticket.Id, time.Now().Sub(ticket.OpenTime)); err != nil {
 						sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 					}
 				})
@@ -90,7 +95,7 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 	}
 
 	premiumTier, err := sentry.WithSpan2(span.Context(), "Get premium tier", func(span *sentry.Span) (premium.PremiumTier, error) {
-		return utils.PremiumClient.GetTierByGuildId(ctx, e.GuildId, true, worker.Token, worker.RateLimiter)
+		return utils.PremiumClient.GetTierByGuildId(ctx, guildId, true, worker.Token, worker.RateLimiter)
 	})
 	if err != nil {
 		sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
@@ -135,13 +140,13 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			}
 
 			if ticket.Status != newStatus {
-				if err := dbclient.Client.Tickets.SetStatus(ctx, e.GuildId, ticket.Id, newStatus); err != nil {
+				if err := dbclient.Client.Tickets.SetStatus(ctx, guildId, ticket.Id, newStatus); err != nil {
 					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 				}
 
 				if !ticket.IsThread {
 					if err := sentry.WithSpan1(span.Context(), "Update status update queue", func(span *sentry.Span) error {
-						return dbclient.Client.CategoryUpdateQueue.Add(ctx, e.GuildId, ticket.Id, newStatus)
+						return dbclient.Client.CategoryUpdateQueue.Add(ctx, guildId, ticket.Id, newStatus)
 					}); err != nil {
 						sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 					}
