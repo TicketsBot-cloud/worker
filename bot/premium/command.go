@@ -84,7 +84,10 @@ func BuildPatreonSubscriptionFoundMessage(ctx registry.CommandContext, legacyEnt
 			}),
 		))
 
-		embed := utils.BuildEmbed(ctx, customisation.Red, i18n.MessagePremiumSubscriptionFound, i18n.MessagePremiumSubscriptionFoundContent, nil, guild.OwnerId, commands["addadmin"], commands["viewstaff"])
+		addAdminCommand := fmt.Sprintf("<%s:%d>", "/addadmin", commands["addadmin"])
+		viewStaffCommand := fmt.Sprintf("<%s:%d>", "/viewstaff", commands["viewstaff"])
+
+		embed := utils.BuildEmbed(ctx, customisation.Red, i18n.MessagePremiumSubscriptionFound, i18n.MessagePremiumSubscriptionFoundContent, nil, guild.OwnerId, addAdminCommand, viewStaffCommand)
 		return command.NewEphemeralEmbedMessageResponseWithComponents(embed, components), nil
 	} else { // Modern entitlements
 		components := utils.Slice(component.BuildActionRow(
@@ -119,7 +122,7 @@ func BuildPatreonNotLinkedMessage(ctx registry.CommandContext) command.MessageRe
 			Label: ctx.GetMessage(i18n.MessagePremiumLinkPatreonAccount),
 			Style: component.ButtonStyleLink,
 			Emoji: ctx.SelectValidEmoji(customisation.EmojiPatreon, "🔗"),
-			Url:   utils.Ptr("https://support.patreon.com/hc/en-us/articles/212052266-Get-my-Discord-role"), // TODO: Localised link
+			Url:   utils.Ptr("https://support.patreon.com/hc/en-us/articles/212052266-Get-my-Discord-role"),
 		}),
 		component.BuildButton(component.Button{
 			Label: ctx.GetMessage(i18n.MessageJoinSupportServer),
@@ -129,7 +132,7 @@ func BuildPatreonNotLinkedMessage(ctx registry.CommandContext) command.MessageRe
 		}),
 	))
 
-	embed := utils.BuildEmbed(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumNoSubscription, nil)
+	embed := utils.BuildEmbed(ctx, customisation.Red, i18n.TitlePremium, i18n.MessagePremiumNoSubscription, nil, "https://support.patreon.com/hc/en-us/articles/212052266-Get-my-Discord-role")
 	return command.NewEphemeralEmbedMessageResponseWithComponents(embed, components)
 }
 

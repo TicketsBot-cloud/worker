@@ -43,7 +43,7 @@ func (OpenCommand) Execute(ctx *context.SlashCommandContext, providedSubject *st
 	}
 
 	if settings.DisableOpenCommand {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCommandDisabled)
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCommandDisabled, "/open")
 		return
 	}
 
@@ -52,5 +52,5 @@ func (OpenCommand) Execute(ctx *context.SlashCommandContext, providedSubject *st
 		subject = *providedSubject
 	}
 
-	logic.OpenTicket(ctx.Context, ctx, nil, subject, nil)
+	logic.OpenTicket(ctx.Context, ctx, nil, subject, nil, nil, nil, nil)
 }

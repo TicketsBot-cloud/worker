@@ -1,6 +1,7 @@
 package tags
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -72,8 +73,9 @@ func (ManageTagsAddCommand) Execute(ctx registry.CommandContext, tagId, content 
 		return
 	}
 
+	tagMessage := fmt.Sprintf("%s %s", "/tag", tagId)
 	if exists {
-		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagCreateAlreadyExists, utils.ToSlice(usageEmbed), tagId, tagId)
+		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagCreateAlreadyExists, utils.ToSlice(usageEmbed), tagId, tagMessage)
 		return
 	}
 
@@ -90,5 +92,5 @@ func (ManageTagsAddCommand) Execute(ctx registry.CommandContext, tagId, content 
 		return
 	}
 
-	ctx.Reply(customisation.Green, i18n.MessageTag, i18n.MessageTagCreateSuccess, tagId)
+	ctx.Reply(customisation.Green, i18n.MessageTag, i18n.MessageTagCreateSuccess, tagMessage)
 }

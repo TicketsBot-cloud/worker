@@ -36,7 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string) (database.Ticket, error) {
+func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int) (database.Ticket, error) {
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
@@ -66,7 +66,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Make sure ticket count is within ticket limit
 	// Check ticket limit before ratelimit token to prevent 1 person from stopping everyone opening tickets
-	violatesTicketLimit, limit := getTicketLimit(ctx, cmd)
+	violatesTicketLimit, limit := getTicketLimit(ctx, cmd, panel)
 	if violatesTicketLimit {
 		// Notify the user
 		ticketsPluralised := "ticket"
@@ -94,6 +94,38 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if !ok {
 		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenRatelimited)
 		return database.Ticket{}, nil
+	}
+
+	// Check per-user per-panel cooldown
+	if panel != nil && panel.CooldownSeconds > 0 {
+		span = sentry.StartSpan(rootSpan.Context(), "Check panel cooldown")
+
+		// Staff are exempt from cooldown
+		permLevel, err := cmd.UserPermissionLevel(ctx)
+		if err != nil {
+			cmd.HandleError(err)
+			span.Finish()
+			return database.Ticket{}, err
+		}
+
+		if permLevel < permcache.Support {
+			cooldownDuration := time.Duration(panel.CooldownSeconds) * time.Second
+			canOpen, remaining, err := redis.TakePanelCooldownToken(ctx, cmd.GuildId(), panel.PanelId, cmd.UserId(), cooldownDuration)
+			if err != nil {
+				cmd.HandleError(err)
+				span.Finish()
+				return database.Ticket{}, err
+			}
+
+			if !canOpen {
+				expiresAt := time.Now().Add(remaining).Unix()
+				cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelCooldown, fmt.Sprintf("<t:%d:R>", expiresAt))
+				span.Finish()
+				return database.Ticket{}, nil
+			}
+		}
+
+		span.Finish()
 	}
 
 	// Ensure that the panel isn't disabled
@@ -257,11 +289,19 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 	span.Finish()
 
+	// Get member for audit log reason
+	member, err := cmd.Member()
+	auditReason := "Ticket opened"
+	if err == nil {
+		auditReason = fmt.Sprintf("Ticket %d opened by %s", ticketId, member.User.Username)
+	}
+
 	var ch channel.Channel
 	var joinMessageId *uint64
 	if isThread {
 		span = sentry.StartSpan(rootSpan.Context(), "Create thread")
-		ch, err = cmd.Worker().CreatePrivateThread(cmd.ChannelId(), name, uint16(settings.ThreadArchiveDuration), false)
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(settings.ThreadArchiveDuration), false)
 		if err != nil {
 			cmd.HandleError(err)
 
@@ -326,14 +366,15 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 
 		span = sentry.StartSpan(rootSpan.Context(), "Create channel")
-		tmp, err := cmd.Worker().CreateGuildChannel(cmd.GuildId(), data)
+		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+		tmp, err := cmd.Worker().CreateGuildChannel(reasonCtx, cmd.GuildId(), data)
 		if err != nil { // Bot likely doesn't have permission
+			cmd.HandleError(err)
+
 			// To prevent tickets getting in a glitched state, we should mark it as closed (or delete it completely?)
 			if err := dbclient.Client.Tickets.Close(ctx, ticketId, cmd.GuildId()); err != nil {
 				cmd.HandleError(err)
 			}
-
-			cmd.HandleError(err)
 
 			var restError request.RestError
 			if errors.As(err, &restError) && restError.ApiError.FirstErrorCode() == "CHANNEL_PARENT_MAX_CHANNELS" {
@@ -565,6 +606,31 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, err
 	}
 
+	// Send out-of-hours warning inside the ticket channel
+	if outOfHoursWarning != nil && outOfHoursTitle != nil {
+		span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
+		defer span.Finish()
+
+		colourHex := customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red)
+		if outOfHoursColour != nil {
+			colourHex = *outOfHoursColour
+		}
+
+		warningEmbed := utils.BuildEmbedRaw(
+			colourHex,
+			*outOfHoursTitle,
+			*outOfHoursWarning,
+			nil,
+			cmd.PremiumTier(),
+		)
+
+		_, err := cmd.Worker().CreateMessageEmbed(ch.Id, warningEmbed)
+
+		if err != nil {
+			cmd.HandleError(err)
+		}
+	}
+
 	// Pin the welcome message as the last step after everything else is complete
 	if welcomeMessageId != 0 && ticket.ChannelId != nil {
 		span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
@@ -737,7 +803,7 @@ func refreshCachedChannels(ctx context.Context, worker *worker.Context, guildId 
 }
 
 // has hit ticket limit, ticket limit
-func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int) {
+func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *database.Panel) (bool, int) {
 	isStaff, err := cmd.UserPermissionLevel(ctx)
 	if err != nil {
 		sentry.ErrorWithContext(err, cmd.ToErrorContext())
@@ -748,28 +814,39 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext) (bool, int
 		return false, 50
 	}
 
-	var openedTickets []database.Ticket
+	var openTicketCount int
 	var ticketLimit uint8
 
 	group, _ := errgroup.WithContext(ctx)
 
-	// get ticket limit
-	group.Go(func() (err error) {
-		ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
-		return
-	})
+	// If panel has a per-panel limit, use it and count only panel tickets
+	if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
+		ticketLimit = *panel.TicketLimit
 
-	group.Go(func() (err error) {
-		openedTickets, err = dbclient.Client.Tickets.GetOpenByUser(ctx, cmd.GuildId(), cmd.UserId())
-		return
-	})
+		group.Go(func() (err error) {
+			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
+				ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
+			return
+		})
+	} else {
+		// Use global limit and count all tickets
+		group.Go(func() (err error) {
+			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
+			return
+		})
+
+		group.Go(func() (err error) {
+			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+			return
+		})
+	}
 
 	if err := group.Wait(); err != nil {
 		sentry.ErrorWithContext(err, cmd.ToErrorContext())
 		return true, 1
 	}
 
-	return len(openedTickets) >= int(ticketLimit), int(ticketLimit)
+	return openTicketCount >= int(ticketLimit), int(ticketLimit)
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
@@ -1060,7 +1137,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	} else {
 		var err error
-		name, err = DoSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
+		name, err = DoSubstitutionsWithParams(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)
@@ -1106,6 +1183,79 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 				}
 
 				return nickname
+			}),
+		}, []ParameterizedSubstitutor{
+			// %date% or %date:FORMAT% (e.g., %date:yyyy-mm-dd%)
+			NewParameterizedSubstitutor("date", false, false, func(u user.User, m member.Member, params []string) string {
+				format := ""
+				if len(params) > 0 {
+					format = params[0]
+				}
+				return FormatPlainDate(time.Now(), format)
+			}),
+			// %date_days:N% or %date_days:N:FORMAT%
+			NewParameterizedSubstitutor("date_days", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				days, err := ParseOffset(params[0])
+				if err != nil {
+					return ""
+				}
+				targetTime := time.Now().AddDate(0, 0, days)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(targetTime, format)
+			}),
+			// %date_weeks:N% or %date_weeks:N:FORMAT%
+			NewParameterizedSubstitutor("date_weeks", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				weeks, err := ParseOffset(params[0])
+				if err != nil {
+					return ""
+				}
+				targetTime := time.Now().AddDate(0, 0, weeks*7)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(targetTime, format)
+			}),
+			// %date_months:N% or %date_months:N:FORMAT%
+			NewParameterizedSubstitutor("date_months", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				months, err := ParseOffset(params[0])
+				if err != nil {
+					return ""
+				}
+				targetTime := time.Now().AddDate(0, months, 0)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(targetTime, format)
+			}),
+			// %date_timestamp:UNIX% or %date_timestamp:UNIX:FORMAT%
+			NewParameterizedSubstitutor("date_timestamp", false, false, func(u user.User, m member.Member, params []string) string {
+				if len(params) < 1 {
+					return ""
+				}
+				ts, err := ParseTimestamp(params[0])
+				if err != nil {
+					return ""
+				}
+				t := time.Unix(ts, 0)
+				format := ""
+				if len(params) >= 2 {
+					format = params[1]
+				}
+				return FormatPlainDate(t, format)
 			}),
 		})
 

@@ -33,7 +33,7 @@ type SlashCommandContext struct {
 	premium     premium.PremiumTier
 
 	hasReplied *atomic.Bool
-	responseCh chan interaction.ApplicationCommandCallbackData
+	responseCh chan command.Response
 }
 
 var _ registry.CommandContext = (*SlashCommandContext)(nil)
@@ -43,7 +43,7 @@ func NewSlashCommandContext(
 	worker *worker.Context,
 	interaction interaction.ApplicationCommandInteraction,
 	premium premium.PremiumTier,
-	responseCh chan interaction.ApplicationCommandCallbackData,
+	responseCh chan command.Response,
 ) SlashCommandContext {
 	c := SlashCommandContext{
 		Context: ctx,
@@ -123,7 +123,7 @@ func (c *SlashCommandContext) ReplyWith(response command.MessageResponse) (messa
 		return message.Message{}, err
 	}
 
-	c.responseCh <- response.IntoApplicationCommandData()
+	c.responseCh <- command.ResponseMessage{Data: response.IntoApplicationCommandData()}
 
 	return message.Message{}, nil
 
@@ -143,6 +143,10 @@ func (c *SlashCommandContext) ReplyWith(response command.MessageResponse) (messa
 			return message.Message{}, nil
 		}
 	*/
+}
+
+func (c *SlashCommandContext) Modal(data interaction.ModalResponseData) {
+	c.responseCh <- command.ResponseModal{Data: data}
 }
 
 func (c *SlashCommandContext) Channel() (channel.PartialChannel, error) {

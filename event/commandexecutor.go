@@ -34,7 +34,7 @@ func executeCommand(
 	worker *worker.Context,
 	registry cmdregistry.Registry,
 	data interaction.ApplicationCommandInteraction,
-	responseCh chan interaction.ApplicationCommandCallbackData,
+	responseCh chan command.Response,
 ) (bool, bool, error) {
 	cmd, ok := registry[data.Data.Name]
 	if !ok {
@@ -97,21 +97,21 @@ func executeCommand(
 
 		if !allowed {
 			if currentContext == interaction.InteractionContextBotDM {
-				responseCh <- interaction.ApplicationCommandCallbackData{
+				responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 					Content: "This command can only be used in servers.",
-				}
+				}}
 			} else {
-				responseCh <- interaction.ApplicationCommandCallbackData{
+				responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 					Content: "This command can only be used in DMs.",
-				}
+				}}
 			}
 			return false, false, nil
 		}
 	} else {
 		if currentContext == interaction.InteractionContextBotDM {
-			responseCh <- interaction.ApplicationCommandCallbackData{
+			responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 				Content: "This command can only be used in servers.",
-			}
+			}}
 			return false, false, nil
 		}
 	}
@@ -159,11 +159,12 @@ func executeCommand(
 
 			if err := group.Wait(); err != nil {
 				errorId := sentry.Error(err)
-				responseCh <- interaction.ApplicationCommandCallbackData{
+				responseCh <- command.ResponseMessage{Data: interaction.ApplicationCommandCallbackData{
 					Content: fmt.Sprintf("An error occurred while processing this request (Error ID `%s`)", errorId),
-				}
+				}}
 				return
 			}
+
 		}
 
 		if premiumLevel == premium.None && config.Conf.PremiumOnly {
@@ -177,12 +178,7 @@ func executeCommand(
 
 		// Check if the guild is globally blacklisted
 		if data.GuildId.Value != 0 && blacklist.IsGuildBlacklisted(data.GuildId.Value) {
-			reason, _ := dbclient.Client.ServerBlacklist.GetReason(lookupCtx, data.GuildId.Value)
-			if reason != "" {
-				interactionContext.ReplyRaw(customisation.Red, i18n.GetMessageFromGuild(data.GuildId.Value, i18n.TitleBlacklisted), i18n.GetMessageFromGuild(data.GuildId.Value, i18n.MessageGuildBlacklisted)+"\n\n**"+i18n.GetMessageFromGuild(data.GuildId.Value, i18n.Reason)+":** "+reason)
-			} else {
-				interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
-			}
+			interactionContext.Reply(customisation.Red, i18n.TitleBlacklisted, i18n.MessageGuildBlacklisted)
 			return
 		}
 
@@ -202,7 +198,7 @@ func executeCommand(
 		}
 
 		if properties.PremiumOnly && premiumLevel == premium.None {
-			interactionContext.Reply(customisation.Red, i18n.TitlePremiumOnly, i18n.MessagePremium)
+			interactionContext.Reply(customisation.Red, i18n.TitlePremiumOnly, i18n.MessagePremium, "https://www.patreon.com/ticketsbot-cloud", config.Conf.Bot.VoteUrl)
 			return
 		}
 
@@ -242,12 +238,12 @@ func executeCommand(
 					content := `This command registration is outdated. Please ask the server administrators to visit the whitelabel dashboard and press "Create Slash Commands" again.`
 					embed := utils.BuildEmbedRaw(customisation.GetDefaultColour(customisation.Red), "Outdated Command", content, nil, premium.Whitelabel)
 					res := command.NewEphemeralEmbedMessageResponse(embed)
-					responseCh <- res.IntoApplicationCommandData()
+					responseCh <- command.ResponseMessage{Data: res.IntoApplicationCommandData()}
 
 					return
 				} else {
 					res := command.NewEphemeralTextMessageResponse("argument is missing")
-					responseCh <- res.IntoApplicationCommandData()
+					responseCh <- command.ResponseMessage{Data: res.IntoApplicationCommandData()}
 				}
 			} else {
 				interactionContext.HandleError(err)

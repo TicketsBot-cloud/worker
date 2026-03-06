@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/permission"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -212,8 +213,23 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			return
 		}
 
+		user, err := ctx.Worker().GetUser(id)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		executor, err := ctx.Member()
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		auditReason := fmt.Sprintf("Removed %s from ticket %d by %s", user.Username, ticket.Id, executor.User.Username)
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+
 		if ticket.IsThread {
-			if err := ctx.Worker().RemoveThreadMember(ctx.ChannelId(), id); err != nil {
+			if err := ctx.Worker().RemoveThreadMember(reasonCtx, ticketChannelId, id); err != nil {
 				ctx.HandleError(err)
 				return
 			}
@@ -225,7 +241,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 				Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 			}
 
-			if err := ctx.Worker().EditChannelPermissions(ticketChannelId, data); err != nil {
+			if err := ctx.Worker().EditChannelPermissions(reasonCtx, ticketChannelId, data); err != nil {
 				ctx.HandleError(err)
 				return
 			}
@@ -309,7 +325,15 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
 		}
 
-		if err := ctx.Worker().EditChannelPermissions(ticketChannelId, data); err != nil {
+		executor, err := ctx.Member()
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		auditReason := fmt.Sprintf("Removed role from ticket %d by %s", ticket.Id, executor.User.Username)
+		reasonCtx := request.WithAuditReason(ctx, auditReason)
+		if err := ctx.Worker().EditChannelPermissions(reasonCtx, ticketChannelId, data); err != nil {
 			ctx.HandleError(err)
 			return
 		}
