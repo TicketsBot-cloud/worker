@@ -26,6 +26,17 @@ func ListenTicketClose() {
 		payload := payload
 
 		go func() {
+			var succeeded bool
+			defer func() {
+				if payload.ResponseKey == "" {
+					return
+				}
+				result := closerelay.CloseResult{Success: succeeded}
+				if err := closerelay.PublishResult(redis.Client, payload.ResponseKey, result); err != nil {
+					sentry.Error(err)
+				}
+			}()
+
 			ctx, cancel := context.WithTimeout(context.Background(), constants.TimeoutCloseTicket)
 			defer cancel()
 
@@ -98,13 +109,15 @@ func ListenTicketClose() {
 			if ticket.ChannelId == nil {
 				if err := dbclient.Client.Tickets.Close(ctx, payload.TicketId, payload.GuildId); err != nil {
 					sentry.ErrorWithContext(err, errorContext)
+					return
 				}
+				succeeded = true
 				return
 			}
 
 			// ticket.ChannelId cannot be nil
 			cc := cmdcontext.NewDashboardContext(ctx, workerCtx, ticket.GuildId, *ticket.ChannelId, payload.UserId, premiumTier)
-			logic.CloseTicket(ctx, &cc, &payload.Reason, false)
+			succeeded = logic.CloseTicket(ctx, &cc, &payload.Reason, false)
 		}()
 	}
 }

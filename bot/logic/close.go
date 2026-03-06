@@ -25,8 +25,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *string, bypassPermissionCheck bool) {
-	var success bool
+func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *string, bypassPermissionCheck bool) (success bool) {
 	errorContext := cmd.ToErrorContext()
 
 	// Get ticket struct
@@ -280,6 +279,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 	}
 
 	sendCloseEmbed(ctx, cmd, errorContext, member, settings, ticket, reason)
+	return
 }
 
 func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
