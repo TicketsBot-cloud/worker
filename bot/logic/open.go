@@ -1042,16 +1042,16 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 				perms, ok := teamPermsMap[teamId]
 				if !ok {
 					perms = database.SupportTeamPermissions{
+						AddReactions:           true,
 						SendMessages:           true,
+						SendTTSMessages:        true,
 						EmbedLinks:             true,
 						AttachFiles:            true,
-						AddReactions:           true,
-						SendVoiceMessages:      true,
-						SendTTSMessages:        true,
-						UseApplicationCommands: true,
 						MentionEveryone:        false,
 						UseExternalEmojis:      true,
+						UseApplicationCommands: true,
 						UseExternalStickers:    true,
+						SendVoiceMessages:      true,
 					}
 				}
 

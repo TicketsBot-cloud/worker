@@ -103,16 +103,16 @@ func buildStaffPermissions(p database.SupportTeamPermissions) (allow, deny []per
 		}
 	}
 
+	toggle(permission.AddReactions, p.AddReactions)
 	toggle(permission.SendMessages, p.SendMessages)
+	toggle(permission.SendTTSMessages, p.SendTTSMessages)
 	toggle(permission.EmbedLinks, p.EmbedLinks)
 	toggle(permission.AttachFiles, p.AttachFiles)
-	toggle(permission.AddReactions, p.AddReactions)
-	toggle(permission.SendVoiceMessages, p.SendVoiceMessages)
-	toggle(permission.SendTTSMessages, p.SendTTSMessages)
-	toggle(permission.UseApplicationCommands, p.UseApplicationCommands)
 	toggle(permission.MentionEveryone, p.MentionEveryone)
 	toggle(permission.UseExternalEmojis, p.UseExternalEmojis)
+	toggle(permission.UseApplicationCommands, p.UseApplicationCommands)
 	toggle(permission.UseExternalStickers, p.UseExternalStickers)
+	toggle(permission.SendVoiceMessages, p.SendVoiceMessages)
 
 	return allow, deny
 }
