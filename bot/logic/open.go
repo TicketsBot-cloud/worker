@@ -1050,6 +1050,8 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 						SendTTSMessages:        true,
 						UseApplicationCommands: true,
 						MentionEveryone:        false,
+						UseExternalEmojis:      true,
+						UseExternalStickers:    true,
 					}
 				}
 

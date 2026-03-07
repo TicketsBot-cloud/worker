@@ -111,6 +111,8 @@ func buildStaffPermissions(p database.SupportTeamPermissions) (allow, deny []per
 	toggle(permission.SendTTSMessages, p.SendTTSMessages)
 	toggle(permission.UseApplicationCommands, p.UseApplicationCommands)
 	toggle(permission.MentionEveryone, p.MentionEveryone)
+	toggle(permission.UseExternalEmojis, p.UseExternalEmojis)
+	toggle(permission.UseExternalStickers, p.UseExternalStickers)
 
 	return allow, deny
 }
