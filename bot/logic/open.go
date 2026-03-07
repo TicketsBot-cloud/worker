@@ -943,13 +943,13 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 
 	// Apply panel-level grants on top of global settings (OR logic: panel can only add permissions)
 	if panel != nil {
-		additionalPermissions.AttachFiles = additionalPermissions.AttachFiles || panel.TicketPermsAttachFiles
-		additionalPermissions.EmbedLinks = additionalPermissions.EmbedLinks || panel.TicketPermsEmbedLinks
 		additionalPermissions.AddReactions = additionalPermissions.AddReactions || panel.TicketPermsAddReactions
-		additionalPermissions.SendVoiceMessages = additionalPermissions.SendVoiceMessages || panel.TicketPermsSendVoiceMessages
 		additionalPermissions.SendTTSMessages = additionalPermissions.SendTTSMessages || panel.TicketPermsSendTTSMessages
+		additionalPermissions.EmbedLinks = additionalPermissions.EmbedLinks || panel.TicketPermsEmbedLinks
+		additionalPermissions.AttachFiles = additionalPermissions.AttachFiles || panel.TicketPermsAttachFiles
 		additionalPermissions.UseExternalEmojis = additionalPermissions.UseExternalEmojis || panel.TicketPermsUseExternalEmojis
 		additionalPermissions.UseExternalStickers = additionalPermissions.UseExternalStickers || panel.TicketPermsUseExternalStickers
+		additionalPermissions.SendVoiceMessages = additionalPermissions.SendVoiceMessages || panel.TicketPermsSendVoiceMessages
 	}
 
 	// Separate permissions apply

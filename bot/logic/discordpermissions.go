@@ -36,10 +36,16 @@ func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPerm
 	allow := MinimalPermissions[:]
 	var deny []permission.Permission
 
-	if additionalPermissions.AttachFiles {
-		allow = append(allow, permission.AttachFiles)
+	if additionalPermissions.AddReactions {
+		allow = append(allow, permission.AddReactions)
 	} else {
-		deny = append(deny, permission.AttachFiles)
+		deny = append(deny, permission.AddReactions)
+	}
+
+	if additionalPermissions.SendTTSMessages {
+		allow = append(allow, permission.SendTTSMessages)
+	} else {
+		deny = append(deny, permission.SendTTSMessages)
 	}
 
 	if additionalPermissions.EmbedLinks {
@@ -48,22 +54,10 @@ func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPerm
 		deny = append(deny, permission.EmbedLinks)
 	}
 
-	if additionalPermissions.AddReactions {
-		allow = append(allow, permission.AddReactions)
+	if additionalPermissions.AttachFiles {
+		allow = append(allow, permission.AttachFiles)
 	} else {
-		deny = append(deny, permission.AddReactions)
-	}
-
-	if additionalPermissions.SendVoiceMessages {
-		allow = append(allow, permission.SendVoiceMessages)
-	} else {
-		deny = append(deny, permission.SendVoiceMessages)
-	}
-
-	if additionalPermissions.SendTTSMessages {
-		allow = append(allow, permission.SendTTSMessages)
-	} else {
-		deny = append(deny, permission.SendTTSMessages)
+		deny = append(deny, permission.AttachFiles)
 	}
 
 	if additionalPermissions.UseExternalEmojis {
@@ -76,6 +70,12 @@ func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPerm
 		allow = append(allow, permission.UseExternalStickers)
 	} else {
 		deny = append(deny, permission.UseExternalStickers)
+	}
+
+	if additionalPermissions.SendVoiceMessages {
+		allow = append(allow, permission.SendVoiceMessages)
+	} else {
+		deny = append(deny, permission.SendVoiceMessages)
 	}
 
 	return channel.PermissionOverwrite{
@@ -90,10 +90,16 @@ func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPerm
 	allow := MinimalPermissions[:]
 	var deny []permission.Permission
 
-	if additionalPermissions.AttachFiles {
-		allow = append(allow, permission.AttachFiles)
+	if additionalPermissions.AddReactions {
+		allow = append(allow, permission.AddReactions)
 	} else {
-		deny = append(deny, permission.AttachFiles)
+		deny = append(deny, permission.AddReactions)
+	}
+
+	if additionalPermissions.SendTTSMessages {
+		allow = append(allow, permission.SendTTSMessages)
+	} else {
+		deny = append(deny, permission.SendTTSMessages)
 	}
 
 	if additionalPermissions.EmbedLinks {
@@ -102,22 +108,10 @@ func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPerm
 		deny = append(deny, permission.EmbedLinks)
 	}
 
-	if additionalPermissions.AddReactions {
-		allow = append(allow, permission.AddReactions)
+	if additionalPermissions.AttachFiles {
+		allow = append(allow, permission.AttachFiles)
 	} else {
-		deny = append(deny, permission.AddReactions)
-	}
-
-	if additionalPermissions.SendVoiceMessages {
-		allow = append(allow, permission.SendVoiceMessages)
-	} else {
-		deny = append(deny, permission.SendVoiceMessages)
-	}
-
-	if additionalPermissions.SendTTSMessages {
-		allow = append(allow, permission.SendTTSMessages)
-	} else {
-		deny = append(deny, permission.SendTTSMessages)
+		deny = append(deny, permission.AttachFiles)
 	}
 
 	if additionalPermissions.UseExternalEmojis {
@@ -130,6 +124,12 @@ func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPerm
 		allow = append(allow, permission.UseExternalStickers)
 	} else {
 		deny = append(deny, permission.UseExternalStickers)
+	}
+
+	if additionalPermissions.SendVoiceMessages {
+		allow = append(allow, permission.SendVoiceMessages)
+	} else {
+		deny = append(deny, permission.SendVoiceMessages)
 	}
 
 	return channel.PermissionOverwrite{
