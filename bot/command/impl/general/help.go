@@ -64,6 +64,11 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 	for _, cmd := range c.Registry {
 		properties := cmd.Properties()
 
+		// hide dev commands
+		if properties.DevBotOnly {
+			continue
+		}
+
 		// check bot admin / helper only commands
 		if (properties.AdminOnly && !utils.IsBotAdmin(ctx.UserId())) || (properties.HelperOnly && !utils.IsBotHelper(ctx.UserId())) {
 			continue

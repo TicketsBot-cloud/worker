@@ -29,6 +29,7 @@ func (cm *CommandManager) RegisterCommands() {
 
 	cm.registry["admin"] = admin.AdminCommand{}
 
+	cm.registry["test"] = general.TestCommand{}
 	cm.registry["about"] = general.AboutCommand{}
 	cm.registry["gdpr"] = general.GDPRCommand{}
 	cm.registry["invite"] = general.InviteCommand{}
@@ -78,7 +79,7 @@ func (cm *CommandManager) RunSetupFuncs() {
 	}
 }
 
-func (cm *CommandManager) BuildCreatePayload(isWhitelabel bool, adminCommandGuildId *uint64) (data []rest.CreateCommandData, adminCommands []rest.CreateCommandData) {
+func (cm *CommandManager) BuildCreatePayload(isDevBot bool, isWhitelabel bool, adminCommandGuildId *uint64) (data []rest.CreateCommandData, adminCommands []rest.CreateCommandData) {
 	for _, cmd := range cm.GetCommands() {
 		properties := cmd.Properties()
 
@@ -91,6 +92,10 @@ func (cm *CommandManager) BuildCreatePayload(isWhitelabel bool, adminCommandGuil
 		var description string
 		if properties.Type == interaction.ApplicationCommandTypeChatInput {
 			description = option.Description
+		}
+
+		if properties.DevBotOnly && !isDevBot {
+			continue
 		}
 
 		if properties.MainBotOnly && isWhitelabel {
