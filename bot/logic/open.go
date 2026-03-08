@@ -943,13 +943,17 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 
 	// Apply panel-level grants on top of global settings (OR logic: panel can only add permissions)
 	if panel != nil {
-		additionalPermissions.AddReactions = additionalPermissions.AddReactions || panel.TicketPermsAddReactions
-		additionalPermissions.SendTTSMessages = additionalPermissions.SendTTSMessages || panel.TicketPermsSendTTSMessages
-		additionalPermissions.EmbedLinks = additionalPermissions.EmbedLinks || panel.TicketPermsEmbedLinks
-		additionalPermissions.AttachFiles = additionalPermissions.AttachFiles || panel.TicketPermsAttachFiles
-		additionalPermissions.UseExternalEmojis = additionalPermissions.UseExternalEmojis || panel.TicketPermsUseExternalEmojis
-		additionalPermissions.UseExternalStickers = additionalPermissions.UseExternalStickers || panel.TicketPermsUseExternalStickers
-		additionalPermissions.SendVoiceMessages = additionalPermissions.SendVoiceMessages || panel.TicketPermsSendVoiceMessages
+		panelPerms, err := dbclient.Client.PanelTicketPermissions.Get(ctx, panel.PanelId)
+		if err != nil {
+			return nil, err
+		}
+		additionalPermissions.AddReactions = additionalPermissions.AddReactions || panelPerms.AddReactions
+		additionalPermissions.SendTTSMessages = additionalPermissions.SendTTSMessages || panelPerms.SendTTSMessages
+		additionalPermissions.EmbedLinks = additionalPermissions.EmbedLinks || panelPerms.EmbedLinks
+		additionalPermissions.AttachFiles = additionalPermissions.AttachFiles || panelPerms.AttachFiles
+		additionalPermissions.UseExternalEmojis = additionalPermissions.UseExternalEmojis || panelPerms.UseExternalEmojis
+		additionalPermissions.UseExternalStickers = additionalPermissions.UseExternalStickers || panelPerms.UseExternalStickers
+		additionalPermissions.SendVoiceMessages = additionalPermissions.SendVoiceMessages || panelPerms.SendVoiceMessages
 	}
 
 	// Separate permissions apply
