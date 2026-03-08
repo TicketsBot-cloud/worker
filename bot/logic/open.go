@@ -636,28 +636,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
 		channelId := *ticket.ChannelId
 
-		if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err == nil {
-			// Delete the system pin notification message
-			span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
-
-			// Fetch recent messages to find the system pin notification
-			messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
-				Limit: 3,
-			})
-
-			if err == nil {
-				// Find and delete the system pin notification message
-				for _, msg := range messages {
-					// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
-					if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
-						_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
-						break
-					}
-				}
-			}
-
-			span2.Finish()
-		}
+		_ = cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId)
 		span.Finish()
 	}
 
@@ -1002,47 +981,108 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		})
 	}
 
-	// Create list of members & roles who should be added to the ticket
-	allowedUsers, allowedRoles, err := GetAllowedStaffUsersAndRoles(ctx, cmd.GuildId(), panel)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, member := range allowedUsers {
-		allow := make([]permission.Permission, len(StandardPermissions))
-		copy(allow, StandardPermissions[:]) // Do not append to StandardPermissions
-
-		if member == cmd.Worker().BotId {
-			continue // Already added overwrite above
+	// Default team (ticket admins + ticket support) — always StandardPermissions
+	if panel == nil || panel.WithDefaultTeam {
+		supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, cmd.GuildId())
+		if err != nil {
+			return nil, err
 		}
 
-		overwrites = append(overwrites, channel.PermissionOverwrite{
-			Id:    member,
-			Type:  channel.PermissionTypeMember,
-			Allow: permission.BuildPermissions(allow...),
-			Deny:  0,
-		})
+		supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, cmd.GuildId())
+		if err != nil {
+			return nil, err
+		}
+
+		for _, member := range supportUsers {
+			if member == cmd.Worker().BotId {
+				continue // Already added overwrite above
+			}
+
+			allow := make([]permission.Permission, len(StandardPermissions))
+			copy(allow, StandardPermissions[:])
+
+			overwrites = append(overwrites, channel.PermissionOverwrite{
+				Id:    member,
+				Type:  channel.PermissionTypeMember,
+				Allow: permission.BuildPermissions(allow...),
+				Deny:  0,
+			})
+		}
+
+		for _, role := range supportRoles {
+			overwrites = append(overwrites, channel.PermissionOverwrite{
+				Id:    role,
+				Type:  channel.PermissionTypeRole,
+				Allow: permission.BuildPermissions(StandardPermissions[:]...),
+				Deny:  0,
+			})
+		}
 	}
 
-	for _, role := range allowedRoles {
-		overwrites = append(overwrites, channel.PermissionOverwrite{
-			Id:    role,
-			Type:  channel.PermissionTypeRole,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
-			Deny:  0,
-		})
+	// Panel-specific custom teams — per-team permissions
+	if panel != nil {
+		panelTeamIds, err := dbclient.Client.PanelTeams.GetTeamIds(ctx, panel.PanelId)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(panelTeamIds) > 0 {
+			teamPermsMap, err := dbclient.Client.SupportTeamPermissions.GetForTeams(ctx, panelTeamIds)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, teamId := range panelTeamIds {
+				perms, ok := teamPermsMap[teamId]
+				if !ok {
+					perms = database.SupportTeamPermissions{
+						AddReactions:           true,
+						SendMessages:           true,
+						SendTTSMessages:        true,
+						EmbedLinks:             true,
+						AttachFiles:            true,
+						MentionEveryone:        false,
+						UseExternalEmojis:      true,
+						UseApplicationCommands: true,
+						UseExternalStickers:    true,
+						SendVoiceMessages:      true,
+					}
+				}
+
+				userIds, err := dbclient.Client.SupportTeamMembers.Get(ctx, teamId)
+				if err != nil {
+					return nil, err
+				}
+
+				roleIds, err := dbclient.Client.SupportTeamRoles.Get(ctx, teamId)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, userId := range userIds {
+					if userId == cmd.Worker().BotId {
+						continue
+					}
+					overwrites = append(overwrites, BuildStaffUserOverwrite(userId, perms))
+				}
+
+				for _, roleId := range roleIds {
+					overwrites = append(overwrites, BuildStaffRoleOverwrite(roleId, perms))
+				}
+			}
+		}
 	}
 
 	return overwrites, nil
 }
 
+// GetAllowedStaffUsersAndRoles returns the default team (ticket admins + ticket support) users and roles.
+// Panel-specific custom teams are handled separately in CreateOverwrites with per-team permission support.
 func GetAllowedStaffUsersAndRoles(ctx context.Context, guildId uint64, panel *database.Panel) ([]uint64, []uint64, error) {
-	// Create list of members & roles who should be added to the ticket
-	// Add the sender & self
 	allowedUsers := make([]uint64, 0)
 	allowedRoles := make([]uint64, 0)
 
-	// Should we add the default team
+	// Only return default team members
 	if panel == nil || panel.WithDefaultTeam {
 		// Get support reps & admins
 		supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, guildId)
@@ -1058,7 +1098,7 @@ func GetAllowedStaffUsersAndRoles(ctx context.Context, guildId uint64, panel *da
 			return nil, nil, err
 		}
 
-		allowedRoles = append(allowedUsers, supportRoles...)
+		allowedRoles = append(allowedRoles, supportRoles...)
 	}
 
 	// Add other support teams
