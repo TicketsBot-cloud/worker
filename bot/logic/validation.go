@@ -20,6 +20,11 @@ import (
 // outOfHoursWarning is non-nil when the panel is outside support hours but the behaviour is allow_with_warning.
 // outOfHoursColour is non-nil when a custom colour is configured for the out-of-hours embed.
 func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) (bool, *string, *string, *int, error) {
+	// Variables to hold out-of-hours warning info if behaviour is allow_with_warning
+	var outOfHoursWarningTitle *string
+	var outOfHoursWarningMessage *string
+	var outOfHoursWarningColour *int
+
 	// Check support hours
 	hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)
 	if err != nil {
@@ -72,7 +77,9 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 
 			switch behaviour {
 			case database.OutOfHoursBehaviourAllowWithWarning:
-				return true, &outOfHoursTitle, &outOfHoursMessage, outOfHoursColour, nil
+				outOfHoursWarningTitle = &outOfHoursTitle
+				outOfHoursWarningMessage = &outOfHoursMessage
+				outOfHoursWarningColour = outOfHoursColour
 			default:
 				if outOfHoursColour != nil {
 					embed := utils.BuildEmbedRaw(*outOfHoursColour, outOfHoursTitle, outOfHoursMessage, nil, ctx.PremiumTier())
@@ -129,7 +136,7 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 		return false, nil, nil, nil, fmt.Errorf("invalid access control action %s", action)
 	}
 
-	return true, nil, nil, nil, nil
+	return true, outOfHoursWarningTitle, outOfHoursWarningMessage, outOfHoursWarningColour, nil
 }
 
 func sendAccessControlDeniedMessage(ctx context.Context, cmd registry.InteractionContext, panelId int, matchedRole uint64) error {
