@@ -920,6 +920,21 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		return nil, err
 	}
 
+	// Apply panel-level grants on top of global settings (OR logic: panel can only add permissions)
+	if panel != nil {
+		panelPerms, err := dbclient.Client.PanelTicketPermissions.Get(ctx, panel.PanelId)
+		if err != nil {
+			return nil, err
+		}
+		additionalPermissions.AddReactions = additionalPermissions.AddReactions || panelPerms.AddReactions
+		additionalPermissions.SendTTSMessages = additionalPermissions.SendTTSMessages || panelPerms.SendTTSMessages
+		additionalPermissions.EmbedLinks = additionalPermissions.EmbedLinks || panelPerms.EmbedLinks
+		additionalPermissions.AttachFiles = additionalPermissions.AttachFiles || panelPerms.AttachFiles
+		additionalPermissions.UseExternalEmojis = additionalPermissions.UseExternalEmojis || panelPerms.UseExternalEmojis
+		additionalPermissions.UseExternalStickers = additionalPermissions.UseExternalStickers || panelPerms.UseExternalStickers
+		additionalPermissions.SendVoiceMessages = additionalPermissions.SendVoiceMessages || panelPerms.SendVoiceMessages
+	}
+
 	// Separate permissions apply
 	for _, snowflake := range append(otherUsers, userId) {
 		overwrites = append(overwrites, BuildUserOverwrite(snowflake, additionalPermissions))
