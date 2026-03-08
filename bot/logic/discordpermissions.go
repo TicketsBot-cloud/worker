@@ -92,6 +92,54 @@ func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPerm
 	}
 }
 
+func buildStaffPermissions(p database.SupportTeamPermissions) (allow, deny []permission.Permission) {
+	allow = []permission.Permission{permission.ViewChannel, permission.ReadMessageHistory}
+
+	toggle := func(perm permission.Permission, enabled bool) {
+		if enabled {
+			allow = append(allow, perm)
+		} else {
+			deny = append(deny, perm)
+		}
+	}
+
+	toggle(permission.AddReactions, p.AddReactions)
+	toggle(permission.SendMessages, p.SendMessages)
+	toggle(permission.SendTTSMessages, p.SendTTSMessages)
+	toggle(permission.EmbedLinks, p.EmbedLinks)
+	toggle(permission.AttachFiles, p.AttachFiles)
+	toggle(permission.MentionEveryone, p.MentionEveryone)
+	toggle(permission.UseExternalEmojis, p.UseExternalEmojis)
+	toggle(permission.UseApplicationCommands, p.UseApplicationCommands)
+	toggle(permission.UseExternalStickers, p.UseExternalStickers)
+	toggle(permission.SendVoiceMessages, p.SendVoiceMessages)
+
+	return allow, deny
+}
+
+// BuildStaffUserOverwrite builds a permission overwrite for a custom team member (user)
+// applying per-team restrictions. Default team members should use StandardPermissions directly.
+func BuildStaffUserOverwrite(userId uint64, p database.SupportTeamPermissions) channel.PermissionOverwrite {
+	allow, deny := buildStaffPermissions(p)
+	return channel.PermissionOverwrite{
+		Id:    userId,
+		Type:  channel.PermissionTypeMember,
+		Allow: permission.BuildPermissions(allow...),
+		Deny:  permission.BuildPermissions(deny...),
+	}
+}
+
+// BuildStaffRoleOverwrite builds a permission overwrite for a custom team role applying per-team restrictions.
+func BuildStaffRoleOverwrite(roleId uint64, p database.SupportTeamPermissions) channel.PermissionOverwrite {
+	allow, deny := buildStaffPermissions(p)
+	return channel.PermissionOverwrite{
+		Id:    roleId,
+		Type:  channel.PermissionTypeRole,
+		Allow: permission.BuildPermissions(allow...),
+		Deny:  permission.BuildPermissions(deny...),
+	}
+}
+
 func RemoveOnCallRoles(ctx context.Context, cmd registry.CommandContext, userId uint64) error {
 	member, err := cmd.Worker().GetGuildMember(cmd.GuildId(), userId)
 	if err != nil {
