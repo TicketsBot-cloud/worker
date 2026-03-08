@@ -636,28 +636,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span = sentry.StartSpan(rootSpan.Context(), "Pin welcome message")
 		channelId := *ticket.ChannelId
 
-		if err := cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId); err == nil {
-			// Delete the system pin notification message
-			span2 := sentry.StartSpan(rootSpan.Context(), "Delete pin notification")
-
-			// Fetch recent messages to find the system pin notification
-			messages, err := cmd.Worker().GetChannelMessages(channelId, rest.GetChannelMessagesData{
-				Limit: 3,
-			})
-
-			if err == nil {
-				// Find and delete the system pin notification message
-				for _, msg := range messages {
-					// Pin notification has MessageReference pointing to the pinned message, but is not the pinned message itself
-					if msg.MessageReference.MessageId == welcomeMessageId && msg.Id != welcomeMessageId {
-						_ = cmd.Worker().DeleteMessage(channelId, msg.Id)
-						break
-					}
-				}
-			}
-
-			span2.Finish()
-		}
+		_ = cmd.Worker().AddPinnedChannelMessage(channelId, welcomeMessageId)
 		span.Finish()
 	}
 
@@ -1105,6 +1084,37 @@ func GetAllowedStaffUsersAndRoles(ctx context.Context, guildId uint64, panel *da
 		}
 
 		allowedRoles = append(allowedRoles, supportRoles...)
+	}
+
+	// Add other support teams
+	if panel != nil {
+		group, _ := errgroup.WithContext(ctx)
+
+		// Get users for support teams of panel
+		group.Go(func() error {
+			userIds, err := dbclient.Client.SupportTeamMembers.GetAllSupportMembersForPanel(ctx, panel.PanelId)
+			if err != nil {
+				return err
+			}
+
+			allowedUsers = append(allowedUsers, userIds...) // No mutex needed
+			return nil
+		})
+
+		// Get roles for support teams of panel
+		group.Go(func() error {
+			roleIds, err := dbclient.Client.SupportTeamRoles.GetAllSupportRolesForPanel(ctx, panel.PanelId)
+			if err != nil {
+				return err
+			}
+
+			allowedRoles = append(allowedRoles, roleIds...) // No mutex needed
+			return nil
+		})
+
+		if err := group.Wait(); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return allowedUsers, allowedRoles, nil
