@@ -9,7 +9,6 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -75,35 +74,16 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, guildIdRaw str
 	}
 
 	// Check for whitelabel
-	botId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	var w *worker.Context
-	if isWhitelabel {
-		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		w = &worker.Context{
-			Token:        bot.Token,
-			BotId:        bot.BotId,
-			IsWhitelabel: true,
-			Cache:        ctx.Worker().Cache,
-			RateLimiter:  nil, // Use http-proxy ratelimit functionality
-		}
-	} else {
-		w = ctx.Worker()
-	}
-
 	// Try to get owner
 	var ownerId *uint64
 	var botInGuild bool
-	guild, err := w.GetGuild(guildId)
+	guild, err := worker.GetGuild(guildId)
 	if err == nil {
 		ownerId = &guild.OwnerId
 		botInGuild = true
@@ -142,7 +122,7 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, guildIdRaw str
 
 	// Leave guild
 	if botInGuild {
-		if err := w.LeaveGuild(guildId); err != nil {
+		if err := worker.LeaveGuild(guildId); err != nil {
 			ctx.HandleError(err)
 			return
 		}

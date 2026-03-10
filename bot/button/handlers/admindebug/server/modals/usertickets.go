@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -93,6 +94,12 @@ func (h *AdminDebugServerUserTicketsModalSubmitHandler) Execute(ctx *context.Mod
 		return
 	}
 
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	// Get all open tickets for the guild
 	allOpenTickets, err := dbclient.Client.Tickets.GetGuildOpenTickets(ctx, guildId)
 	if err != nil {
@@ -104,7 +111,7 @@ func (h *AdminDebugServerUserTicketsModalSubmitHandler) Execute(ctx *context.Mod
 	var results []string
 
 	for _, userId := range userIds {
-		result := checkUserTickets(ctx, guildId, userId, allOpenTickets)
+		result := checkUserTickets(ctx, worker, guildId, userId, allOpenTickets)
 		results = append(results, result)
 	}
 
@@ -123,7 +130,7 @@ func (h *AdminDebugServerUserTicketsModalSubmitHandler) Execute(ctx *context.Mod
 	}))
 }
 
-func checkUserTickets(ctx *context.ModalContext, guildId, userId uint64, allOpenTickets []database.Ticket) string {
+func checkUserTickets(ctx *context.ModalContext, worker *w.Context, guildId, userId uint64, allOpenTickets []database.Ticket) string {
 	var lines []string
 
 	// Get open ticket count
@@ -162,7 +169,7 @@ func checkUserTickets(ctx *context.ModalContext, guildId, userId uint64, allOpen
 			channelMention := fmt.Sprintf("`%d`", *ticket.ChannelId)
 
 			if ticket.ChannelId != nil {
-				_, err := ctx.Worker().GetChannel(*ticket.ChannelId)
+				_, err := worker.GetChannel(*ticket.ChannelId)
 				if err == nil {
 					channelExists = true
 				}
