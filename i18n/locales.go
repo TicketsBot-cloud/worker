@@ -50,7 +50,7 @@ var Locales = []*Locale{
 		IsoShortCode:       "ch",
 		IsoLongCode:        "de-CH",
 		FlagEmoji:          "🇨🇭",
-		EnglishName:        "German (Switzerland)",
+		EnglishName:        "Swiss German",
 		LocalName:          "Schwiizerdütsch",
 		DiscordLocale:      nil,
 		ParentIsoShortCode: ptr("de"),
