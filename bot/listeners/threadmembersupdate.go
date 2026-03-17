@@ -60,10 +60,17 @@ func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate)
 			return
 		}
 
-		if settings.TicketNotificationChannel != nil {
+		var notificationChannel *uint64
+		if panel != nil && panel.TicketNotificationChannel != nil {
+			notificationChannel = panel.TicketNotificationChannel
+		} else if settings.TicketNotificationChannel != nil {
+			notificationChannel = settings.TicketNotificationChannel
+		}
+
+		if notificationChannel != nil {
 			name, _ := logic.GenerateChannelName(ctx, worker, panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
 			data := logic.BuildJoinThreadMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, threadStaff, premiumTier)
-			if _, err := worker.EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, data.IntoEditMessageData()); err != nil {
+			if _, err := worker.EditMessage(*notificationChannel, *ticket.JoinMessageId, data.IntoEditMessageData()); err != nil {
 				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
 			}
 		}
