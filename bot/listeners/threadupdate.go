@@ -66,7 +66,7 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 	}
 
 	// Handle thread being unarchived
-	if !ticket.Open && !e.ThreadMetadata.Archived {
+	if !ticket.Open && !e.ThreadMetadata.Archived && !e.ThreadMetadata.Locked {
 		if err := dbclient.Client.Tickets.SetOpen(ctx, ticket.GuildId, ticket.Id); err != nil {
 			sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
 			return
