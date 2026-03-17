@@ -42,8 +42,14 @@ func (h *AdminDebugServerEntitlementsHandler) Execute(ctx *context.ButtonContext
 		return
 	}
 
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	// Get guild to fetch owner ID
-	guild, err := ctx.Worker().GetGuild(guildId)
+	guild, err := worker.GetGuild(guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return

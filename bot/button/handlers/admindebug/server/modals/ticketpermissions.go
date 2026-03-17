@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -94,8 +95,14 @@ func (h *AdminDebugServerTicketPermissionsModalSubmitHandler) Execute(ctx *conte
 		return
 	}
 
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	// Get guild info
-	guild, err := ctx.Worker().GetGuild(guildId)
+	guild, err := worker.GetGuild(guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
@@ -150,10 +157,10 @@ func (h *AdminDebugServerTicketPermissionsModalSubmitHandler) Execute(ctx *conte
 		}
 
 		if isUser {
-			result := checkUserTicketPermissions(ctx, guildId, guild.OwnerId, entityId, adminUsers, supportUsers, panels)
+			result := checkUserTicketPermissions(ctx, worker, guildId, guild.OwnerId, entityId, adminUsers, supportUsers, panels)
 			results = append(results, result)
 		} else {
-			result := checkRoleTicketPermissions(ctx, guildId, entityId, adminRoles, supportRoles, panels)
+			result := checkRoleTicketPermissions(ctx, worker, guildId, entityId, adminRoles, supportRoles, panels)
 			results = append(results, result)
 		}
 	}
@@ -173,7 +180,7 @@ func (h *AdminDebugServerTicketPermissionsModalSubmitHandler) Execute(ctx *conte
 	}))
 }
 
-func checkUserTicketPermissions(ctx *context.ModalContext, guildId, ownerId, userId uint64, adminUsers, supportUsers []uint64, panels []database.Panel) string {
+func checkUserTicketPermissions(ctx *context.ModalContext, worker *w.Context, guildId, ownerId, userId uint64, adminUsers, supportUsers []uint64, panels []database.Panel) string {
 	var lines []string
 
 	// Ticket Permission Level
@@ -190,10 +197,10 @@ func checkUserTicketPermissions(ctx *context.ModalContext, guildId, ownerId, use
 	lines = append(lines, ticketPermLevel)
 
 	// Check member roles for role-based permissions
-	member, err := ctx.Worker().GetGuildMember(guildId, userId)
+	member, err := worker.GetGuildMember(guildId, userId)
 	if err == nil {
 		// Get all guild roles for name lookups
-		guildRoles, err := ctx.Worker().GetGuildRoles(guildId)
+		guildRoles, err := worker.GetGuildRoles(guildId)
 		roleMap := make(map[uint64]string)
 		if err == nil {
 			for _, role := range guildRoles {
@@ -300,11 +307,11 @@ func checkUserTicketPermissions(ctx *context.ModalContext, guildId, ownerId, use
 	return fmt.Sprintf("**User:** <@%d>\n%s", userId, strings.Join(lines, "\n"))
 }
 
-func checkRoleTicketPermissions(ctx *context.ModalContext, guildId, roleId uint64, adminRoles, supportRoles []uint64, panels []database.Panel) string {
+func checkRoleTicketPermissions(ctx *context.ModalContext, worker *w.Context, guildId, roleId uint64, adminRoles, supportRoles []uint64, panels []database.Panel) string {
 	var lines []string
 
 	// Get role name
-	guildRoles, err := ctx.Worker().GetGuildRoles(guildId)
+	guildRoles, err := worker.GetGuildRoles(guildId)
 	roleName := "Unknown Role"
 	if err == nil {
 		for _, role := range guildRoles {
