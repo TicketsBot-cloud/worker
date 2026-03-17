@@ -243,17 +243,26 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", newPanel.Title))
 
 		// Modify join message
-		if ticket.JoinMessageId != nil && settings.TicketNotificationChannel != nil {
-			threadStaff, err := logic.GetStaffInThread(ctx.Context, ctx.Worker(), ticket, *ticket.ChannelId)
-			if err != nil {
-				sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
-				return
+		if ticket.JoinMessageId != nil {
+			var notificationChannel *uint64
+			if newPanel.TicketNotificationChannel != nil {
+				notificationChannel = newPanel.TicketNotificationChannel
+			} else if settings.TicketNotificationChannel != nil {
+				notificationChannel = settings.TicketNotificationChannel
 			}
 
-			msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, newChannelName, ticket.Id, &newPanel, threadStaff, ctx.PremiumTier())
-			if _, err := ctx.Worker().EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, msg.IntoEditMessageData()); err != nil {
-				sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
-				return
+			if notificationChannel != nil {
+				threadStaff, err := logic.GetStaffInThread(ctx.Context, ctx.Worker(), ticket, *ticket.ChannelId)
+				if err != nil {
+					sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
+					return
+				}
+
+				msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, newChannelName, ticket.Id, &newPanel, threadStaff, ctx.PremiumTier())
+				if _, err := ctx.Worker().EditMessage(*notificationChannel, *ticket.JoinMessageId, msg.IntoEditMessageData()); err != nil {
+					sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
+					return
+				}
 			}
 		}
 
