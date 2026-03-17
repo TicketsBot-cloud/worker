@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -54,6 +55,11 @@ func (h *EditLabelsButtonHandler) Execute(ctx *context.ButtonContext) {
 	ticketLabelIds, err := dbclient.Client.TicketLabelAssignments.GetByTicket(ctx, ctx.GuildId(), ticket.Id)
 	if err != nil {
 		ctx.HandleError(err)
+		return
+	}
+
+	if len(labels) == 0 {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageEditLabelsNoneConfigured, fmt.Sprintf("%s/manage/%d/tickets", config.Conf.Bot.DashboardUrl, ctx.GuildId()))
 		return
 	}
 
