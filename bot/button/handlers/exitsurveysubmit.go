@@ -130,12 +130,21 @@ func (h *ExitSurveySubmitHandler) Execute(cmd *cmdcontext.ModalContext) {
 		return
 	}
 
-	responses := make(map[int]string)
+	inputsByCustomId := make(map[string]database.FormInput, len(formInputs))
 	for _, input := range formInputs {
-		value, ok := cmd.GetInput(input.CustomId)
-		if ok {
-			responses[input.Id] = value
-		}
+		inputsByCustomId[input.CustomId] = input
+	}
+
+	formAnswers := parseModalComponents(cmd.Interaction.Data.Components, inputsByCustomId)
+
+	if invalidLabel, valid := validateFormAnswers(formAnswers); !valid {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageFormMissingInput, invalidLabel)
+		return
+	}
+
+	responses := make(map[int]string, len(formAnswers))
+	for input, value := range formAnswers {
+		responses[input.Id] = value
 	}
 
 	if err := dbclient.Client.ExitSurveyResponses.AddResponses(ctx, guildId, ticketId, *panel.ExitSurveyFormId, responses); err != nil {
