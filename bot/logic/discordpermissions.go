@@ -19,10 +19,15 @@ var StandardPermissions = [...]permission.Permission{
 	permission.AddReactions,
 	permission.ViewChannel,
 	permission.SendMessages,
+	permission.SendTTSMessages,
 	permission.EmbedLinks,
 	permission.AttachFiles,
+	permission.MentionEveryone,
+	permission.UseExternalEmojis,
 	permission.ReadMessageHistory,
 	permission.UseApplicationCommands,
+	permission.UseExternalStickers,
+	permission.SendVoiceMessages,
 }
 
 var MinimalPermissions = [...]permission.Permission{

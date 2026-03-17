@@ -426,4 +426,5 @@ var (
 	MessageEditLabelsModalTitle           MessageId = "commands.edit.labels.update_modal.title"
 	MessageEditLabelsModalSelectMenuTitle MessageId = "commands.edit.labels.update_modal.select_menu_title"
 	MessageEditLabelsModalSuccess         MessageId = "commands.edit.labels.update_modal.success"
+	MessageEditLabelsNoneConfigured       MessageId = "commands.edit.labels.none_configured"
 )

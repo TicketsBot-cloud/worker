@@ -9,7 +9,6 @@ import (
 
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
-	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -127,36 +126,17 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	components := make([]component.Component, len(formInputs))
-	for i, input := range formInputs {
-		var minLength, maxLength *uint32
-		if input.MinLength != nil && *input.MinLength > 0 {
-			minLength = utils.Ptr(uint32(*input.MinLength))
-		}
-
-		if input.MaxLength != nil {
-			maxLength = utils.Ptr(uint32(*input.MaxLength))
-		}
-
-		components[i] = component.BuildLabel(component.Label{
-			Label: input.Label,
-			Component: component.BuildInputText(component.InputText{
-				Style:       component.TextStyleTypes(input.Style),
-				CustomId:    input.CustomId,
-				Placeholder: input.Placeholder,
-				MinLength:   minLength,
-				MaxLength:   maxLength,
-				Required:    utils.Ptr(input.Required),
-				Value:       nil,
-			}),
-		})
+	inputOptions, err := dbclient.Client.FormInputOption.GetOptionsByForm(ctx, form.Id)
+	if err != nil {
+		ctx.HandleError(err)
+		return
 	}
 
 	ctx.Modal(button.ResponseModal{
 		Data: interaction.ModalResponseData{
 			CustomId:   fmt.Sprintf("exit-survey-%d-%d", guildId, ticketId),
 			Title:      form.Title,
-			Components: components,
+			Components: buildFormComponents(formInputs, inputOptions),
 		},
 	})
 }
