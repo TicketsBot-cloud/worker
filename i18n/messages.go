@@ -419,6 +419,18 @@ var (
 	GdprErrorQueueFailed      MessageId = "gdpr.error.queue_failed"
 	GdprErrorWorkerOffline    MessageId = "gdpr.error.worker_offline"
 
+	GdprExportSectionTitle        MessageId = "gdpr.section.export"
+	GdprButtonExportGuild         MessageId = "gdpr.button.export_guild"
+	GdprButtonExportUser          MessageId = "gdpr.button.export_user"
+	GdprModalExportGuildTitle     MessageId = "gdpr.modal.export_guild"
+	GdprConfirmExportGuild        MessageId = "gdpr.confirm.export_guild"
+	GdprConfirmExportGuildMulti   MessageId = "gdpr.confirm.export_guild_multi"
+	GdprConfirmExportUser         MessageId = "gdpr.confirm.export_user"
+	GdprConfirmExportButton       MessageId = "gdpr.confirm.export_button"
+	GdprQueuedExportGuild         MessageId = "gdpr.queued.export_guild"
+	GdprQueuedExportGuildMulti    MessageId = "gdpr.queued.export_guild_multi"
+	GdprQueuedExportUser          MessageId = "gdpr.queued.export_user"
+
 	MessageEditTitle                      MessageId = "commands.edit.title"
 	MessageEditDescription                MessageId = "commands.edit.description"
 	MessageEditLabelsTitle                MessageId = "commands.edit.labels.title"
