@@ -63,6 +63,20 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 		return
 	}
 
+	// If the tag is linked to a KB article, override content with the article's content
+	if tag.KBArticleId != nil {
+		article, articleOk, articleErr := dbclient.Client.KBArticles.Get(ctx, *tag.KBArticleId)
+		if articleErr == nil && articleOk && article.Published {
+			if article.Content != nil {
+				tag.Content = article.Content
+			}
+			if article.Embed != nil {
+				tag.Embed = article.Embed
+			}
+		}
+		// If article not found or unpublished, fall through to the tag's own content
+	}
+
 	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, ctx.ChannelId(), ctx.GuildId())
 	if err != nil {
 		sentry.ErrorWithContext(err, ctx.ToErrorContext())
