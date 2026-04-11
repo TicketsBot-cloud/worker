@@ -152,23 +152,25 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 }
 
 func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, settings database.Settings, panels []database.Panel) ([]string, bool) {
-	// Server-wide permissions
-	serverWidePermissions := append(
-		[]permission.Permission{
-			// Thread mode specific
+	// Server-wide permissions depend on the active mode so we don't report
+	// false failures for permissions that are irrelevant to the current mode
+	serverWidePermissions := []permission.Permission{
+		// Required in both modes
+		permission.ManageWebhooks,
+		permission.PinMessages,
+		// Server-wide only
+		permission.ManageRoles,
+	}
+	if settings.UseThreads {
+		serverWidePermissions = append(serverWidePermissions,
 			permission.CreatePrivateThreads,
 			permission.SendMessagesInThreads,
 			permission.ManageThreads,
-			// Channel mode specific
-			permission.ManageChannels,
-			// Both modes
-			permission.ManageWebhooks,
-			permission.PinMessages,
-			// Server-wide only
-			permission.ManageRoles,
-		},
-		logic.StandardPermissions[:]...,
-	)
+		)
+	} else {
+		serverWidePermissions = append(serverWidePermissions, permission.ManageChannels)
+	}
+	serverWidePermissions = append(serverWidePermissions, logic.StandardPermissions[:]...)
 
 	var results []string
 	var hasMissingPermissions bool
@@ -256,22 +258,17 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 	var hasMissingPermissions bool
 
 	// Determine if this panel uses threads or channels
-	usesThreads := panel.UseThreads
+	usesThreads := settings.UseThreads || panel.UseThreads
 
 	// Check panel channel permissions (if panel has a channel)
 	if panel.ChannelId != 0 {
 		var panelChannelPerms []permission.Permission
 		if usesThreads {
-			// Thread mode: specific thread permissions + standard permissions
+			// Thread mode: permissions needed in the panel channel where threads are created.
 			panelChannelPerms = append(
-				[]permission.Permission{
-					permission.CreatePrivateThreads,
-					permission.SendMessagesInThreads,
-					permission.ManageThreads,
-					permission.ManageWebhooks,
-					permission.PinMessages,
-				},
-				logic.StandardPermissions[:]...,
+				logic.ThreadPermissions[:],
+				permission.ManageWebhooks,
+				permission.PinMessages,
 			)
 		} else {
 			// Channel mode: just standard permissions (no special ones needed for panel channel in channel mode)

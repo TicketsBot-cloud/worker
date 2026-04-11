@@ -37,6 +37,18 @@ var MinimalPermissions = [...]permission.Permission{
 	permission.UseApplicationCommands,
 }
 
+// ThreadPermissions are the permissions the bot needs in the panel channel when operating in thread mode
+var ThreadPermissions = [...]permission.Permission{
+	permission.ViewChannel,
+	permission.ReadMessageHistory,
+	permission.EmbedLinks,
+	permission.AttachFiles,
+	permission.UseExternalEmojis,
+	permission.CreatePrivateThreads,
+	permission.SendMessagesInThreads,
+	permission.ManageThreads,
+}
+
 func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPermissions) channel.PermissionOverwrite {
 	allow := MinimalPermissions[:]
 	var deny []permission.Permission
