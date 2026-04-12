@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -22,7 +23,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
@@ -356,10 +356,10 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 	if useThreads {
 		primaryChannelId = ctx.ChannelId()
 		primaryLabel = "Panel channel"
-		primaryRequired = logic.ThreadPermissions[:]
+		primaryRequired = botpermissions.ThreadModeRequired
 	} else {
 		primaryLabel = "Ticket category"
-		primaryRequired = append([]permission.Permission{permission.ManageChannels}, logic.StandardPermissions[:]...)
+		primaryRequired = botpermissions.ChannelModeRequired
 		if panel != nil && panel.TargetCategory != 0 {
 			primaryChannelId = panel.TargetCategory
 		} else {
@@ -388,7 +388,7 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 			notifChannelId = settings.TicketNotificationChannel
 		}
 		if notifChannelId != nil {
-			notifRequired := append(logic.MinimalPermissions[:], permission.EmbedLinks, permission.AttachFiles)
+			notifRequired := botpermissions.NotifChannelRequired
 			loc := checkChannel(*notifChannelId, "Notification channel", notifRequired)
 			if len(loc.missing) > 0 {
 				locations = append(locations, loc)
@@ -398,7 +398,7 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 
 	// 3. Transcript channel (panel-level, both modes)
 	if panel != nil && panel.TranscriptChannelId != nil {
-		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", logic.MinimalPermissions[:])
+		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", botpermissions.TranscriptChannelRequired)
 		if len(loc.missing) > 0 {
 			locations = append(locations, loc)
 		}

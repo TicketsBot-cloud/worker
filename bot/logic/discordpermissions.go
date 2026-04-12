@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/permission"
@@ -14,43 +15,8 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
-// StandardPermissions Returns the standard permissions that users are given in a ticket
-var StandardPermissions = [...]permission.Permission{
-	permission.AddReactions,
-	permission.ViewChannel,
-	permission.SendMessages,
-	permission.SendTTSMessages,
-	permission.EmbedLinks,
-	permission.AttachFiles,
-	permission.MentionEveryone,
-	permission.UseExternalEmojis,
-	permission.ReadMessageHistory,
-	permission.UseApplicationCommands,
-	permission.UseExternalStickers,
-	permission.SendVoiceMessages,
-}
-
-var MinimalPermissions = [...]permission.Permission{
-	permission.ViewChannel,
-	permission.SendMessages,
-	permission.ReadMessageHistory,
-	permission.UseApplicationCommands,
-}
-
-// ThreadPermissions are the permissions the bot needs in the panel channel when operating in thread mode
-var ThreadPermissions = [...]permission.Permission{
-	permission.ViewChannel,
-	permission.ReadMessageHistory,
-	permission.EmbedLinks,
-	permission.AttachFiles,
-	permission.UseExternalEmojis,
-	permission.CreatePrivateThreads,
-	permission.SendMessagesInThreads,
-	permission.ManageThreads,
-}
-
 func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPermissions) channel.PermissionOverwrite {
-	allow := MinimalPermissions[:]
+	allow := append([]permission.Permission{}, botpermissions.MinimalPermissions...)
 	var deny []permission.Permission
 
 	if additionalPermissions.AddReactions {
@@ -104,7 +70,7 @@ func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPerm
 }
 
 func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPermissions) channel.PermissionOverwrite {
-	allow := MinimalPermissions[:]
+	allow := append([]permission.Permission{}, botpermissions.MinimalPermissions...)
 	var deny []permission.Permission
 
 	if additionalPermissions.AddReactions {
