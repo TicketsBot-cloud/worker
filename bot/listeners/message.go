@@ -40,19 +40,22 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 		return
 	}
 
-	ticket, isTicket, err := getTicket(span.Context(), e.ChannelId)
-	if err != nil {
-		sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+	// Delete pin notification messages in ticket channels.
+	if e.Type == message.MessageTypeChannelPinnedMessage && e.Author.Id == worker.BotId {
+		ticket, ok, err := dbclient.Client.Tickets.GetByChannel(span.Context(), e.ChannelId)
+		if err == nil && ok && ticket.Id != 0 {
+			sentry.WithSpan0(span.Context(), "Delete pin notification", func(span *sentry.Span) {
+				if err := worker.DeleteMessage(e.ChannelId, e.Id); err != nil {
+					sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
+				}
+			})
+		}
 		return
 	}
 
-	// Delete pin notification messages in ticket channels
-	if isTicket && ticket.Id != 0 && e.Type == message.MessageTypeChannelPinnedMessage && e.Author.Id == worker.BotId {
-		sentry.WithSpan0(span.Context(), "Delete pin notification", func(span *sentry.Span) {
-			if err := worker.DeleteMessage(e.ChannelId, e.Id); err != nil {
-				sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
-			}
-		})
+	ticket, isTicket, err := getTicket(span.Context(), e.ChannelId)
+	if err != nil {
+		sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 		return
 	}
 
