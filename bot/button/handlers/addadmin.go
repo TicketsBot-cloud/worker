@@ -19,7 +19,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -210,7 +210,7 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 		overwrites := append(ch.PermissionOverwrites, channel.PermissionOverwrite{
 			Id:    id,
 			Type:  mentionableType.OverwriteType(),
-			Allow: permission.BuildPermissions(logic.StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 
