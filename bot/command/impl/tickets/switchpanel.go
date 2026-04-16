@@ -177,7 +177,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 
 	// Update welcome message
 	if ticket.WelcomeMessageId != nil {
-		msg, err := ctx.Worker().GetChannelMessage(ctx.ChannelId(), *ticket.WelcomeMessageId)
+		msg, err := ctx.Worker().GetChannelMessage(*ticket.ChannelId, *ticket.WelcomeMessageId)
 
 		// Error is likely to be due to message being deleted, we want to continue further even if it is
 		if err == nil {
@@ -208,7 +208,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 				Components: msg.Components,
 			}
 
-			if _, err = ctx.Worker().EditMessage(ctx.ChannelId(), *ticket.WelcomeMessageId, editData); err != nil {
+			if _, err = ctx.Worker().EditMessage(*ticket.ChannelId, *ticket.WelcomeMessageId, editData); err != nil {
 				ctx.HandleWarning(err)
 			}
 		}
