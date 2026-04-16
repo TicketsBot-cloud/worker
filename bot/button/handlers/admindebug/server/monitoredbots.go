@@ -41,10 +41,16 @@ func (h *AdminDebugServerMonitoredBotsHandler) Execute(ctx *context.ButtonContex
 		return
 	}
 
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	var monitoredBotsPresent []string
 
 	for _, botId := range config.Conf.Bot.MonitoredBots {
-		_, err = ctx.Worker().GetGuildMember(guildId, botId)
+		_, err = worker.GetGuildMember(guildId, botId)
 		if err == nil {
 			botUser, err := ctx.Worker().GetUser(botId)
 			if err == nil {
