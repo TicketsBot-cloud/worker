@@ -184,23 +184,45 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 	}
 
 	if ticket.IsThread {
-		// If it is a thread, we need to send a message
-		if reason == nil {
-			cmd.ReplyPermanent(customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, cmd.UserId())
-		} else {
-			fields := []embed.EmbedField{
-				{
-					Name:   cmd.GetMessage(i18n.Reason),
-					Value:  fmt.Sprintf("```%s```", *reason),
-					Inline: false,
-				},
+		// Ack and use CreateMessage so the close message is confirmed sent before archiving.
+		type acknowledger interface {
+			Ack()
+		}
+		if acker, ok := cmd.(acknowledger); ok {
+			acker.Ack()
+
+			var fields []embed.EmbedField
+			if reason != nil {
+				fields = []embed.EmbedField{
+					{
+						Name:   cmd.GetMessage(i18n.Reason),
+						Value:  fmt.Sprintf("```%s```", *reason),
+						Inline: false,
+					},
+				}
 			}
 
-			cmd.ReplyWithFieldsPermanent(customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, fields, cmd.UserId())
-		}
+			closeEmbed := utils.BuildEmbed(cmd, customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, fields, cmd.UserId())
+			if _, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, rest.CreateMessageData{
+				Embeds: utils.Slice(closeEmbed),
+			}); err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+			}
+		} else {
+			if reason == nil {
+				cmd.ReplyPermanent(customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, cmd.UserId())
+			} else {
+				fields := []embed.EmbedField{
+					{
+						Name:   cmd.GetMessage(i18n.Reason),
+						Value:  fmt.Sprintf("```%s```", *reason),
+						Inline: false,
+					},
+				}
 
-		// Discord has a race condition
-		time.Sleep(time.Millisecond * 250)
+				cmd.ReplyWithFieldsPermanent(customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, fields, cmd.UserId())
+			}
+		}
 
 		data := rest.ModifyChannelData{
 			ThreadMetadataModifyData: &rest.ThreadMetadataModifyData{
@@ -314,6 +336,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			{
 				TranscriptLinkElement(settings.StoreTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
+				EditCloseReasonElement(),
 			},
 		}
 
@@ -411,8 +434,12 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			Components: closeComponents,
 		}
 
-		if _, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
+		if msg, err := cmd.Worker().CreateMessageComplex(dmChannel, data); err != nil {
 			sentry.ErrorWithContext(err, errorContext)
+		} else {
+			if err := dbclient.Client.ArchiveDmMessages.Set(ctx, ticket.GuildId, ticket.Id, msg.Id); err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+			}
 		}
 	}
 }

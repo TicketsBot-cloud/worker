@@ -253,10 +253,8 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 			}
 		} else if restError.ApiError.Code == 160005 { // Thread is locked
 			message = r.GetMessage(i18n.MessageErrorThreadLocked)
-		} else if restError.ApiError.Code == 160006 { // Maximum number of active threads reached
+		} else if restError.ApiError.Code == 160006 || restError.ApiError.Code == 160007 { // Maximum number of active threads reached
 			message = r.GetMessage(i18n.MessageErrorMaxActiveThreads)
-		} else if restError.ApiError.Code == 160007 { // Maximum number of active announcement threads reached
-			message = r.GetMessage(i18n.MessageErrorMaxActiveAnnouncementThreads)
 		} else if restError.StatusCode == http.StatusTooManyRequests {
 			// Rate limit error - parse raw response to extract retry_after and global flag
 			var rateLimit rateLimitResponse

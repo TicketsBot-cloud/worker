@@ -6,6 +6,7 @@ import (
 
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -66,64 +67,11 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 			return
 		}
 
-		formAnswers := make(map[database.FormInput]string)
-		for _, actionRow := range data.Components {
-			if actionRow.Component != nil {
-				answer := ""
+		formAnswers := parseModalComponents(data.Components, inputs)
 
-				switch actionRow.Component.Type {
-				case component.ComponentSelectMenu:
-					answer = strings.Join(actionRow.Component.Values, ", ")
-				case component.ComponentInputText:
-					answer = actionRow.Component.Value
-				case component.ComponentUserSelect:
-					answer = joinMentions(actionRow.Component.Values, "user")
-				case component.ComponentRoleSelect:
-					answer = joinMentions(actionRow.Component.Values, "role")
-				case component.ComponentMentionableSelect:
-					answer = strings.Trim(strings.Join(actionRow.Component.Values, ", "), "<@&!>")
-				case component.ComponentChannelSelect:
-					answer = joinMentions(actionRow.Component.Values, "channel")
-				case component.ComponentRadioGroup:
-					answer = actionRow.Component.Value
-				case component.ComponentCheckboxGroup:
-					answer = strings.Join(actionRow.Component.Values, ", ")
-				}
-
-				questionData, ok := inputs[actionRow.Component.CustomId]
-				if ok { // If form has changed, we can skip
-					formAnswers[questionData] = answer
-				}
-				continue
-			}
-
-			for _, input := range actionRow.Components {
-				questionData, ok := inputs[input.CustomId]
-				if ok {
-					formAnswers[questionData] = input.Value
-				}
-			}
-		}
-
-		// Validate user input
-		for question, answer := range formAnswers {
-			if !question.Required {
-				continue
-			}
-
-			// Check that users have not just pressed newline or space
-			isValid := false
-			for _, c := range answer {
-				if c != rune(' ') && c != rune('\n') {
-					isValid = true
-					break
-				}
-			}
-
-			if !isValid {
-				ctx.Reply(customisation.Red, i18n.Error, i18n.MessageFormMissingInput, question.Label)
-				return
-			}
+		if invalidLabel, valid := validateFormAnswers(formAnswers); !valid {
+			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageFormMissingInput, invalidLabel)
+			return
 		}
 
 		ctx.Defer()
@@ -131,6 +79,65 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 
 		return
 	}
+}
+
+// parseModalComponents extracts answers from modal action rows, keyed by the matching FormInput.
+func parseModalComponents(actionRows []interaction.ModalSubmitInteractionActionRowData, inputsByCustomId map[string]database.FormInput) map[database.FormInput]string {
+	answers := make(map[database.FormInput]string)
+	for _, actionRow := range actionRows {
+		if actionRow.Component != nil {
+			c := actionRow.Component
+			var answer string
+			switch c.Type {
+			case component.ComponentSelectMenu, component.ComponentCheckboxGroup:
+				answer = strings.Join(c.Values, ", ")
+			case component.ComponentInputText:
+				answer = c.Value
+			case component.ComponentUserSelect:
+				answer = joinMentions(c.Values, "user")
+			case component.ComponentRoleSelect:
+				answer = joinMentions(c.Values, "role")
+			case component.ComponentMentionableSelect:
+				answer = strings.Trim(strings.Join(c.Values, ", "), "<@&!>")
+			case component.ComponentChannelSelect:
+				answer = joinMentions(c.Values, "channel")
+			case component.ComponentRadioGroup:
+				answer = c.Value
+			}
+			if input, ok := inputsByCustomId[c.CustomId]; ok {
+				answers[input] = answer
+			}
+			continue
+		}
+		for _, comp := range actionRow.Components {
+			if formInput, ok := inputsByCustomId[comp.CustomId]; ok {
+				answers[formInput] = comp.Value
+			}
+		}
+	}
+	return answers
+}
+
+// validateFormAnswers checks that all required fields have a non-whitespace value.
+// Returns the label of the first invalid field and false if validation fails.
+func validateFormAnswers(answers map[database.FormInput]string) (string, bool) {
+	for question, answer := range answers {
+		if !question.Required {
+			continue
+		}
+		// Check that users have not just pressed newline or space
+		valid := false
+		for _, c := range answer {
+			if c != ' ' && c != '\n' {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return question.Label, false
+		}
+	}
+	return "", true
 }
 
 func joinMentions(mentions []string, mentionType string) string {
