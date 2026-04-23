@@ -93,10 +93,6 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
 	case nil:
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelSuccess, transcriptChannel.Id))
-
-		if err := dbclient.Client.ArchiveChannel.Set(ctx, ctx.GuildId(), utils.Ptr(transcriptChannel.Id)); err != nil {
-			ctx.HandleError(err)
-		}
 	default:
 		failed = true
 		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelFailure))

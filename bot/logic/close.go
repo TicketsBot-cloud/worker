@@ -287,10 +287,8 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			}
 		}
 
-		if panel != nil && panel.TicketNotificationChannel != nil {
+		if panel != nil {
 			notificationChannel = panel.TicketNotificationChannel
-		} else if settings.TicketNotificationChannel != nil {
-			notificationChannel = settings.TicketNotificationChannel
 		}
 
 		if notificationChannel != nil {
@@ -305,23 +303,18 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 }
 
 func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
-	// Send logs to archive channel
+	// Send logs to archive channel (per-panel transcript channel only)
 	var archiveChannelId *uint64
 
 	if ticket.PanelId != nil {
-		acId, err := dbclient.Client.ArchiveChannel.GetByPanel(ctx, ticket.GuildId, *ticket.PanelId)
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
 		if err != nil {
 			sentry.ErrorWithContext(err, errorContext)
 			return
 		}
-		archiveChannelId = acId
-	} else {
-		acId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
-		if err != nil {
-			sentry.ErrorWithContext(err, errorContext)
-			return
+		if p.PanelId != 0 {
+			archiveChannelId = p.TranscriptChannelId
 		}
-		archiveChannelId = acId
 	}
 
 	var archiveChannelExists bool

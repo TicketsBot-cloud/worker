@@ -24,12 +24,6 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 		return
 	}
 
-	settings, err := dbclient.Client.Settings.Get(ctx, e.GuildId)
-	if err != nil {
-		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
-		return
-	}
-
 	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, e.Id, e.GuildId)
 	if err != nil {
 		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
@@ -72,7 +66,7 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 			return
 		}
 
-		if settings.TicketNotificationChannel != nil {
+		if panel != nil && panel.TicketNotificationChannel != nil {
 			staffCount, err := logic.GetStaffInThread(ctx, worker, ticket, e.Id)
 			if err != nil {
 				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
@@ -81,7 +75,7 @@ func OnThreadUpdate(worker *worker.Context, e events.ThreadUpdate) {
 
 			name, _ := logic.GenerateChannelName(ctx, worker, panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
 			data := logic.BuildThreadReopenMessage(ctx, worker, ticket.GuildId, ticket.UserId, name, ticket.Id, panel, staffCount, premiumTier)
-			msg, err := worker.CreateMessageComplex(*settings.TicketNotificationChannel, data.IntoCreateMessageData())
+			msg, err := worker.CreateMessageComplex(*panel.TicketNotificationChannel, data.IntoCreateMessageData())
 			if err != nil {
 				sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
 				return

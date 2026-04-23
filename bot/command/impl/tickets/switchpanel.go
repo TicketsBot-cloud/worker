@@ -217,12 +217,6 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	// If the ticket is a thread, we cannot update the permissions (possibly remove a small amount of  members in the
 	// future), or the parent channel (user may not have access to it. can you even move threads anyway?)
 	if ticket.IsThread {
-		settings, err := ctx.Settings()
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
 		data := rest.ModifyChannelData{}
 		if shouldUpdateName {
 			data.Name = newChannelName
@@ -244,12 +238,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 
 		// Modify join message
 		if ticket.JoinMessageId != nil {
-			var notificationChannel *uint64
-			if newPanel.TicketNotificationChannel != nil {
-				notificationChannel = newPanel.TicketNotificationChannel
-			} else if settings.TicketNotificationChannel != nil {
-				notificationChannel = settings.TicketNotificationChannel
-			}
+			notificationChannel := newPanel.TicketNotificationChannel
 
 			if notificationChannel != nil {
 				threadStaff, err := logic.GetStaffInThread(ctx.Context, ctx.Worker(), ticket, *ticket.ChannelId)

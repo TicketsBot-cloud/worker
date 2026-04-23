@@ -316,20 +316,12 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 	var useThreads bool
 	var targetChannelId uint64
 
-	settings, err := ctx.Settings()
-	if err == nil {
-		useThreads = settings.UseThreads
-	}
-
 	var panel *database.Panel
 	if btnCtx, ok := ctx.(*ButtonContext); ok {
 		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
 		if err == nil && panelExists {
 			panel = &p
-			// Panel can enable threads if global setting is disabled
-			if !useThreads {
-				useThreads = panel.UseThreads
-			}
+			useThreads = panel.UseThreads
 		}
 	}
 
@@ -337,13 +329,9 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permi
 		// Thread mode - check permissions in the current channel
 		targetChannelId = ctx.ChannelId()
 	} else {
-		// Channel mode - check permissions in the ticket category
-		if panel != nil && panel.TargetCategory != 0 {
-			// Use panel's target category
+		// Channel mode - check permissions in the panel's category (0 = no category, skip check)
+		if panel != nil {
 			targetChannelId = panel.TargetCategory
-		} else {
-			// Fall back to guild default category
-			targetChannelId, _ = dbclient.Client.ChannelCategory.Get(context.Background(), ctx.GuildId())
 		}
 	}
 

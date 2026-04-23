@@ -53,7 +53,6 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 		var openTicketCount int
 
 		if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
-			// Use per-panel limit and count only panel tickets
 			ticketLimit = *panel.TicketLimit
 			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
 			if err != nil {
@@ -61,13 +60,7 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 				return
 			}
 		} else {
-			// Use global limit and count all tickets
-			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
-			if err != nil {
-				cmd.HandleError(err)
-				return
-			}
-
+			ticketLimit = 5
 			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
 			if err != nil {
 				cmd.HandleError(err)

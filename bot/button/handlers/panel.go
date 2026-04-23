@@ -227,10 +227,15 @@ func buildFormComponents(inputs []database.FormInput, inputOptions map[int][]dat
 
 func buildForm(panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) button.ResponseModal {
 	return button.ResponseModal{
-		Data: interaction.ModalResponseData{
-			CustomId:   fmt.Sprintf("form_%s", panel.CustomId),
-			Title:      form.Title,
-			Components: buildFormComponents(inputs, inputOptions),
-		},
+		Data: BuildFormModal(panel, form, inputs, inputOptions),
+	}
+}
+
+// BuildFormModal returns the modal response data for a panel form, exported for use by slash command contexts.
+func BuildFormModal(panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) interaction.ModalResponseData {
+	return interaction.ModalResponseData{
+		CustomId:   fmt.Sprintf("form_%s", panel.CustomId),
+		Title:      form.Title,
+		Components: buildFormComponents(inputs, inputOptions),
 	}
 }

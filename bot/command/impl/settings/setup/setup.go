@@ -21,8 +21,6 @@ func (SetupCommand) Properties() registry.Properties {
 		Children: []registry.Command{
 			AutoSetupCommand{},
 			LimitSetupCommand{},
-			TranscriptsSetupCommand{},
-			ThreadsSetupCommand{},
 		},
 	}
 }

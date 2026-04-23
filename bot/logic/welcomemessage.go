@@ -40,11 +40,6 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
-	settings, err := dbclient.Client.Settings.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return 0, err
-	}
-
 	// Build embeds
 	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
@@ -70,13 +65,11 @@ func SendWelcomeMessage(
 		embeds = append(embeds, formAnswersEmbed)
 	}
 
-	hideClose := settings.HideCloseButton
-	hideCloseWithReason := settings.HideCloseWithReasonButton
-	hideClaim := settings.HideClaimButton
+	var hideClose, hideCloseWithReason, hideClaim bool
 	if panel != nil {
-		hideClose = hideClose || panel.HideCloseButton
-		hideCloseWithReason = hideCloseWithReason || panel.HideCloseWithReasonButton
-		hideClaim = hideClaim || panel.HideClaimButton
+		hideClose = panel.HideCloseButton
+		hideCloseWithReason = panel.HideCloseWithReasonButton
+		hideClaim = panel.HideClaimButton
 	}
 
 	var buttons []component.Component
@@ -139,18 +132,8 @@ func BuildWelcomeMessageEmbed(
 	additionalPlaceholders map[string]string,
 ) (*embed.Embed, error) {
 	if panel == nil || panel.WelcomeMessageEmbed == nil {
-		welcomeMessage, err := dbclient.Client.WelcomeMessages.Get(ctx, ticket.GuildId)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(welcomeMessage) == 0 {
-			welcomeMessage = "Thank you for contacting support.\nPlease describe your issue (and provide an invite to your server if applicable) and wait for a response."
-		}
-
-		// Replace variables
+		welcomeMessage := "Thank you for contacting support.\nPlease describe your issue (and provide an invite to your server if applicable) and wait for a response."
 		welcomeMessage = DoPlaceholderSubstitutions(ctx, welcomeMessage, cmd.Worker(), ticket, additionalPlaceholders)
-
 		return utils.BuildEmbedRaw(cmd.GetColour(customisation.Green), subject, welcomeMessage, nil, cmd.PremiumTier()), nil
 	} else {
 		data, err := dbclient.Client.Embeds.GetEmbed(ctx, *panel.WelcomeMessageEmbed)
@@ -533,9 +516,14 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		tickets, _ := dbclient.Client.Tickets.GetTotalCountByUser(ctx, ticket.GuildId, ticket.UserId)
 		return strconv.Itoa(tickets)
 	},
-	"ticket_limit": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
-		limit, _ := dbclient.Client.TicketLimit.Get(ctx, ticket.GuildId)
-		return strconv.Itoa(int(limit))
+	"ticket_limit": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
+		if ticket.PanelId != nil {
+			panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err == nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
+				return strconv.Itoa(int(*panel.TicketLimit))
+			}
+		}
+		return "5"
 	},
 	"rating_count": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
 		ctx, cancel := context.WithTimeout(context.Background(), substitutionTimeout)

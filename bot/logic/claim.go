@@ -123,9 +123,12 @@ func GenerateClaimedOverwrites(ctx context.Context, worker *worker.Context, tick
 		return nil, err
 	}
 
-	additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return nil, err
+	var additionalPermissions database.TicketPermissions
+	if ticket.PanelId != nil {
+		additionalPermissions, err = dbclient.Client.PanelTicketPermissions.Get(ctx, *ticket.PanelId)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	integrationRoleId, err := GetIntegrationRoleId(ctx, worker, ticket.GuildId)
