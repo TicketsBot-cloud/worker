@@ -1,4 +1,4 @@
-package setup
+package settings
 
 import (
 	"context"
@@ -21,30 +21,26 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-const freePanelLimit = 3
+type SetupCommand struct{}
 
-type AutoSetupCommand struct {
-}
-
-func (AutoSetupCommand) Properties() registry.Properties {
+func (SetupCommand) Properties() registry.Properties {
 	return registry.Properties{
-		Name:            "auto",
+		Name:            "setup",
 		Description:     i18n.HelpSetup,
 		Type:            interaction.ApplicationCommandTypeChatInput,
 		PermissionLevel: permission.Admin,
 		Category:        command.Settings,
-		Children:        nil,
 		InteractionOnly: true,
 		Timeout:         time.Second * 10,
 	}
 }
 
-func (c AutoSetupCommand) GetExecutor() interface{} {
+func (c SetupCommand) GetExecutor() interface{} {
 	return c.Execute
 }
 
 // TODO: Separate into diff functions
-func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
+func (SetupCommand) Execute(ctx registry.CommandContext) {
 	interaction, ok := ctx.(*cmdcontext.SlashCommandContext)
 	if !ok {
 		return
@@ -112,22 +108,18 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	switch _, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), categoryData); err {
-	case nil: // ok
+	case nil:
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategorySuccess))
-	default: // error
+	default:
 		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategoryFailure))
 	}
 
 	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCompleted, fmt.Sprintf("%s/manage/%d/panels", config.Conf.Bot.DashboardUrl, ctx.GuildId()), adminRoleId, supportRoleId))
 	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoDocs, config.Conf.Bot.DocsUrl))
 
-	// update status
 	if shouldEdit {
 		embed.SetDescription(messageContent)
-
-		if err := edit(interaction, embed); err != nil {
-			shouldEdit = false
-		}
+		edit(interaction, embed) //nolint:errcheck
 	}
 }
 
@@ -148,7 +140,6 @@ func getColour(ctx context.Context, guildId uint64, failed bool) int {
 		colour = customisation.Green
 	}
 
-	// ignore error, return default
 	hex, _ := customisation.GetColour(ctx, guildId, colour)
 	return hex
 }
@@ -163,7 +154,7 @@ func getTranscriptChannelData(guildId, supportRoleId, adminRoleId uint64) rest.C
 	)
 
 	overwrites := []channel.PermissionOverwrite{
-		{ // deny everyone else access to channel
+		{
 			Id:    guildId,
 			Type:  channel.PermissionTypeRole,
 			Allow: 0,

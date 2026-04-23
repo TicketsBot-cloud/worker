@@ -14,7 +14,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin/debug"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/general"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings"
-	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings/setup"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/statistics"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tags"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tickets"
@@ -364,10 +363,7 @@ func callCommand(
 	case settings.ViewStaffCommand:
 
 		v.Execute(ctx)
-	case setup.AutoSetupCommand:
-
-		v.Execute(ctx)
-	case setup.SetupCommand:
+	case settings.SetupCommand:
 
 		v.Execute(ctx)
 	case statistics.StatsCommand:
