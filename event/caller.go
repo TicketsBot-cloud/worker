@@ -367,21 +367,6 @@ func callCommand(
 	case setup.AutoSetupCommand:
 
 		v.Execute(ctx)
-	case setup.LimitSetupCommand:
-		var arg0 int
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(float64)
-			if !ok {
-				return fmt.Errorf("option %s was not a float64", opt0.Name)
-			}
-			arg0 = int(argValue)
-		}
-
-		v.Execute(ctx, arg0)
 	case setup.SetupCommand:
 
 		v.Execute(ctx)

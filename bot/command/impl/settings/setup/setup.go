@@ -20,7 +20,6 @@ func (SetupCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		Children: []registry.Command{
 			AutoSetupCommand{},
-			LimitSetupCommand{},
 		},
 	}
 }

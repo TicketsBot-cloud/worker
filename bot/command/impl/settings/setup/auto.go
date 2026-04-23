@@ -111,13 +111,9 @@ func (AutoSetupCommand) Execute(ctx registry.CommandContext) {
 		Type: channel.ChannelTypeGuildCategory,
 	}
 
-	switch category, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), categoryData); err {
+	switch _, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), categoryData); err {
 	case nil: // ok
 		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategorySuccess))
-
-		if err := dbclient.Client.ChannelCategory.Set(ctx, ctx.GuildId(), category.Id); err != nil {
-			ctx.HandleError(err)
-		}
 	default: // error
 		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategoryFailure))
 	}

@@ -68,7 +68,6 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		var isBlacklisted bool
 		var totalTickets int
 		var openTickets int
-		var ticketLimit uint8
 
 		group, _ := errgroup.WithContext(ctx)
 
@@ -101,15 +100,6 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			return err
 		})
 
-		// load ticketLimit
-		group.Go(func() (err error) {
-			span := sentry.StartSpan(span.Context(), "TicketLimit")
-			defer span.Finish()
-
-			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, ctx.GuildId())
-			return
-		})
-
 		if err := group.Wait(); err != nil {
 			ctx.HandleError(err)
 			return
@@ -125,7 +115,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			AddField("Is Blacklisted", strconv.FormatBool(isBlacklisted), true).
 			AddBlankField(true).
 			AddField("Total Tickets", strconv.Itoa(totalTickets), true).
-			AddField("Open Tickets", fmt.Sprintf("%d / %d", openTickets, ticketLimit), true)
+			AddField("Open Tickets", strconv.Itoa(openTickets), true)
 
 		_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
 		span.Finish()
