@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
@@ -50,6 +51,11 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 	if err := dbclient.Client.TicketClaims.Set(ctx, ticket.GuildId, ticket.Id, userId); err != nil {
 		return err
 	}
+
+	workflowbus.Emit(ctx, workflowbus.TriggerTicketClaimed, ticket.GuildId, cmd.Worker().CausationId, workflowbus.TicketClaimedPayload{
+		TicketId:  ticket.Id,
+		ClaimedBy: userId,
+	})
 
 	newOverwrites, err := GenerateClaimedOverwrites(ctx, cmd.Worker(), ticket, userId)
 	if err != nil {

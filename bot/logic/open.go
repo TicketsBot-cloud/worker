@@ -12,6 +12,7 @@ import (
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
@@ -646,6 +647,33 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		statsd.Client.IncrementKey(statsd.KeyOpenCommand)
 	}
 	span.Finish()
+
+	// Emit automation trigger. The executor consumes this from Kafka and runs any
+	// enabled automations whose trigger is ticket.created. No-op if no producer
+	// is configured. Uses the interaction's causation id if present to block a
+	// recursive trigger chain.
+	var panelIdPtr *int
+	if panel != nil {
+		pid := panel.PanelId
+		panelIdPtr = &pid
+	}
+	// Build form answers map keyed by input label so the executor can resolve
+	// %form:fieldLabel% placeholders in conditions and message content.
+	var formAnswers map[string]string
+	if len(formData) > 0 {
+		formAnswers = make(map[string]string, len(formData))
+		for input, answer := range formData {
+			formAnswers[input.Label] = answer
+		}
+	}
+	workflowbus.Emit(ctx, workflowbus.TriggerTicketCreated, cmd.GuildId(), cmd.Worker().CausationId, workflowbus.TicketCreatedPayload{
+		TicketId:  ticket.Id,
+		OpenerId:  cmd.UserId(),
+		PanelId:   panelIdPtr,
+		ChannelId: ticket.ChannelId,
+		IsThread:  ticket.IsThread,
+		Form:      formAnswers,
+	})
 
 	return ticket, nil
 }

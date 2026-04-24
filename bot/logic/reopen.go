@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
@@ -155,4 +156,9 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 		cmd.HandleError(err)
 		return
 	}
+
+	workflowbus.Emit(ctx, workflowbus.TriggerTicketReopened, ticket.GuildId, cmd.Worker().CausationId, workflowbus.TicketReopenedPayload{
+		TicketId:   ticket.Id,
+		ReopenedBy: cmd.UserId(),
+	})
 }

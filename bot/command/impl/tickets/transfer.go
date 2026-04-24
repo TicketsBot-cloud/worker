@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -73,10 +74,19 @@ func (TransferCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		return
 	}
 
+	previousClaimer, _ := dbclient.Client.TicketClaims.Get(ctx, ticket.GuildId, ticket.Id)
+
 	if err := logic.ClaimTicket(ctx, ctx, ticket, userId); err != nil {
 		ctx.HandleError(err)
 		return
 	}
+
+	workflowbus.Emit(ctx, workflowbus.TriggerTicketTransferred, ticket.GuildId, ctx.Worker().CausationId, workflowbus.TicketTransferredPayload{
+		TicketId:      ticket.Id,
+		FromUserId:    previousClaimer,
+		ToUserId:      userId,
+		TransferredBy: ctx.UserId(),
+	})
 
 	// Update the welcome message claim button
 	if err := logic.UpdateWelcomeMessageClaimButton(ctx, ctx.Worker(), ctx, ticket, true); err != nil {

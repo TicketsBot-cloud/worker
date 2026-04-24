@@ -84,6 +84,7 @@ func ListenTicketClose() {
 				IsWhitelabel: botId != 0,
 				Cache:        cache.Client, // TODO: Less hacky
 				RateLimiter:  nil,          // Use http-proxy ratelimit functionality
+				CausationId:  payload.CausationId,
 			}
 
 			// Get whether the guild is premium for log archiver

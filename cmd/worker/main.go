@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/rpc"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
@@ -152,6 +153,30 @@ func main() {
 
 	logger.Info("Initialising integrations")
 	integrations.InitIntegrations()
+
+	// Workflow trigger producer — initialised in every mode so Discord event handlers
+	// can emit automation triggers regardless of INTERACTIONS vs GATEWAY deployment.
+	// If KAFKA_BROKERS is unset, NewProducer returns a no-op producer.
+	//
+	// HMAC secret is read directly from env so the worker doesn't need a new
+	// config field just for this. Must match the executor's WORKFLOWBUS_HMAC_SECRET
+	// or the executor rejects every envelope.
+	workflowSigner := workflowbus.NewSigner([]byte(os.Getenv(workflowbus.SecretEnvVar)))
+	if workflowSigner.Active() {
+		logger.Info("Workflow envelope HMAC enabled")
+	}
+	workflowProducer, err := workflowbus.NewProducer(
+		config.Conf.Kafka.Brokers,
+		logger.With(zap.String("service", "workflowbus")),
+		workflowSigner,
+	)
+	if err != nil {
+		logger.Error("Failed to create workflow trigger producer — automations will not fire", zap.Error(err))
+	} else {
+		workflowbus.SetGlobal(workflowProducer)
+		defer workflowProducer.Close()
+		logger.Info("Workflow trigger producer ready")
+	}
 
 	go messagequeue.ListenTicketClose()
 	go messagequeue.ListenAutoClose(logger.With(zap.String("service", "autoclose")))

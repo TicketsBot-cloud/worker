@@ -13,6 +13,12 @@ type Context struct {
 	ShardId      int
 	Cache        *cache.PgCache
 	RateLimiter  *ratelimit.Ratelimiter
+
+	// Automation causation tracking.
+	// Populated only when this context is running on behalf of an automation execution —
+	// used by the recursion guard so an automation cannot trigger itself in a causation chain.
+	CausationId string
+	WorkflowId  int64
 }
 
 func (ctx *Context) Self() (user.User, error) {

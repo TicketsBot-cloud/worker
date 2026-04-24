@@ -10,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/common/collections"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
@@ -80,6 +81,12 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 				cmd.HandleError(err)
 				return
 			}
+
+			workflowbus.Emit(ctx, workflowbus.TriggerTicketClosed, ticket.GuildId, cmd.Worker().CausationId, workflowbus.TicketClosedPayload{
+				TicketId: ticket.Id,
+				ClosedBy: cmd.UserId(),
+				Reason:   reason,
+			})
 
 			return
 		}
@@ -165,6 +172,12 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		cmd.HandleError(err)
 		return
 	}
+
+	workflowbus.Emit(ctx, workflowbus.TriggerTicketClosed, ticket.GuildId, cmd.Worker().CausationId, workflowbus.TicketClosedPayload{
+		TicketId: ticket.Id,
+		ClosedBy: cmd.UserId(),
+		Reason:   reason,
+	})
 
 	success = true
 	ticket.CloseTime = utils.Ptr(time.Now())
