@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TicketsBot-cloud/common/integrations/bloxlink"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
@@ -211,48 +210,6 @@ func DoPlaceholderSubstitutions(
 
 				lock.Lock()
 				message = strings.Replace(message, formatted, replacement, -1)
-				lock.Unlock()
-
-				return nil
-			})
-		}
-	}
-
-	// Group substitutions
-	for _, substitutor := range groupSubstitutions {
-		substitutor := substitutor
-
-		contains := false
-		for _, placeholder := range substitutor.Placeholders {
-			formatted := fmt.Sprintf("%%%s%%", placeholder)
-			if strings.Contains(message, formatted) {
-				contains = true
-				break
-			}
-		}
-
-		if contains {
-			group.Go(func() error {
-				ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-				defer cancel()
-
-				replacements := substitutor.F(ctx, worker, ticket)
-				if replacements == nil {
-					replacements = make(map[string]string)
-				}
-
-				// Fill any placeholder with N/A that do not have values
-				for _, placeholder := range substitutor.Placeholders {
-					if _, ok := replacements[placeholder]; !ok {
-						replacements[placeholder] = "N/A"
-					}
-				}
-
-				lock.Lock()
-				for placeholder, replacement := range replacements {
-					formatted := fmt.Sprintf("%%%s%%", placeholder)
-					message = strings.Replace(message, formatted, replacement, -1)
-				}
 				lock.Unlock()
 
 				return nil
@@ -632,45 +589,6 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 	"discord_account_age": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		return fmt.Sprintf("<t:%d:R>", utils.SnowflakeToTime(ticket.UserId).Unix())
 	},
-}
-
-type GroupSubstitutionFunc func(context.Context, *worker.Context, database.Ticket) map[string]string
-
-type GroupSubstitutor struct {
-	Placeholders []string
-	F            GroupSubstitutionFunc
-}
-
-func NewGroupSubstitutor(placeholders []string, f GroupSubstitutionFunc) GroupSubstitutor {
-	return GroupSubstitutor{
-		Placeholders: placeholders,
-		F:            f,
-	}
-}
-
-var groupSubstitutions = []GroupSubstitutor{
-	NewGroupSubstitutor([]string{"roblox_username", "roblox_id", "roblox_display_name", "roblox_profile_url", "roblox_account_age", "roblox_account_created"},
-		func(ctx context.Context, worker *worker.Context, ticket database.Ticket) map[string]string {
-			user, err := integrations.Bloxlink.GetRobloxUser(ctx, ticket.UserId)
-			if err != nil {
-				if err == bloxlink.ErrUserNotFound {
-					return nil
-				} else {
-					sentry.Error(err)
-					return nil
-				}
-			}
-
-			return map[string]string{
-				"roblox_username":        user.Name,
-				"roblox_id":              strconv.Itoa(user.Id),
-				"roblox_display_name":    user.DisplayName,
-				"roblox_profile_url":     fmt.Sprintf("https://www.roblox.com/users/%d/profile", user.Id),
-				"roblox_account_age":     fmt.Sprintf("<t:%d:R>", user.Created.Unix()),
-				"roblox_account_created": fmt.Sprintf("<t:%d:D>", user.Created.Unix()),
-			}
-		},
-	),
 }
 
 func formAnswersToMap(formData map[database.FormInput]string) map[string]*string {
