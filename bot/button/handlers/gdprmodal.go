@@ -867,3 +867,102 @@ func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 		ctx.HandleError(err)
 	}
 }
+
+type GDPRModalExportGuildHandler struct{}
+
+func (h *GDPRModalExportGuildHandler) Matcher() matcher.Matcher {
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_modal_export_guild_")
+	})
+}
+
+func (h *GDPRModalExportGuildHandler) Properties() registry.Properties {
+	return registry.Properties{
+		Flags:   registry.SumFlags(registry.DMsAllowed),
+		Timeout: constants.TimeoutGDPR,
+	}
+}
+
+func (h *GDPRModalExportGuildHandler) Execute(ctx *context.ModalContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
+	userId := ctx.UserId()
+
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+		return
+	}
+
+	var guildIds []uint64
+
+	for _, actionRow := range ctx.Interaction.Data.Components {
+		if actionRow.Component != nil {
+			switch actionRow.Component.CustomId {
+			case "server_ids":
+				if actionRow.Component.Values != nil {
+					for _, val := range actionRow.Component.Values {
+						if id, err := strconv.ParseUint(val, 10, 64); err == nil {
+							guildIds = append(guildIds, id)
+						}
+					}
+				} else if actionRow.Component.Value != "" {
+					guildIds = utils.ParseGuildIdsFromInput(actionRow.Component.Value)
+				}
+			}
+		} else {
+			for _, comp := range actionRow.Components {
+				switch comp.CustomId {
+				case "server_ids":
+					if comp.Values != nil {
+						for _, val := range comp.Values {
+							if id, err := strconv.ParseUint(val, 10, 64); err == nil {
+								guildIds = append(guildIds, id)
+							}
+						}
+					} else if comp.Value != "" {
+						guildIds = utils.ParseGuildIdsFromInput(comp.Value)
+					}
+				}
+			}
+		}
+	}
+
+	if len(guildIds) == 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
+		return
+	}
+
+	var serverNames []string
+	var validGuildIds []uint64
+
+	for _, guildId := range guildIds {
+		guild, err := ctx.Worker().GetGuild(guildId)
+		if err != nil || guild.OwnerId != userId {
+			continue
+		}
+
+		serverNames = append(serverNames, fmt.Sprintf("%s (ID: %d)", guild.Name, guildId))
+		validGuildIds = append(validGuildIds, guildId)
+	}
+
+	if len(validGuildIds) == 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
+		return
+	}
+
+	guildIdsStr := strings.Trim(strings.ReplaceAll(fmt.Sprint(validGuildIds), " ", ","), "[]")
+
+	exportGuildData := GDPRConfirmationData{
+		RequestType:     GDPRExportGuild,
+		UserId:          userId,
+		GuildIds:        validGuildIds,
+		GuildNames:      serverNames,
+		Locale:          locale,
+		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_export_guild_%s_%s", guildIdsStr, locale.IsoShortCode),
+	}
+
+	exportComponents := buildGDPRConfirmationView(ctx, locale, exportGuildData)
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(exportComponents)); err != nil {
+		ctx.HandleError(err)
+	}
+}

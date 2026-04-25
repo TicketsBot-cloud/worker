@@ -19,6 +19,8 @@ const (
 	GDPRSpecificTranscripts
 	GDPRAllMessages
 	GDPRSpecificMessages
+	GDPRExportGuild
+	GDPRExportUser
 )
 
 type GDPRConfirmationData struct {
@@ -57,9 +59,33 @@ func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRCo
 
 	case GDPRSpecificMessages:
 		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificMessages, data.GuildNames[0], data.TicketIdsStr)
+
+	case GDPRExportGuild:
+		if len(data.GuildIds) == 1 {
+			content = i18n.GetMessage(locale, i18n.GdprConfirmExportGuild, data.GuildNames[0])
+		} else {
+			serversList := strings.Join(data.GuildNames, "\n* ")
+			content = i18n.GetMessage(locale, i18n.GdprConfirmExportGuildMulti, serversList)
+		}
+
+	case GDPRExportUser:
+		content = i18n.GetMessage(locale, i18n.GdprConfirmExportUser)
 	}
 
-	content += i18n.GetMessage(locale, i18n.GdprConfirmWarning)
+	isExport := data.RequestType == GDPRExportGuild || data.RequestType == GDPRExportUser
+
+	if !isExport {
+		content += i18n.GetMessage(locale, i18n.GdprConfirmWarning)
+	}
+
+	buttonStyle := component.ButtonStyleDanger
+	buttonLabel := i18n.GetMessage(locale, i18n.GdprConfirmButton)
+	buttonEmoji := utils.BuildEmoji("⚠️")
+	if isExport {
+		buttonStyle = component.ButtonStylePrimary
+		buttonLabel = i18n.GetMessage(locale, i18n.GdprConfirmExportButton)
+		buttonEmoji = utils.BuildEmoji("📦")
+	}
 
 	innerComponents := []component.Component{
 		component.BuildTextDisplay(component.TextDisplay{
@@ -68,10 +94,10 @@ func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRCo
 		component.BuildSeparator(component.Separator{}),
 		component.BuildActionRow(
 			component.BuildButton(component.Button{
-				Label:    i18n.GetMessage(locale, i18n.GdprConfirmButton),
+				Label:    buttonLabel,
 				CustomId: data.ConfirmButtonId,
-				Style:    component.ButtonStyleDanger,
-				Emoji:    utils.BuildEmoji("⚠️"),
+				Style:    buttonStyle,
+				Emoji:    buttonEmoji,
 			}),
 		),
 	}
