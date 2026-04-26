@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TicketsBot-cloud/analytics-client"
 	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -54,12 +54,16 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 	var totalTickets, openTickets uint64
 
 	// totalTickets
-	group.Go(func() (err error) {
+	group.Go(func() error {
 		span := sentry.StartSpan(span.Context(), "GetTotalTicketCount")
 		defer span.Finish()
 
-		totalTickets, err = dbclient.Analytics.GetTotalTicketCount(ctx, ctx.GuildId())
-		return
+		count, err := dbclient.Client.Tickets.GetTotalTicketCount(ctx, ctx.GuildId())
+		if err != nil {
+			return err
+		}
+		totalTickets = uint64(count)
+		return nil
 	})
 
 	// openTickets
@@ -79,49 +83,54 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 	var feedbackRating float64
 	var feedbackCount uint64
 
-	group.Go(func() (err error) {
+	group.Go(func() error {
 		span := sentry.StartSpan(span.Context(), "GetAverageFeedbackRating")
 		defer span.Finish()
 
-		feedbackRating, err = dbclient.Analytics.GetAverageFeedbackRatingGuild(ctx, ctx.GuildId())
-		return
+		avg, err := dbclient.Client.ServiceRatings.GetAverage(ctx, ctx.GuildId())
+		if err != nil {
+			return err
+		}
+		feedbackRating = float64(avg)
+		return nil
 	})
 
-	group.Go(func() (err error) {
+	group.Go(func() error {
 		span := sentry.StartSpan(span.Context(), "GetFeedbackCount")
 		defer span.Finish()
 
-		feedbackCount, err = dbclient.Analytics.GetFeedbackCountGuild(ctx, ctx.GuildId())
-		return
+		count, err := dbclient.Client.ServiceRatings.GetCount(ctx, ctx.GuildId())
+		if err != nil {
+			return err
+		}
+		feedbackCount = uint64(count)
+		return nil
 	})
 
-	// first response times
-	var firstResponseTime analytics.TripleWindow
+	var firstResponseTime database.TripleWindow
 	group.Go(func() (err error) {
 		span := sentry.StartSpan(span.Context(), "GetFirstResponseTimeStats")
 		defer span.Finish()
 
-		firstResponseTime, err = dbclient.Analytics.GetFirstResponseTimeStats(ctx, ctx.GuildId())
+		firstResponseTime, err = dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ctx.GuildId())
 		return
 	})
 
-	// ticket duration
-	var ticketDuration analytics.TripleWindow
+	var ticketDuration database.TripleWindow
 	group.Go(func() (err error) {
 		span := sentry.StartSpan(span.Context(), "GetTicketDurationStats")
 		defer span.Finish()
 
-		ticketDuration, err = dbclient.Analytics.GetTicketDurationStats(ctx, ctx.GuildId())
+		ticketDuration, err = dbclient.Client.Tickets.GetTicketDurationTripleWindow(ctx, ctx.GuildId())
 		return
 	})
 
-	// tickets per day
 	var ticketVolumeTable string
 	group.Go(func() error {
 		span := sentry.StartSpan(span.Context(), "GetLastNTicketsPerDayGuild")
 		defer span.Finish()
 
-		counts, err := dbclient.Analytics.GetLastNTicketsPerDayGuild(ctx, ctx.GuildId(), 7)
+		counts, err := dbclient.Client.Tickets.GetTicketsPerDay(ctx, ctx.GuildId(), 7)
 		if err != nil {
 			return err
 		}

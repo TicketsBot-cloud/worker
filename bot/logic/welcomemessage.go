@@ -505,8 +505,8 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		return strconv.Itoa(len(open))
 	},
 	"total_tickets": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
-		count, _ := dbclient.Analytics.GetTotalTicketCount(ctx, ticket.GuildId)
-		return strconv.FormatUint(count, 10)
+		count, _ := dbclient.Client.Tickets.GetTotalTicketCount(ctx, ticket.GuildId)
+		return strconv.Itoa(count)
 	},
 	"user_open_tickets": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		count, _ := dbclient.Client.Tickets.GetOpenCountByUser(ctx, ticket.GuildId, ticket.UserId)
@@ -529,11 +529,11 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		ctx, cancel := context.WithTimeout(context.Background(), substitutionTimeout)
 		defer cancel()
 
-		ratingCount, _ := dbclient.Analytics.GetFeedbackCountGuild(ctx, ticket.GuildId)
-		return strconv.FormatUint(ratingCount, 10)
+		ratingCount, _ := dbclient.Client.ServiceRatings.GetCount(ctx, ticket.GuildId)
+		return strconv.Itoa(ratingCount)
 	},
 	"average_rating": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
-		average, _ := dbclient.Analytics.GetAverageFeedbackRatingGuild(ctx, ticket.GuildId)
+		average, _ := dbclient.Client.ServiceRatings.GetAverage(ctx, ticket.GuildId)
 		return fmt.Sprintf("%.1f", average)
 	},
 	"time": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
@@ -561,7 +561,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 			}
 		}
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(ctx, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -582,7 +582,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 			}
 		}
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(ctx, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -606,7 +606,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		context, cancel := context.WithTimeout(context.Background(), time.Millisecond*1500)
 		defer cancel()
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(context, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(context, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""

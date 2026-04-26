@@ -30,8 +30,8 @@ func (wr WorkerRetriever) Cache() permission.PermissionCache {
 	return permission.NewRedisCache(redis.Client)
 }
 
-func (wr WorkerRetriever) IsBotAdmin(_ context.Context, userId uint64) bool {
-	return IsBotAdmin(userId)
+func (wr WorkerRetriever) IsBotAdmin(ctx context.Context, userId uint64) bool {
+	return IsBotAdmin(ctx, userId)
 }
 
 func (wr WorkerRetriever) GetGuildOwner(ctx context.Context, guildId uint64) (uint64, error) {

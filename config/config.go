@@ -39,8 +39,7 @@ type (
 			IconUrl             string   `env:"ICON_URL" envDefault:"https://tickets.bot/assets/img/logo.png"`
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			InviteUrl           string   `env:"INVITE_URL" envDefault:"https://invite.tickets.bot"`
-			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
-			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
+			Owner               uint64   `env:"WORKER_BOT_OWNER"`
 			MonitoredBots       []uint64 `env:"MONITORED_BOTS"`
 		}
 
@@ -72,14 +71,6 @@ type (
 			Password string `env:"PASSWORD"`
 			Threads  int    `env:"THREADS"`
 		} `envPrefix:"DATABASE_"`
-
-		Clickhouse struct {
-			Address  string `env:"ADDR"`
-			Threads  int    `env:"THREADS"`
-			Database string `env:"DATABASE"`
-			Username string `env:"USERNAME"`
-			Password string `env:"PASSWORD"`
-		} `envPrefix:"CLICKHOUSE_"`
 
 		Cache struct {
 			Host     string `env:"HOST"`

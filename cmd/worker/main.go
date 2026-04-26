@@ -106,10 +106,6 @@ func main() {
 	cache.Client = &pgCache
 	logger.Info("Connected to cache")
 
-	logger.Info("Connecting to clickhouse")
-	dbclient.ConnectAnalytics(logger.With(zap.String("service", "clickhouse")))
-	logger.Info("Connected to clickhouse")
-
 	// Configure HTTP proxy
 	if config.Conf.Discord.ProxyUrl != "" {
 		logger.Info("Configuring REST proxy", zap.String("url", config.Conf.Discord.ProxyUrl))
