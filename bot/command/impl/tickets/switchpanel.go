@@ -101,6 +101,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 
 	if !ticket.IsThread && newPanel.UseThreads {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageSwitchPanelNonThreadToThread)
+		return
 	}
 
 	// Get ticket claimer
@@ -108,6 +109,40 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	if err != nil {
 		ctx.HandleError(err)
 		return
+	}
+
+	// Check if claimer has access to new panel
+	autoUnclaimed := false
+	originalClaimer := claimer
+	if claimer != 0 {
+		claimerHasAccess, err := logic.HasPermissionForPanel(ctx.Context, ctx.Worker(), ctx.GuildId(), &newPanel, claimer)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		if !claimerHasAccess {
+			claimSettings, err := dbclient.Client.ClaimSettings.Get(ctx, ctx.GuildId())
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			switch claimSettings.SwitchPanelClaimBehavior {
+			case database.SwitchPanelBlockSwitch:
+				ctx.Reply(customisation.Red, i18n.MessageSwitchPanelClaimerNoAccessTitle, i18n.MessageSwitchPanelClaimerNoAccess, claimer)
+				return
+			case database.SwitchPanelAutoUnclaim:
+				if err := dbclient.Client.TicketClaims.Delete(ctx, ticket.GuildId, ticket.Id); err != nil {
+					ctx.HandleError(err)
+					return
+				}
+				claimer = 0
+				autoUnclaimed = true
+			case database.SwitchPanelRemoveOnUnclaim, database.SwitchPanelKeepAccess:
+				// Handled in unclaim
+			}
+		}
 	}
 
 	// Generate new channel name
@@ -142,7 +177,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 
 	// Update welcome message
 	if ticket.WelcomeMessageId != nil {
-		msg, err := ctx.Worker().GetChannelMessage(ctx.ChannelId(), *ticket.WelcomeMessageId)
+		msg, err := ctx.Worker().GetChannelMessage(*ticket.ChannelId, *ticket.WelcomeMessageId)
 
 		// Error is likely to be due to message being deleted, we want to continue further even if it is
 		if err == nil {
@@ -173,7 +208,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 				Components: msg.Components,
 			}
 
-			if _, err = ctx.Worker().EditMessage(ctx.ChannelId(), *ticket.WelcomeMessageId, editData); err != nil {
+			if _, err = ctx.Worker().EditMessage(*ticket.ChannelId, *ticket.WelcomeMessageId, editData); err != nil {
 				ctx.HandleWarning(err)
 			}
 		}
@@ -208,17 +243,26 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", newPanel.Title))
 
 		// Modify join message
-		if ticket.JoinMessageId != nil && settings.TicketNotificationChannel != nil {
-			threadStaff, err := logic.GetStaffInThread(ctx.Context, ctx.Worker(), ticket, *ticket.ChannelId)
-			if err != nil {
-				sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
-				return
+		if ticket.JoinMessageId != nil {
+			var notificationChannel *uint64
+			if newPanel.TicketNotificationChannel != nil {
+				notificationChannel = newPanel.TicketNotificationChannel
+			} else if settings.TicketNotificationChannel != nil {
+				notificationChannel = settings.TicketNotificationChannel
 			}
 
-			msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, newChannelName, ticket.Id, &newPanel, threadStaff, ctx.PremiumTier())
-			if _, err := ctx.Worker().EditMessage(*settings.TicketNotificationChannel, *ticket.JoinMessageId, msg.IntoEditMessageData()); err != nil {
-				sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
-				return
+			if notificationChannel != nil {
+				threadStaff, err := logic.GetStaffInThread(ctx.Context, ctx.Worker(), ticket, *ticket.ChannelId)
+				if err != nil {
+					sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
+					return
+				}
+
+				msg := logic.BuildJoinThreadMessage(ctx.Context, ctx.Worker(), ctx.GuildId(), ticket.UserId, newChannelName, ticket.Id, &newPanel, threadStaff, ctx.PremiumTier())
+				if _, err := ctx.Worker().EditMessage(*notificationChannel, *ticket.JoinMessageId, msg.IntoEditMessageData()); err != nil {
+					sentry.ErrorWithContext(err, ctx.ToErrorContext()) // Only log
+					return
+				}
 			}
 		}
 
@@ -241,6 +285,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 	} else {
+		ticket.PanelId = &newPanel.PanelId
 		overwrites, err = logic.GenerateClaimedOverwrites(ctx.Context, ctx.Worker(), ticket, claimer)
 		if err != nil {
 			ctx.HandleError(err)
@@ -250,7 +295,12 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		// GenerateClaimedOverwrites returns nil if the permissions are the same as an unclaimed ticket
 		// so if this is the case, we still need to calculate permissions
 		if overwrites == nil {
-			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, members...)
+			membersWithClaimer := append(members, claimer)
+			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, membersWithClaimer...)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
 		}
 	}
 
@@ -276,7 +326,15 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		return
 	}
 
-	ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelSuccess, newPanel.Title, ctx.UserId())
+	// If the ticket was auto-unclaimed, update the welcome message claim button
+	if autoUnclaimed {
+		if err := logic.UpdateWelcomeMessageClaimButton(ctx.Context, ctx.Worker(), ctx, ticket, false); err != nil {
+			ctx.HandleWarning(err)
+		}
+		ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelAutoUnclaimed, newPanel.Title, ctx.UserId(), originalClaimer)
+	} else {
+		ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelSuccess, newPanel.Title, ctx.UserId())
+	}
 }
 
 func (SwitchPanelCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {

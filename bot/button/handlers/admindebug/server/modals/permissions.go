@@ -82,38 +82,13 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 
 	selectedValues := selectData.Values
 
-	// Get guild and settings
-	botId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	var worker *w.Context
-	if isWhitelabel {
-		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if bot.BotId == 0 {
-			ctx.HandleError(errors.New("bot not found"))
-			return
-		}
-
-		worker = &w.Context{
-			Token:        bot.Token,
-			BotId:        bot.BotId,
-			IsWhitelabel: true,
-			ShardId:      0,
-			Cache:        ctx.Worker().Cache,
-			RateLimiter:  nil,
-		}
-	} else {
-		worker = ctx.Worker()
-	}
-
+	// Get guild and settings
 	settings, err := dbclient.Client.Settings.Get(ctx, guildId)
 	if err != nil {
 		ctx.HandleError(err)
@@ -126,7 +101,7 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 		return
 	}
 
-	botMember, err := worker.GetGuildMember(guildId, ctx.Worker().BotId)
+	botMember, err := worker.GetGuildMember(guildId, worker.BotId)
 	if err != nil {
 		ctx.HandleError(err)
 		return

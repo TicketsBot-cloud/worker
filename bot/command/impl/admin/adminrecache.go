@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -9,11 +8,9 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
-	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -77,35 +74,10 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId 
 	ctx.Worker().Cache.DeleteGuildRoles(ctx, guildId)
 
 	// re-cache
-	botId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
-	}
-
-	var worker *w.Context
-	if isWhitelabel {
-		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if bot.BotId == 0 {
-			ctx.HandleError(errors.New("bot not found"))
-			return
-		}
-
-		worker = &w.Context{
-			Token:        bot.Token,
-			BotId:        bot.BotId,
-			IsWhitelabel: true,
-			ShardId:      0,
-			Cache:        ctx.Worker().Cache,
-			RateLimiter:  nil, // Use http-proxy ratelimit functionality
-		}
-	} else {
-		worker = ctx.Worker()
 	}
 
 	guild, err := worker.GetGuild(guildId)

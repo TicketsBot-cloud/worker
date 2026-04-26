@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,13 +8,11 @@ import (
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
-	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
@@ -38,7 +35,6 @@ func (h *AdminDebugServerRecacheHandler) Properties() registry.Properties {
 }
 
 func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
-
 	if !utils.IsBotHelper(ctx.UserId()) {
 		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
 	}
@@ -66,35 +62,10 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 	ctx.Worker().Cache.DeleteGuildChannels(ctx, guildId)
 	ctx.Worker().Cache.DeleteGuildRoles(ctx, guildId)
 
-	botId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, guildId)
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
-	}
-
-	var worker *w.Context
-	if isWhitelabel {
-		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if bot.BotId == 0 {
-			ctx.HandleError(errors.New("bot not found"))
-			return
-		}
-
-		worker = &w.Context{
-			Token:        bot.Token,
-			BotId:        bot.BotId,
-			IsWhitelabel: true,
-			ShardId:      0,
-			Cache:        ctx.Worker().Cache,
-			RateLimiter:  nil, // Use http-proxy ratelimit functionality
-		}
-	} else {
-		worker = ctx.Worker()
 	}
 
 	guild, err := worker.GetGuild(guildId)

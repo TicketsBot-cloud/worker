@@ -93,7 +93,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 	}
 }
 
-func buildForm(panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) button.ResponseModal {
+func buildFormComponents(inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) []component.Component {
 	components := make([]component.Component, len(inputs))
 	for i, input := range inputs {
 		var minLength, maxLength *int
@@ -222,11 +222,15 @@ func buildForm(panel database.Panel, form database.Form, inputs []database.FormI
 		components[i] = component.BuildLabel(label)
 	}
 
+	return components
+}
+
+func buildForm(panel database.Panel, form database.Form, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) button.ResponseModal {
 	return button.ResponseModal{
 		Data: interaction.ModalResponseData{
 			CustomId:   fmt.Sprintf("form_%s", panel.CustomId),
 			Title:      form.Title,
-			Components: components,
+			Components: buildFormComponents(inputs, inputOptions),
 		},
 	}
 }

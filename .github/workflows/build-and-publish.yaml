@@ -78,7 +78,7 @@ jobs:
           script: |
             await github.rest.actions.createWorkflowDispatch({
               owner: 'ticketsbot-cloud',
-              repo: 'infra',
+              repo: 'internal-infra',
               workflow_id: 'update-deployment.yml',
               ref: 'main',
               inputs: {

@@ -61,7 +61,6 @@ type (
 		} `envPrefix:"WEB_PROXY_"`
 
 		Integrations struct {
-			BloxlinkApiKey string `env:"BLOXLINK_API_KEY"`
 			SecureProxyUrl string `env:"SECURE_PROXY_URL"`
 		}
 
