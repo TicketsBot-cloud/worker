@@ -137,7 +137,7 @@ func (h *UnclaimHandler) Execute(ctx *context.ButtonContext) {
 		if !claimerHasAccess {
 			filteredOverwrites := make([]channel.PermissionOverwrite, 0, len(overwrites))
 			for _, ow := range overwrites {
-				if ow.Id != whoClaimed || ow.Type != channel.PermissionTypeMember {
+				if ow.Id != whoClaimed || ow.Type != channel.PermissionOverwriteTypeMember {
 					filteredOverwrites = append(filteredOverwrites, ow)
 				}
 			}
@@ -147,14 +147,14 @@ func (h *UnclaimHandler) Execute(ctx *context.ButtonContext) {
 			case database.SwitchPanelKeepAccess:
 				overwrites = append(overwrites, channel.PermissionOverwrite{
 					Id:    whoClaimed,
-					Type:  channel.PermissionTypeMember,
+					Type:  channel.PermissionOverwriteTypeMember,
 					Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
 					Deny:  0,
 				})
 			case database.SwitchPanelRemoveOnUnclaim:
 				overwrites = append(overwrites, channel.PermissionOverwrite{
 					Id:    whoClaimed,
-					Type:  channel.PermissionTypeMember,
+					Type:  channel.PermissionOverwriteTypeMember,
 					Allow: 0,
 					Deny:  discordpermission.BuildPermissions(discordpermission.ViewChannel),
 				})
