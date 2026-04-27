@@ -126,23 +126,6 @@ func (c *SlashCommandContext) ReplyWith(response command.MessageResponse) (messa
 	c.responseCh <- command.ResponseMessage{Data: response.IntoApplicationCommandData()}
 
 	return message.Message{}, nil
-
-	/*
-		if hasReplied {
-			msg, err := rest.EditOriginalInteractionResponse(context.Background(), c.Interaction.Token, c.worker.RateLimiter, c.worker.BotId, response.IntoWebhookEditBody())
-
-			if err != nil {
-				sentry.LogWithContext(err, c.ToErrorContext())
-			}
-
-			return msg, err
-		} else {
-			c.responseCh <- response.IntoApplicationCommandData()
-
-			// todo: uhm
-			return message.Message{}, nil
-		}
-	*/
 }
 
 func (c *SlashCommandContext) Modal(data interaction.ModalResponseData) {
