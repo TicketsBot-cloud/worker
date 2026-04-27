@@ -44,10 +44,6 @@ func main() {
 		typeName := strings.TrimPrefix(object.Type().String(), PackageName+".")
 
 		if typeName == object.Name() {
-			if typeName == "EventBus" {
-				continue
-			}
-
 			// Check if underlying type is a struct
 			underlying := object.Type().Underlying()
 			if _, ok := underlying.(*types.Struct); ok {
