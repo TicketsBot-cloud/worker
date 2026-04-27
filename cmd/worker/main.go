@@ -32,8 +32,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/event"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"go.uber.org/zap"
-
-	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {

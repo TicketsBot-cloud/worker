@@ -10,7 +10,6 @@ import (
 	"strings"
 	"unicode"
 
-	_ "github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"golang.org/x/tools/go/packages"
 )
 
