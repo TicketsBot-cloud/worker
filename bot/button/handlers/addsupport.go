@@ -74,49 +74,24 @@ func (h *AddSupportHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		ctx.ReplyRaw(customisation.Red, "Error", "Users in support teams are now deprecated. Please use roles instead.")
 		return
-
-		/* TODO: Remove if Discord does not resolve the performance issues
-
-		// Guild owner doesn't need to be added
-		guild, err := ctx.Guild()
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if guild.OwnerId == id {
-			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOwnerIsAlreadyAdmin)
-			return
-		}
-
-		if err := dbclient.Client.Permissions.AddSupport(ctx.GuildId(), id); err != nil {
-			sentry.ErrorWithContext(err, ctx.ToErrorContext())
-		}
-
-		if err := utils.ToRetriever(ctx.Worker()).Cache().SetCachedPermissionLevel(ctx.GuildId(), id, permcache.Support); err != nil {
-			ctx.HandleError(err)
-			return
-		}
-		*/
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		if id == ctx.GuildId() {
 			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageAddSupportEveryone)
 			return
 		}
-
 		if err := dbclient.Client.RolePermissions.AddSupport(ctx, ctx.GuildId(), id); err != nil {
 			ctx.HandleError(err)
 			return
 		}
-
 		if err := utils.ToRetriever(ctx.Worker()).Cache().SetCachedPermissionLevel(ctx, ctx.GuildId(), id, permcache.Support); err != nil {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("invalid mentionable type: %d", mentionableType))
 		return
 	}
@@ -142,11 +117,12 @@ func updateChannelPermissions(ctx cmdregistry.CommandContext, id uint64, mention
 
 	// Get the name of the user/role being added
 	var targetName string
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		if targetMember, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id); err == nil {
 			targetName = targetMember.User.Username
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		if roles, err := ctx.Worker().GetGuildRoles(ctx.GuildId()); err == nil {
 			for _, role := range roles {
 				if role.Id == id {
@@ -161,7 +137,7 @@ func updateChannelPermissions(ctx cmdregistry.CommandContext, id uint64, mention
 	if settings.TicketNotificationChannel != nil {
 		auditReason := "Added support member/role"
 		if hasMember && targetName != "" {
-			auditReason = fmt.Sprintf("Added support %s (%s) by %s", mentionableType, targetName, member.User.Username)
+			auditReason = fmt.Sprintf("Added support %d (%s) by %s", mentionableType, targetName, member.User.Username)
 		} else if hasMember {
 			auditReason = fmt.Sprintf("Added support member/role by %s", member.User.Username)
 		}
@@ -250,7 +226,7 @@ func updateChannelPermissions(ctx cmdregistry.CommandContext, id uint64, mention
 
 		ticketAuditReason := fmt.Sprintf("Added support to ticket %d", ticket.Id)
 		if hasMember && targetName != "" {
-			ticketAuditReason = fmt.Sprintf("Added support %s (%s) to ticket %d by %s", mentionableType, targetName, ticket.Id, member.User.Username)
+			ticketAuditReason = fmt.Sprintf("Added support %d (%s) to ticket %d by %s", mentionableType, targetName, ticket.Id, member.User.Username)
 		} else if hasMember {
 			ticketAuditReason = fmt.Sprintf("Added support to ticket %d by %s", ticket.Id, member.User.Username)
 		}

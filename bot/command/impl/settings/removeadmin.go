@@ -60,7 +60,8 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		// get guild object
 		guild, err := ctx.Worker().GetGuild(ctx.GuildId())
 		if err != nil {
@@ -87,7 +88,7 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 			ctx.HandleError(err)
 			return
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		if err := dbclient.Client.RolePermissions.RemoveAdmin(ctx, ctx.GuildId(), id); err != nil {
 			ctx.HandleError(err)
 			return
@@ -97,16 +98,20 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("infallible"))
 		return
 	}
 
 	var mention string
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		mention = fmt.Sprintf("<@%d>", id)
-	} else {
+	case context.MentionableTypeRole:
 		mention = fmt.Sprintf("<@&%d>", id)
+	default:
+		ctx.HandleError(fmt.Errorf("infallible"))
+		return
 	}
 
 	ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(
@@ -120,11 +125,12 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 		// Get the name of the user/role being removed
 		var targetName string
-		if mentionableType == context.MentionableTypeUser {
+		switch mentionableType {
+		case context.MentionableTypeUser:
 			if targetMember, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id); err == nil {
 				targetName = targetMember.User.Username
 			}
-		} else if mentionableType == context.MentionableTypeRole {
+		case context.MentionableTypeRole:
 			if roles, err := ctx.Worker().GetGuildRoles(ctx.GuildId()); err == nil {
 				for _, role := range roles {
 					if role.Id == id {
@@ -136,7 +142,7 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 		}
 
 		if err == nil && targetName != "" {
-			auditReason = fmt.Sprintf("Removed admin %s (%s) by %s", mentionableType, targetName, member.User.Username)
+			auditReason = fmt.Sprintf("Removed admin %d (%s) by %s", mentionableType, targetName, member.User.Username)
 		} else if err == nil {
 			auditReason = fmt.Sprintf("Removed admin member/role by %s", member.User.Username)
 		}

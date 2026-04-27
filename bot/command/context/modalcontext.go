@@ -149,7 +149,7 @@ func (c *ModalContext) ReplyWith(response command.MessageResponse) (msg message.
 			Data: response,
 		}
 	} else {
-		if time.Now().Sub(utils.SnowflakeToTime(c.interaction.Id)) > time.Minute*14 {
+		if time.Since(utils.SnowflakeToTime(c.interaction.Id)) > time.Minute*14 {
 			return
 		}
 

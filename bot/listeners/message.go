@@ -100,7 +100,7 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 			if *isStaffCached { // check the user is staff
 				// We don't have to check for previous responses due to ON CONFLICT DO NOTHING
 				sentry.WithSpan0(span.Context(), "Set first response time", func(span *sentry.Span) {
-					if err := dbclient.Client.FirstResponseTime.Set(ctx, guildId, e.Author.Id, ticket.Id, time.Now().Sub(ticket.OpenTime)); err != nil {
+					if err := dbclient.Client.FirstResponseTime.Set(ctx, guildId, e.Author.Id, ticket.Id, time.Since(ticket.OpenTime)); err != nil {
 						sentry.ErrorWithContext(err, utils.MessageCreateErrorContext(e))
 					}
 				})

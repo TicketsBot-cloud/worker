@@ -336,7 +336,7 @@ func checkChannelPermissions(worker *w.Context, channelId uint64, botMember memb
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("**%s** (`#%s`)\n", label, channel.Name))
+	result.WriteString(fmt.Sprintf("**%s** (`#%s`)\n", label, *channel.Name))
 	if len(missing) > 0 {
 		result.WriteString("**Missing Permissions:**\n")
 		for _, p := range missing {

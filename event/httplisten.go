@@ -60,7 +60,7 @@ func HttpListen(redis *redis.Client, cache *cache.PgCache) {
 
 	// Routes
 	router.POST("/event", eventHandler(cache))
-	router.POST("/interaction", interactionHandler(redis, cache))
+	router.POST("/interaction", interactionHandler(cache))
 
 	if err := router.Run(config.Conf.Bot.HttpAddress); err != nil {
 		panic(err)
@@ -99,7 +99,7 @@ func eventHandler(cache *cache.PgCache) func(*gin.Context) {
 	}
 }
 
-func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Context) {
+func interactionHandler(cache *cache.PgCache) func(*gin.Context) {
 	commandManager := new(cmd_manager.CommandManager)
 	commandManager.RegisterCommands()
 	commandManager.RunSetupFuncs()
@@ -249,7 +249,7 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 
 			var handler command.AutoCompleteHandler
 			for _, arg := range cmd.Properties().Arguments {
-				if strings.ToLower(arg.Name) == strings.ToLower(focused.Name) {
+				if strings.EqualFold(arg.Name, focused.Name) {
 					handler = arg.AutoCompleteHandler
 				}
 			}
@@ -302,7 +302,7 @@ func handleApplicationCommandResponseAfterDefer(interactionData interaction.Appl
 				return
 			}
 
-			if time.Now().Sub(utils.SnowflakeToTime(interactionData.Id)) > time.Minute*14 ||
+			if time.Since(utils.SnowflakeToTime(interactionData.Id)) > time.Minute*14 ||
 				deferredAt.Sub(utils.SnowflakeToTime(interactionData.Id)) > config.Conf.Discord.DeferHardTimeout {
 				return
 			}
@@ -365,7 +365,7 @@ func handleButtonResponseAfterDefer(interactionData interaction.InteractionMetad
 				return
 			}
 
-			if time.Now().Sub(utils.SnowflakeToTime(interactionData.Id)) > time.Minute*14 ||
+			if time.Since(utils.SnowflakeToTime(interactionData.Id)) > time.Minute*14 ||
 				deferredAt.Sub(utils.SnowflakeToTime(interactionData.Id)) > config.Conf.Discord.DeferHardTimeout {
 				return
 			}
@@ -396,12 +396,12 @@ func findFocusedOption(options []interaction.ApplicationCommandInteractionDataOp
 
 func calculateTimeToReceive(interactionId uint64) time.Duration {
 	generated := utils.SnowflakeToTime(interactionId)
-	return time.Now().Sub(generated)
+	return time.Since(generated)
 }
 
 func calculateTimeToDefer(interactionId uint64) time.Duration {
 	generated := utils.SnowflakeToTime(interactionId)
 
 	// Call max incase the snowflake timestamp is off
-	return max(generated.Add(config.Conf.Discord.CallbackTimeout).Sub(time.Now()), config.Conf.Discord.CallbackTimeout)
+	return max(time.Until(generated.Add(config.Conf.Discord.CallbackTimeout)), config.Conf.Discord.CallbackTimeout)
 }

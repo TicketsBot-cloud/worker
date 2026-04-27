@@ -21,8 +21,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-const freePanelLimit = 3
-
 type AutoSetupCommand struct {
 }
 

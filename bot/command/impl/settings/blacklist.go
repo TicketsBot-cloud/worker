@@ -53,7 +53,8 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id)
 		if err != nil {
 			ctx.HandleError(err)
@@ -109,7 +110,7 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistAdd, member.User.Id)
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		// Check if role is staff
 		isSupport, err := dbclient.Client.RolePermissions.IsSupport(ctx, id)
 		if err != nil {
@@ -167,7 +168,7 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistAddRole, id)
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("infallible"))
 		return
 	}

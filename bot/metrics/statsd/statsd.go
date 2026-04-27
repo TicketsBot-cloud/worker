@@ -37,12 +37,9 @@ func (c *StatsdClient) StartDaemon() {
 	ticker := time.NewTicker(time.Second * 15)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case _ = <-ticker.C:
-			for key, count := range c.buffer {
-				c.client.Count(key.String(), count.Swap(0))
-			}
+	for range ticker.C {
+		for key, count := range c.buffer {
+			c.client.Count(key.String(), count.Swap(0))
 		}
 	}
 }

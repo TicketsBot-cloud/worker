@@ -182,7 +182,6 @@ func (r *Replyable) SelectValidEmoji(customEmoji customisation.CustomEmoji, fall
 
 func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteLink bool) command.MessageResponse {
 	var message string
-	var imageUrl *string
 
 	var restError request.RestError
 	if errors.As(err, &restError) {
@@ -280,9 +279,6 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 	}
 
 	embed := r.buildEmbedRaw(customisation.Red, r.GetMessage(i18n.Error), message)
-	if imageUrl != nil {
-		embed.SetImage(*imageUrl)
-	}
 
 	res := command.NewEphemeralEmbedMessageResponse(embed)
 

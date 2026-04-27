@@ -52,11 +52,12 @@ func (c AddAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 	}
 
 	var mention string
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		mention = fmt.Sprintf("<@%d>", id)
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		mention = fmt.Sprintf("<@&%d>", id)
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("unknown mentionable type: %d", mentionableType))
 		return
 	}

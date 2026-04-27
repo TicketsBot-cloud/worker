@@ -2,7 +2,6 @@ package event
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/TicketsBot-cloud/gdl/gateway/payloads"
@@ -15,7 +14,7 @@ import (
 func execute(c *worker.Context, event []byte) error {
 	var payload payloads.Payload
 	if err := json.Unmarshal(event, &payload); err != nil {
-		return errors.New(fmt.Sprintf("error whilst decoding event data: %s (data: %s)", err.Error(), string(event)))
+		return fmt.Errorf("error whilst decoding event data: %s (data: %s)", err.Error(), string(event))
 	}
 
 	span := sentry.StartTransaction(context.Background(), "Handle Event")

@@ -61,7 +61,8 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		// get guild object
 		guild, err := ctx.Worker().GetGuild(ctx.GuildId())
 		if err != nil {
@@ -93,7 +94,7 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 			ctx.HandleError(err)
 			return
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		if err := dbclient.Client.RolePermissions.RemoveSupport(ctx, ctx.GuildId(), id); err != nil {
 			ctx.HandleError(err)
 			return
@@ -108,7 +109,7 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("infallible"))
 		return
 	}
@@ -147,7 +148,7 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 		}
 
 		if err == nil && targetName != "" {
-			auditReason = fmt.Sprintf("Removed support %s (%s) by %s", mentionableType, targetName, member.User.Username)
+			auditReason = fmt.Sprintf("Removed support %d (%s) by %s", mentionableType, targetName, member.User.Username)
 		} else if err == nil {
 			auditReason = fmt.Sprintf("Removed support member/role by %s", member.User.Username)
 		}

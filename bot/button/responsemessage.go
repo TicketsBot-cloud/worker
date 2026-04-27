@@ -24,7 +24,7 @@ func (r ResponseMessage) Build() interface{} {
 }
 
 func (r ResponseMessage) HandleDeferred(interactionData interaction.InteractionMetadata, worker *worker.Context) error {
-	if time.Now().Sub(utils.SnowflakeToTime(interactionData.Id)) > time.Minute*14 {
+	if time.Since(utils.SnowflakeToTime(interactionData.Id)) > time.Minute*14 {
 		return nil
 	}
 

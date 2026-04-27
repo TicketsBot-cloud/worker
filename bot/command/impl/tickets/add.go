@@ -78,7 +78,8 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		// Add user to ticket in DB
 		if err := dbclient.Client.TicketMembers.Add(ctx, ctx.GuildId(), ticket.Id, id); err != nil {
 			ctx.HandleError(err)
@@ -130,7 +131,7 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 				return
 			}
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		// Handle role addition
 		additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ctx.GuildId())
 		if err != nil {
@@ -153,7 +154,7 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("unknown mentionable type: %d", mentionableType))
 		return
 	}
