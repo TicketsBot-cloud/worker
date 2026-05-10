@@ -99,10 +99,17 @@ func (h *EditCloseReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 		return
 	}
 
-	settings, err := dbclient.Client.Settings.Get(ctx.Context, guildId)
-	if err != nil {
-		ctx.HandleError(err)
-		return
+	var storeTranscripts, feedbackEnabled bool
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx.Context, *ticket.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+		if p.PanelId != 0 {
+			storeTranscripts = p.StoreTranscripts
+			feedbackEnabled = p.FeedbackEnabled
+		}
 	}
 
 	var closedBy uint64
@@ -123,11 +130,11 @@ func (h *EditCloseReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 
 	ctx.Ack()
 
-	if err := logic.EditGuildArchiveMessageIfExists(ctx.Context, ctx.Worker(), ticket, settings, hasFeedback, closedBy, &reason, rating); err != nil {
+	if err := logic.EditGuildArchiveMessageIfExists(ctx.Context, ctx.Worker(), ticket, storeTranscripts, hasFeedback, closedBy, &reason, rating); err != nil {
 		ctx.HandleError(err)
 	}
 
-	if err := logic.EditDMMessageIfExists(ctx.Context, ctx.Worker(), ticket, settings, closedBy, &reason, rating); err != nil {
+	if err := logic.EditDMMessageIfExists(ctx.Context, ctx.Worker(), ticket, storeTranscripts, feedbackEnabled, closedBy, &reason, rating); err != nil {
 		ctx.HandleError(err)
 	}
 }

@@ -156,14 +156,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, nil
 	}
 
-	span = sentry.StartSpan(rootSpan.Context(), "Load settings")
-	settings, err := cmd.Settings()
-	if err != nil {
-		cmd.HandleError(err)
-		return database.Ticket{}, err
-	}
-	span.Finish()
-
 	// Determine if we should use threads; panel-less tickets always use channel mode
 	isThread := panel != nil && panel.UseThreads
 
@@ -228,7 +220,15 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Channel count checks
 	if !isThread {
-		newCategoryId, err := checkChannelLimitAndDetermineParentId(ctx, cmd.Worker(), cmd.GuildId(), category, settings, true)
+		var overflowEnabled bool
+		var overflowCategoryId *uint64
+		var panelId int
+		if panel != nil {
+			overflowEnabled = panel.OverflowEnabled
+			overflowCategoryId = panel.OverflowCategoryId
+			panelId = panel.PanelId
+		}
+		newCategoryId, err := checkChannelLimitAndDetermineParentId(ctx, cmd.Worker(), cmd.GuildId(), category, overflowEnabled, overflowCategoryId, panelId, true)
 		if err != nil {
 			if errors.Is(err, errGuildChannelLimitReached) {
 				cmd.Reply(customisation.Red, i18n.Error, i18n.MessageGuildChannelLimitReached)
@@ -284,7 +284,11 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if isThread {
 		span = sentry.StartSpan(rootSpan.Context(), "Create thread")
 		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
-		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(settings.ThreadArchiveDuration), false)
+		threadArchiveDuration := 10080
+		if panel != nil {
+			threadArchiveDuration = panel.ThreadArchiveDuration
+		}
+		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(threadArchiveDuration), false)
 		if err != nil {
 			cmd.HandleError(err)
 
@@ -639,7 +643,9 @@ func checkChannelLimitAndDetermineParentId(
 	worker *worker.Context,
 	guildId uint64,
 	categoryId uint64,
-	settings database.Settings,
+	overflowEnabled bool,
+	overflowCategoryId *uint64,
+	panelId int,
 	canRetry bool,
 ) (uint64, error) {
 	span := sentry.StartSpan(ctx, "Check < 500 channels")
@@ -660,7 +666,7 @@ func checkChannelLimitAndDetermineParentId(
 					return 0, err
 				}
 
-				return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
+				return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, overflowEnabled, overflowCategoryId, panelId, false)
 			} else {
 				return 0, errGuildChannelLimitReached
 			}
@@ -676,9 +682,9 @@ func checkChannelLimitAndDetermineParentId(
 
 		if categoryChildrenCount >= 50 {
 			// Check if we're already in the overflow category
-			isOverflowCategory := settings.OverflowEnabled &&
-				settings.OverflowCategoryId != nil &&
-				*settings.OverflowCategoryId == categoryId
+			isOverflowCategory := overflowEnabled &&
+				overflowCategoryId != nil &&
+				*overflowCategoryId == categoryId
 
 			if canRetry {
 				canRefresh, err := redis.TakeChannelRefetchToken(ctx, guildId)
@@ -691,7 +697,7 @@ func checkChannelLimitAndDetermineParentId(
 						return 0, err
 					}
 
-					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
+					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, overflowEnabled, overflowCategoryId, panelId, false)
 				} else {
 					// If this is the overflow category and it's full (and we can't refresh), we can't use another overflow
 					if isOverflowCategory {
@@ -701,7 +707,7 @@ func checkChannelLimitAndDetermineParentId(
 
 					// If we can't refresh but overflow is available, try overflow
 					// instead of immediately returning an error
-					if !settings.OverflowEnabled {
+					if !overflowEnabled {
 						return 0, errCategoryChannelLimitReached
 					}
 				}
@@ -714,19 +720,19 @@ func checkChannelLimitAndDetermineParentId(
 			}
 
 			// Try to use the overflow category if there is one
-			if settings.OverflowEnabled {
+			if overflowEnabled {
 				// If overflow is enabled, and the category id is nil, then use the root of the server
-				if settings.OverflowCategoryId == nil {
+				if overflowCategoryId == nil {
 					categoryId = 0
 				} else {
-					categoryId = *settings.OverflowCategoryId
+					categoryId = *overflowCategoryId
 
 					// Verify that the overflow category still exists
 					span := sentry.StartSpan(span.Context(), "Check if overflow category exists")
 					if !utils.ContainsFunc(channels, func(c channel.Channel) bool {
 						return c.Id == categoryId
 					}) {
-						if err := dbclient.Client.Settings.SetOverflow(ctx, guildId, false, nil); err != nil {
+						if err := dbclient.Client.Panel.SetOverflow(ctx, panelId, false, nil); err != nil {
 							return 0, err
 						}
 
@@ -734,7 +740,7 @@ func checkChannelLimitAndDetermineParentId(
 					}
 
 					// Check that the overflow category still has space
-					overflowCategoryChildrenCount := countRealChannels(channels, *settings.OverflowCategoryId)
+					overflowCategoryChildrenCount := countRealChannels(channels, *overflowCategoryId)
 					if overflowCategoryChildrenCount >= 50 {
 						return 0, errCategoryChannelLimitReached
 					}

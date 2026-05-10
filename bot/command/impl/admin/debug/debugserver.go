@@ -146,12 +146,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		return
 	}
 
-	settings, err := dbclient.Client.Settings.Get(ctx, guild.Id)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	owner, err := worker.GetUser(guild.OwnerId)
 	if err != nil {
 		ctx.HandleError(err)
@@ -282,7 +276,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 	hasAdministrator := permissionwrapper.HasPermissions(worker, guild.Id, worker.BotId, permission.Administrator)
 
 	settingsInfo := []string{
-		fmt.Sprintf("Transcripts Enabled: `%t`", settings.StoreTranscripts),
 		fmt.Sprintf("Panel Count: `%d/%s`", panelCount, panelLimit),
 		fmt.Sprintf("Thread Mode Panels: `%d/%d`", threadPanelCount, panelCount),
 		fmt.Sprintf("Bot Has Administrator: `%t`", hasAdministrator),

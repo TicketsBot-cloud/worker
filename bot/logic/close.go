@@ -60,10 +60,17 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		return
 	}
 
-	settings, err := cmd.Settings()
-	if err != nil {
-		cmd.HandleError(err)
-		return
+	// Load panel for per-panel settings
+	var panel *database.Panel
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			cmd.HandleError(err)
+			return
+		}
+		if p.PanelId != 0 {
+			panel = &p
+		}
 	}
 
 	// Check the channel still exists - if it does not, just set to closed in the database, as this must be a request
@@ -86,7 +93,8 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 	}
 
 	// Archive
-	if settings.StoreTranscripts {
+	storeTranscripts := panel != nil && panel.StoreTranscripts
+	if storeTranscripts {
 		msgs := make([]message.Message, 0, 50)
 
 		const limit = 100
@@ -274,19 +282,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 
 	// Delete join thread button
 	if ticket.IsThread && ticket.JoinMessageId != nil {
-		// Determine which notification channel was used
-		// Priority: Panel-specific notification channel > Global notification channel
 		var notificationChannel *uint64
-
-		// Get panel if this ticket has one
-		var panel *database.Panel
-		if ticket.PanelId != nil {
-			p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-			if err == nil && p.PanelId != 0 {
-				panel = &p
-			}
-		}
-
 		if panel != nil {
 			notificationChannel = panel.TicketNotificationChannel
 		}
@@ -299,22 +295,17 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		}
 	}
 
-	sendCloseEmbed(ctx, cmd, errorContext, member, settings, ticket, reason)
+	sendCloseEmbed(ctx, cmd, errorContext, member, panel, ticket, reason)
 }
 
-func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
+func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, panel *database.Panel, ticket database.Ticket, reason *string) {
+	storeTranscripts := panel != nil && panel.StoreTranscripts
+	feedbackEnabled := panel != nil && panel.FeedbackEnabled
+
 	// Send logs to archive channel (per-panel transcript channel only)
 	var archiveChannelId *uint64
-
-	if ticket.PanelId != nil {
-		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-		if err != nil {
-			sentry.ErrorWithContext(err, errorContext)
-			return
-		}
-		if p.PanelId != 0 {
-			archiveChannelId = p.TranscriptChannelId
-		}
+	if panel != nil {
+		archiveChannelId = panel.TranscriptChannelId
 	}
 
 	var archiveChannelExists bool
@@ -327,7 +318,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 	if archiveChannelExists && archiveChannelId != nil {
 		componentBuilders := [][]CloseEmbedElement{
 			{
-				TranscriptLinkElement(settings.StoreTranscripts),
+				TranscriptLinkElement(storeTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 				EditCloseReasonElement(),
 			},
@@ -357,12 +348,6 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 	dmChannel, ok := getDmChannel(cmd, ticket.UserId)
 	if ok {
 		guild, err := cmd.Guild()
-		if err != nil {
-			sentry.ErrorWithContext(err, errorContext)
-			return
-		}
-
-		feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, cmd.GuildId())
 		if err != nil {
 			sentry.ErrorWithContext(err, errorContext)
 			return
@@ -400,7 +385,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 
 		componentBuilders := [][]CloseEmbedElement{
 			{
-				TranscriptLinkElement(settings.StoreTranscripts),
+				TranscriptLinkElement(storeTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 			},
 			{
