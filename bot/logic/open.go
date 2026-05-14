@@ -285,9 +285,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span = sentry.StartSpan(rootSpan.Context(), "Create thread")
 		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 		threadArchiveDuration := 10080
-		if panel != nil {
-			threadArchiveDuration = panel.ThreadArchiveDuration
-		}
 		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(threadArchiveDuration), false)
 		if err != nil {
 			cmd.HandleError(err)
