@@ -376,7 +376,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 		span.Finish()
 
-		// TODO: Remove
 		if tmp.Id == 0 {
 			cmd.HandleError(fmt.Errorf("channel id is 0"))
 			return database.Ticket{}, fmt.Errorf("channel id is 0")
