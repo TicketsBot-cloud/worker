@@ -558,7 +558,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 				return err
 			}
 
-			if panel != nil && panel.DeleteMentions {
+			if panel != nil && panel.MentionBehaviour == "delete" {
 				span = sentry.StartSpan(rootSpan.Context(), "Delete ping message")
 				_ = cmd.Worker().DeleteMessage(ch.Id, msg.Id)
 				span.Finish()
