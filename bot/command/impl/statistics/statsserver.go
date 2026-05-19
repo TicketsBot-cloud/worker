@@ -148,6 +148,60 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 		return nil
 	})
 
+	var feedbackDist [5]int
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetFeedbackDistribution")
+		defer span.Finish()
+
+		feedbackDist, err = dbclient.Client.ServiceRatings.GetDistribution(ctx, ctx.GuildId())
+		return
+	})
+
+	var feedbackRate database.FeedbackResponseRate
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetFeedbackResponseRate")
+		defer span.Finish()
+
+		feedbackRate, err = dbclient.Client.ServiceRatings.GetResponseRate(ctx, ctx.GuildId(), 30)
+		return
+	})
+
+	var autoCloseStats database.AutoCloseStats
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetAutoCloseVsManualClose")
+		defer span.Finish()
+
+		autoCloseStats, err = dbclient.Client.CloseReason.GetAutoCloseVsManualClose(ctx, ctx.GuildId(), 30)
+		return
+	})
+
+	var threadSplit database.ThreadChannelSplit
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetThreadChannelSplit")
+		defer span.Finish()
+
+		threadSplit, err = dbclient.Client.Tickets.GetThreadChannelSplit(ctx, ctx.GuildId(), 30)
+		return
+	})
+
+	var oneTouchResolution database.OneTouchResolution
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetOneTouchResolutionRate")
+		defer span.Finish()
+
+		oneTouchResolution, err = dbclient.Client.TicketMessageCounts.GetOneTouchResolutionRate(ctx, ctx.GuildId(), 30)
+		return
+	})
+
+	var avgMessageCounts database.AverageMessageCounts
+	group.Go(func() (err error) {
+		span := sentry.StartSpan(span.Context(), "GetAverageMessageCounts")
+		defer span.Finish()
+
+		avgMessageCounts, err = dbclient.Client.TicketMessageCounts.GetAverageMessageCounts(ctx, ctx.GuildId(), 30)
+		return
+	})
+
 	if err := group.Wait(); err != nil {
 		ctx.HandleError(err)
 		return
@@ -209,6 +263,48 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 			}
 		}
 
+		autoCloseTotal := autoCloseStats.AutoClosed + autoCloseStats.ManualClosed
+		var autoClosePct, manualClosePct float64
+		if autoCloseTotal > 0 {
+			autoClosePct = float64(autoCloseStats.AutoClosed) / float64(autoCloseTotal) * 100
+			manualClosePct = float64(autoCloseStats.ManualClosed) / float64(autoCloseTotal) * 100
+		}
+
+		threadTotal := threadSplit.ThreadCount + threadSplit.ChannelCount
+		var threadPct, channelPct float64
+		if threadTotal > 0 {
+			threadPct = float64(threadSplit.ThreadCount) / float64(threadTotal) * 100
+			channelPct = float64(threadSplit.ChannelCount) / float64(threadTotal) * 100
+		}
+
+		feedbackDistStats := []string{
+			fmt.Sprintf("**★1**: %d  **★2**: %d  **★3**: %d  **★4**: %d  **★5**: %d",
+				feedbackDist[0], feedbackDist[1], feedbackDist[2], feedbackDist[3], feedbackDist[4]),
+			fmt.Sprintf("**Response Rate**: %.0f%% (%d/%d tickets)", feedbackRate.Rate*100, feedbackRate.RatedTickets, feedbackRate.ClosedTickets),
+		}
+
+		var oneTouchPct float64
+		if oneTouchResolution.TotalClosed > 0 {
+			oneTouchPct = float64(oneTouchResolution.OneTouchCount) / float64(oneTouchResolution.TotalClosed) * 100
+		}
+
+		messageStats := []string{
+			fmt.Sprintf("**One-Touch Resolution**: %.0f%% (%d/%d)", oneTouchPct, oneTouchResolution.OneTouchCount, oneTouchResolution.TotalClosed),
+			fmt.Sprintf("**Avg Staff Messages**: %s", formatNullableFloat(avgMessageCounts.AvgStaffMessages)),
+			fmt.Sprintf("**Avg User Messages**: %s", formatNullableFloat(avgMessageCounts.AvgUserMessages)),
+			fmt.Sprintf("**Avg Total Messages**: %s", formatNullableFloat(avgMessageCounts.AvgTotalMessages)),
+		}
+
+		closureStats := []string{
+			fmt.Sprintf("**Auto-closed**: %d (%.0f%%)", autoCloseStats.AutoClosed, autoClosePct),
+			fmt.Sprintf("**Manual**: %d (%.0f%%)", autoCloseStats.ManualClosed, manualClosePct),
+		}
+
+		threadStats := []string{
+			fmt.Sprintf("**Thread**: %d (%.0f%%)", threadSplit.ThreadCount, threadPct),
+			fmt.Sprintf("**Channel**: %d (%.0f%%)", threadSplit.ChannelCount, channelPct),
+		}
+
 		innerComponents := append(topSection, []component.Component{
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
@@ -217,6 +313,22 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
 				Content: fmt.Sprintf("### Average Ticket Duration\n● %s", strings.Join(ticketDurationStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Feedback Distribution\n● %s", strings.Join(feedbackDistStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Message Analytics\n● %s", strings.Join(messageStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Closure Method\n● %s", strings.Join(closureStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Thread / Channel Split\n● %s", strings.Join(threadStats, "\n● ")),
 			}),
 			component.BuildSeparator(component.Separator{}),
 			component.BuildTextDisplay(component.TextDisplay{
@@ -231,6 +343,25 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 			Components: innerComponents,
 		}))))
 	} else {
+		autoCloseTotal := autoCloseStats.AutoClosed + autoCloseStats.ManualClosed
+		var autoClosePct, manualClosePct float64
+		if autoCloseTotal > 0 {
+			autoClosePct = float64(autoCloseStats.AutoClosed) / float64(autoCloseTotal) * 100
+			manualClosePct = float64(autoCloseStats.ManualClosed) / float64(autoCloseTotal) * 100
+		}
+
+		threadTotal := threadSplit.ThreadCount + threadSplit.ChannelCount
+		var threadPct, channelPct float64
+		if threadTotal > 0 {
+			threadPct = float64(threadSplit.ThreadCount) / float64(threadTotal) * 100
+			channelPct = float64(threadSplit.ChannelCount) / float64(threadTotal) * 100
+		}
+
+		var legacyOneTouchPct float64
+		if oneTouchResolution.TotalClosed > 0 {
+			legacyOneTouchPct = float64(oneTouchResolution.OneTouchCount) / float64(oneTouchResolution.TotalClosed) * 100
+		}
+
 		msgEmbed := embed.NewEmbed().
 			SetTitle("Statistics").
 			SetColor(ctx.GetColour(customisation.Green)).
@@ -240,12 +371,20 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 			AddField("Feedback Rating", fmt.Sprintf("%.1f / 5 ⭐", feedbackRating), true).
 			AddField("Feedback Count", strconv.FormatUint(feedbackCount, 10), true).
 			AddBlankField(true).
+			AddField("Feedback Distribution", fmt.Sprintf("★1:%d ★2:%d ★3:%d ★4:%d ★5:%d", feedbackDist[0], feedbackDist[1], feedbackDist[2], feedbackDist[3], feedbackDist[4]), false).
+			AddField("Feedback Rate", fmt.Sprintf("%.0f%% (%d/%d tickets)", feedbackRate.Rate*100, feedbackRate.RatedTickets, feedbackRate.ClosedTickets), true).
+			AddBlankField(true).
 			AddField("Average First Response Time (Total)", formatNullableTime(firstResponseTime.AllTime), true).
 			AddField("Average First Response Time (Monthly)", formatNullableTime(firstResponseTime.Monthly), true).
 			AddField("Average First Response Time (Weekly)", formatNullableTime(firstResponseTime.Weekly), true).
 			AddField("Average Ticket Duration (Total)", formatNullableTime(ticketDuration.AllTime), true).
 			AddField("Average Ticket Duration (Monthly)", formatNullableTime(ticketDuration.Monthly), true).
 			AddField("Average Ticket Duration (Weekly)", formatNullableTime(ticketDuration.Weekly), true).
+			AddField("One-Touch Resolution", fmt.Sprintf("%.0f%% (%d/%d)", legacyOneTouchPct, oneTouchResolution.OneTouchCount, oneTouchResolution.TotalClosed), true).
+			AddField("Avg Messages/Ticket", fmt.Sprintf("Staff: %s | User: %s", formatNullableFloat(avgMessageCounts.AvgStaffMessages), formatNullableFloat(avgMessageCounts.AvgUserMessages)), true).
+			AddBlankField(true).
+			AddField("Auto-close / Manual", fmt.Sprintf("Auto: %d (%.0f%%) | Manual: %d (%.0f%%)", autoCloseStats.AutoClosed, autoClosePct, autoCloseStats.ManualClosed, manualClosePct), false).
+			AddField("Thread / Channel", fmt.Sprintf("Thread: %d (%.0f%%) | Channel: %d (%.0f%%)", threadSplit.ThreadCount, threadPct, threadSplit.ChannelCount, channelPct), false).
 			AddField("Ticket Volume", fmt.Sprintf("```\n%s\n```", ticketVolumeTable), false)
 
 		_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
@@ -256,4 +395,11 @@ func (StatsServerCommand) Execute(ctx registry.CommandContext) {
 
 func formatNullableTime(duration *time.Duration) string {
 	return utils.FormatNullableTime(duration)
+}
+
+func formatNullableFloat(f *float64) string {
+	if f == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.1f", *f)
 }

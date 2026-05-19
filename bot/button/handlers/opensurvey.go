@@ -126,6 +126,8 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
+	FetchApiOptions(ctx, form.Id, ctx.UserId(), formInputs, inputOptions)
+
 	ctx.Modal(button.ResponseModal{
 		Data: interaction.ModalResponseData{
 			CustomId:   fmt.Sprintf("exit-survey-%d-%d", guildId, ticketId),

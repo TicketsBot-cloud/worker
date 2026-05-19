@@ -36,7 +36,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int) (database.Ticket, error) {
+func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int, source database.TicketSource) (database.Ticket, error) {
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
@@ -251,7 +251,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Create channel
 	span = sentry.StartSpan(rootSpan.Context(), "Create ticket in database")
-	ticketId, err := dbclient.Client.Tickets.Create(ctx, cmd.GuildId(), cmd.UserId(), isThread, panelId)
+	ticketId, err := dbclient.Client.Tickets.Create(ctx, cmd.GuildId(), cmd.UserId(), isThread, panelId, source)
 	if err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
@@ -944,7 +944,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		})
 	}
 
-	// Default team (ticket admins + ticket support) — always StandardPermissions
+	// Default team (ticket admins + ticket support) - always StandardPermissions
 	if panel == nil || panel.WithDefaultTeam {
 		supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, cmd.GuildId())
 		if err != nil {
@@ -982,7 +982,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		}
 	}
 
-	// Panel-specific custom teams — per-team permissions
+	// Panel-specific custom teams - per-team permissions
 	if panel != nil {
 		panelTeamIds, err := dbclient.Client.PanelTeams.GetTeamIds(ctx, panel.PanelId)
 		if err != nil {

@@ -254,6 +254,15 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			return
 		})
 
+		var openClaimedCount int
+		group.Go(func() (err error) {
+			span := sentry.StartSpan(span.Context(), "GetOpenClaimedCount")
+			defer span.Finish()
+
+			openClaimedCount, err = dbclient.Client.TicketClaims.GetOpenClaimedCount(ctx, ctx.GuildId(), userId)
+			return
+		})
+
 		if err := group.Wait(); err != nil {
 			ctx.HandleError(err)
 			return
@@ -298,6 +307,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				fmt.Sprintf("**Total**: %d", totalClaimedTickets),
 				fmt.Sprintf("**Monthly**: %d", monthlyClaimedTickets),
 				fmt.Sprintf("**Weekly**: %d", weeklyClaimedTickets),
+				fmt.Sprintf("**Currently Open**: %d", openClaimedCount),
 			}
 
 			var topSection []component.Component
@@ -368,7 +378,8 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 				AddField("Tickets Answered (Total)", fmt.Sprintf("%d / %d", totalAnsweredTickets, totalTotalTickets), true).
 				AddField("Claimed Tickets (Weekly)", strconv.Itoa(weeklyClaimedTickets), true).
 				AddField("Claimed Tickets (Monthly)", strconv.Itoa(monthlyClaimedTickets), true).
-				AddField("Claimed Tickets (Total)", strconv.Itoa(totalClaimedTickets), true)
+				AddField("Claimed Tickets (Total)", strconv.Itoa(totalClaimedTickets), true).
+				AddField("Open Tickets (Claimed)", strconv.Itoa(openClaimedCount), true)
 
 			_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
 		}

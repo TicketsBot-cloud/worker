@@ -10,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/common/collections"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
+	botcache "github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
@@ -155,6 +156,12 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		if err := dbclient.Client.Participants.SetBulk(ctx, cmd.GuildId(), ticket.Id, participants.Collect()); err != nil {
 			cmd.HandleError(err)
 			return
+		}
+
+		// Count staff vs user messages for analytics
+		staffMessages, userMessages := countStaffAndUserMessages(ctx, cmd.GuildId(), ticket, msgs)
+		if err := dbclient.Client.TicketMessageCounts.Set(ctx, cmd.GuildId(), ticket.Id, staffMessages, userMessages); err != nil {
+			sentry.ErrorWithContext(err, errorContext)
 		}
 
 		if err := utils.ArchiverClient.Store(ctx, cmd.GuildId(), ticket.Id, msgs); err != nil {
@@ -479,4 +486,56 @@ func checkChannelExists(ctx registry.CommandContext, ticket database.Ticket) (bo
 	}
 
 	return true, nil
+}
+
+func countStaffAndUserMessages(ctx context.Context, guildId uint64, ticket database.Ticket, msgs []message.Message) (staffMessages, userMessages int) {
+	authorIds := collections.NewSet[uint64]()
+	for _, msg := range msgs {
+		if !msg.Author.Bot {
+			authorIds.Add(msg.Author.Id)
+		}
+	}
+
+	permCache := permission.NewRedisCache(redis.Client)
+	staffSet := collections.NewSet[uint64]()
+	for _, authorId := range authorIds.Collect() {
+		if isStaffUser(ctx, permCache, guildId, authorId) {
+			staffSet.Add(authorId)
+		}
+	}
+
+	for _, msg := range msgs {
+		if msg.Author.Bot {
+			continue
+		}
+		if staffSet.Contains(msg.Author.Id) {
+			staffMessages++
+		} else {
+			userMessages++
+		}
+	}
+
+	return
+}
+
+func isStaffUser(ctx context.Context, permCache *permission.RedisCache, guildId, userId uint64) bool {
+	if cached, err := permCache.GetCachedPermissionLevel(ctx, guildId, userId); err == nil {
+		return cached >= permission.Support
+	}
+
+	if isSupport, err := dbclient.Client.Permissions.IsSupport(ctx, guildId, userId); err == nil && isSupport {
+		return true
+	}
+
+	if isSupport, err := dbclient.Client.SupportTeamMembers.IsSupport(ctx, guildId, userId); err == nil && isSupport {
+		return true
+	}
+
+	if botcache.Client != nil {
+		if owner, err := botcache.Client.GetGuildOwner(ctx, guildId); err == nil && owner == userId {
+			return true
+		}
+	}
+
+	return false
 }

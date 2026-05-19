@@ -155,6 +155,7 @@ func main() {
 	go messagequeue.ListenCloseReasonUpdate()
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
+	go prometheus.StartProductMetricsLoop(logger.With(zap.String("service", "product_metrics")))
 
 	if config.Conf.WorkerMode == config.WorkerModeInteractions {
 		logger.Info("Starting HTTP server", zap.String("mode", string(config.Conf.WorkerMode)))

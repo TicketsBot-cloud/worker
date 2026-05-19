@@ -100,7 +100,7 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 		outOfHoursColour = colour
 	}
 
-	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourceCommand)
 	if err != nil {
 		// Already handled
 		return

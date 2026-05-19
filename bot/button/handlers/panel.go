@@ -56,7 +56,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		}
 
 		if panel.FormId == nil {
-			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
 		} else {
 			form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
 			if err != nil {
@@ -81,8 +81,10 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 				return
 			}
 
+			FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
+
 			if len(inputs) == 0 { // Don't open a blank form
-				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
 			} else {
 				modal := buildForm(panel, form, inputs, inputOptions)
 				ctx.Modal(modal)
@@ -126,11 +128,22 @@ func buildFormComponents(inputs []database.FormInput, inputOptions map[int][]dat
 					Description: option.Description,
 				}
 			}
+
+			selectMin := minLength
+			selectMax := maxLength
+			if selectMax != nil && *selectMax > len(opts) {
+				clamped := len(opts)
+				selectMax = &clamped
+			}
+			if selectMin != nil && selectMax != nil && *selectMin > *selectMax {
+				selectMin = selectMax
+			}
+
 			innerComponent = component.BuildSelectMenu(component.SelectMenu{
 				CustomId:  input.CustomId,
 				Options:   opts,
-				MinValues: minLength,
-				MaxValues: maxLength,
+				MinValues: selectMin,
+				MaxValues: selectMax,
 				Required:  utils.Ptr(input.Required),
 			})
 		// Input Text

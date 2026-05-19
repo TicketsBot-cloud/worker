@@ -39,6 +39,13 @@ var (
 	KafkaMessages  = newHistogramVec("kafka_messages", "topic")
 
 	CategoryUpdates = newCounter("category_updates")
+
+	ProductTicketsCreatedToday = newGauge("product_tickets_created_today")
+	ProductActiveGuildsDaily   = newGauge("product_active_guilds_daily")
+	ProductActiveGuildsWeekly  = newGauge("product_active_guilds_weekly")
+	ProductActiveGuildsMonthly = newGauge("product_active_guilds_monthly")
+	ProductGuildsChurned30d    = newGauge("product_guilds_churned_30d")
+	ProductFeatureAdoption     = newGaugeVec("product_feature_adoption", "feature")
 )
 
 func newCounter(name string) prometheus.Counter {
@@ -79,6 +86,14 @@ func newGauge(name string) prometheus.Gauge {
 		Subsystem: Subsystem,
 		Name:      name,
 	})
+}
+
+func newGaugeVec(name string, labels ...string) *prometheus.GaugeVec {
+	return promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: Subsystem,
+		Name:      name,
+	}, labels)
 }
 
 func LogIntegrationRequest(integration database.CustomIntegration, guildId uint64) {

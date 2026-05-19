@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -58,7 +59,7 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 		}
 
 		if panel.FormId == nil {
-			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
 		} else {
 			form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
 			if err != nil {
@@ -83,8 +84,10 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 				return
 			}
 
+			FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
+
 			if len(inputs) == 0 { // Don't open a blank form
-				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
 			} else {
 				modal := buildForm(panel, form, inputs, inputOptions)
 				ctx.Modal(modal)

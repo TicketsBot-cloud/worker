@@ -118,7 +118,7 @@ func openWithPanel(ctx *cmdcontext.SlashCommandContext, panel database.Panel) {
 	}
 
 	if panel.FormId == nil {
-		logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+		logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourceCommand)
 		return
 	}
 
@@ -145,8 +145,10 @@ func openWithPanel(ctx *cmdcontext.SlashCommandContext, panel database.Panel) {
 		return
 	}
 
+	handlers.FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
+
 	if len(inputs) == 0 {
-		logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+		logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourceCommand)
 	} else {
 		ctx.Modal(handlers.BuildFormModal(panel, form, inputs, inputOptions))
 	}
