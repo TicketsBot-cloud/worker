@@ -7,15 +7,12 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
-	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/experiments"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/getsentry/sentry-go"
 	"golang.org/x/sync/errgroup"
@@ -107,17 +104,45 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		span := sentry.StartSpan(span.Context(), "Reply")
 
-		msgEmbed := embed.NewEmbed().
-			SetTitle("Statistics").
-			SetColor(ctx.GetColour(customisation.Green)).
-			SetAuthor(member.User.Username, "", member.User.AvatarUrl(256)).
-			AddField("Permission Level", "Regular", true).
-			AddField("Is Blacklisted", strconv.FormatBool(isBlacklisted), true).
-			AddBlankField(true).
-			AddField("Total Tickets", strconv.Itoa(totalTickets), true).
-			AddField("Open Tickets", strconv.Itoa(openTickets), true)
+		mainStats := []string{
+			fmt.Sprintf("**Username**: %s", member.User.Username),
+			fmt.Sprintf("**Permission Level**: Regular"),
+			fmt.Sprintf("**Is Blacklisted**: %s", strconv.FormatBool(isBlacklisted)),
+			fmt.Sprintf("**Total Tickets**: %d", totalTickets),
+			fmt.Sprintf("**Open Tickets**: %d", openTickets),
+		}
 
-		_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
+		var topSection []component.Component
+
+		avatarUrl := member.User.AvatarUrl(256)
+		if avatarUrl == "" {
+			topSection = []component.Component{
+				component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+				component.BuildTextDisplay(component.TextDisplay{
+					Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+				}),
+			}
+		} else {
+			topSection = []component.Component{
+				component.BuildSection(component.Section{
+					Accessory: component.BuildThumbnail(component.Thumbnail{
+						Media: component.UnfurledMediaItem{
+							Url: avatarUrl,
+						},
+					}),
+					Components: []component.Component{
+						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+						component.BuildTextDisplay(component.TextDisplay{
+							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+						}),
+					},
+				}),
+			}
+		}
+
+		ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
+			Components: topSection,
+		}))))
 		span.Finish()
 	} else { // Support rep stats
 		group, _ := errgroup.WithContext(ctx)
@@ -277,112 +302,90 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		span := sentry.StartSpan(span.Context(), "Reply")
 
-		if experiments.HasFeature(ctx, ctx.GuildId(), experiments.COMPONENTS_V2_STATISTICS) {
-			userData, err := ctx.Worker().GetUser(userId)
-			if err != nil {
-				ctx.HandleError(err)
-				return
+		userData, err := ctx.Worker().GetUser(userId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		mainStats := []string{
+			fmt.Sprintf("**Username**: %s", userData.Username),
+			fmt.Sprintf("**Permission Level**: %s", permissionLevel),
+			fmt.Sprintf("**Feedback Rating**: %.1f / 5 ★", feedbackRating),
+			fmt.Sprintf("**Feedback Count**: %d", feedbackCount),
+		}
+
+		responseTimeStats := []string{
+			fmt.Sprintf("**Total**: %s", formatNullableTime(totalAR)),
+			fmt.Sprintf("**Monthly**: %s", formatNullableTime(monthlyAR)),
+			fmt.Sprintf("**Weekly**: %s", formatNullableTime(weeklyAR)),
+		}
+
+		ticketsAnsweredStats := []string{
+			fmt.Sprintf("**Total**: %d/%d", totalAnsweredTickets, totalTotalTickets),
+			fmt.Sprintf("**Monthly**: %d/%d", monthlyAnsweredTickets, monthlyTotalTickets),
+			fmt.Sprintf("**Weekly**: %d/%d", weeklyAnsweredTickets, weeklyTotalTickets),
+		}
+
+		claimedStats := []string{
+			fmt.Sprintf("**Total**: %d", totalClaimedTickets),
+			fmt.Sprintf("**Monthly**: %d", monthlyClaimedTickets),
+			fmt.Sprintf("**Weekly**: %d", weeklyClaimedTickets),
+			fmt.Sprintf("**Currently Open**: %d", openClaimedCount),
+		}
+
+		var topSection []component.Component
+
+		avatarUrl := member.User.AvatarUrl(256)
+		if avatarUrl == "" {
+			topSection = []component.Component{
+				component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+				component.BuildTextDisplay(component.TextDisplay{
+					Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+				}),
 			}
-
-			mainStats := []string{
-				fmt.Sprintf("**Username**: %s", userData.Username),
-				fmt.Sprintf("**Permission Level**: %s", permissionLevel),
-				fmt.Sprintf("**Feedback Rating**: %.1f / 5 ★", feedbackRating),
-				fmt.Sprintf("**Feedback Count**: %d", feedbackCount),
-			}
-
-			responseTimeStats := []string{
-				fmt.Sprintf("**Total**: %s", formatNullableTime(totalAR)),
-				fmt.Sprintf("**Monthly**: %s", formatNullableTime(monthlyAR)),
-				fmt.Sprintf("**Weekly**: %s", formatNullableTime(weeklyAR)),
-			}
-
-			ticketsAnsweredStats := []string{
-				fmt.Sprintf("**Total**: %d/%d", totalAnsweredTickets, totalTotalTickets),
-				fmt.Sprintf("**Monthly**: %d/%d", monthlyAnsweredTickets, monthlyTotalTickets),
-				fmt.Sprintf("**Weekly**: %d/%d", weeklyAnsweredTickets, weeklyTotalTickets),
-			}
-
-			claimedStats := []string{
-				fmt.Sprintf("**Total**: %d", totalClaimedTickets),
-				fmt.Sprintf("**Monthly**: %d", monthlyClaimedTickets),
-				fmt.Sprintf("**Weekly**: %d", weeklyClaimedTickets),
-				fmt.Sprintf("**Currently Open**: %d", openClaimedCount),
-			}
-
-			var topSection []component.Component
-
-			avatarUrl := member.User.AvatarUrl(256)
-			if avatarUrl == "" {
-				topSection = []component.Component{
-					component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
-					component.BuildTextDisplay(component.TextDisplay{
-						Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-					}),
-				}
-			} else {
-				topSection = []component.Component{
-					component.BuildSection(component.Section{
-						Accessory: component.BuildThumbnail(component.Thumbnail{
-							Media: component.UnfurledMediaItem{
-								Url: avatarUrl,
-							},
-						}),
-						Components: []component.Component{
-							component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
-							component.BuildTextDisplay(component.TextDisplay{
-								Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
-							}),
+		} else {
+			topSection = []component.Component{
+				component.BuildSection(component.Section{
+					Accessory: component.BuildThumbnail(component.Thumbnail{
+						Media: component.UnfurledMediaItem{
+							Url: avatarUrl,
 						},
 					}),
-				}
+					Components: []component.Component{
+						component.BuildTextDisplay(component.TextDisplay{Content: "## Ticket User Statistics"}),
+						component.BuildTextDisplay(component.TextDisplay{
+							Content: fmt.Sprintf("● %s", strings.Join(mainStats, "\n● ")),
+						}),
+					},
+				}),
 			}
-
-			innerComponents := append(topSection, []component.Component{
-				component.BuildSeparator(component.Separator{}),
-				component.BuildTextDisplay(component.TextDisplay{
-					Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
-				}),
-				component.BuildSeparator(component.Separator{}),
-				component.BuildTextDisplay(component.TextDisplay{
-					Content: fmt.Sprintf(
-						"### Tickets Answered\n● %s",
-						strings.Join(ticketsAnsweredStats, "\n● "),
-					),
-				}),
-				component.BuildSeparator(component.Separator{}),
-				component.BuildTextDisplay(component.TextDisplay{
-					Content: fmt.Sprintf(
-						"### Claimed Tickets\n● %s",
-						strings.Join(claimedStats, "\n● "),
-					),
-				}),
-			}...)
-
-			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
-				Components: innerComponents,
-			}))))
-		} else {
-			msgEmbed := embed.NewEmbed().
-				SetTitle("Statistics").
-				SetColor(ctx.GetColour(customisation.Green)).
-				SetAuthor(member.User.Username, "", member.User.AvatarUrl(256)).
-				AddField("Permission Level", permissionLevel, true).
-				AddField("Feedback Rating", fmt.Sprintf("%.1f / 5 ⭐ (%d ratings)", feedbackRating, feedbackCount), true).
-				AddBlankField(true).
-				AddField("Average First Response Time (Weekly)", formatNullableTime(weeklyAR), true).
-				AddField("Average First Response Time (Monthly)", formatNullableTime(monthlyAR), true).
-				AddField("Average First Response Time (Total)", formatNullableTime(totalAR), true).
-				AddField("Tickets Answered (Weekly)", fmt.Sprintf("%d / %d", weeklyAnsweredTickets, weeklyTotalTickets), true).
-				AddField("Tickets Answered (Monthly)", fmt.Sprintf("%d / %d", monthlyAnsweredTickets, monthlyTotalTickets), true).
-				AddField("Tickets Answered (Total)", fmt.Sprintf("%d / %d", totalAnsweredTickets, totalTotalTickets), true).
-				AddField("Claimed Tickets (Weekly)", strconv.Itoa(weeklyClaimedTickets), true).
-				AddField("Claimed Tickets (Monthly)", strconv.Itoa(monthlyClaimedTickets), true).
-				AddField("Claimed Tickets (Total)", strconv.Itoa(totalClaimedTickets), true).
-				AddField("Open Tickets (Claimed)", strconv.Itoa(openClaimedCount), true)
-
-			_, _ = ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(msgEmbed))
 		}
+
+		innerComponents := append(topSection, []component.Component{
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf("### Average Response Time\n● %s", strings.Join(responseTimeStats, "\n● ")),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf(
+					"### Tickets Answered\n● %s",
+					strings.Join(ticketsAnsweredStats, "\n● "),
+				),
+			}),
+			component.BuildSeparator(component.Separator{}),
+			component.BuildTextDisplay(component.TextDisplay{
+				Content: fmt.Sprintf(
+					"### Claimed Tickets\n● %s",
+					strings.Join(claimedStats, "\n● "),
+				),
+			}),
+		}...)
+
+		ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(utils.Slice(component.BuildContainer(component.Container{
+			Components: innerComponents,
+		}))))
 
 		span.Finish()
 	}
