@@ -190,6 +190,8 @@ func main() {
 			return
 		}
 
+		go messagequeue.StartCategoryUpdatePublisher(rpcClient, logger.With(zap.String("service", "category-update-publisher")))
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
