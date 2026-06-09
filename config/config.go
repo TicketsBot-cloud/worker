@@ -85,11 +85,10 @@ type (
 			Threads  int    `env:"THREADS"`
 		} `envPrefix:"WORKER_REDIS_"`
 
-		Kafka struct {
-			Brokers        []string `env:"BROKERS"`
-			EventsTopic    string   `env:"EVENTS_TOPIC"`
-			GoroutineLimit int      `env:"GOROUTINE_LIMIT" envDefault:"1000"`
-		} `envPrefix:"KAFKA_"`
+		Streams struct {
+			EventsStream   string `env:"STREAMS_EVENTS_STREAM" envDefault:"stream:gateway-events"`
+			GoroutineLimit int    `env:"STREAMS_GOROUTINE_LIMIT" envDefault:"1000"`
+		}
 
 		Prometheus struct {
 			Address string `env:"PROMETHEUS_SERVER_ADDR"`

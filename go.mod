@@ -4,7 +4,7 @@ go 1.25.0
 
 replace github.com/TicketsBot-cloud/database => ../database
 
-//replace github.com/TicketsBot-cloud/common => ../common
+replace github.com/TicketsBot-cloud/common => ../common
 
 //replace github.com/TicketsBot-cloud/gdl => ../gdl
 
@@ -107,7 +107,6 @@ require (
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.63.0 // indirect
@@ -119,8 +118,6 @@ require (
 	github.com/tatsuworks/czlib v0.0.0-20190916144400-8a51758ea0d9 // indirect
 	github.com/tinylib/msgp v1.4.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/twmb/franz-go v1.19.0 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.11.2 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
