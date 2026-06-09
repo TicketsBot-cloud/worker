@@ -159,8 +159,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	// Determine if we should use threads; panel-less tickets always use channel mode
 	isThread := panel != nil && panel.UseThreads
 
-	// Check if the parent channel is an announcement channel
-	span = sentry.StartSpan(rootSpan.Context(), "Check if parent channel is announcement channel")
 	if isThread {
 		panelChannel, err := cmd.Channel()
 		if err != nil {
@@ -168,18 +166,18 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			return database.Ticket{}, err
 		}
 
+		// Check if the parent channel is an announcement channel
 		if panelChannel.Type != channel.ChannelTypeGuildText {
 			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenThreadAnnouncementChannel)
 			return database.Ticket{}, nil
 		}
-	}
-	span.Finish()
 
-	// Check if the user has Send Messages in Threads
-	if isThread && cmd.InteractionMetadata().Member != nil {
-		member := cmd.InteractionMetadata().Member
-		if member.Permissions > 0 && !permission.HasPermissionRaw(member.Permissions, permission.SendMessagesInThreads) {
-			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCantMessageInThreads)
+		// Check if the user can send messages in threads in the parent channel
+		if !permissionwrapper.HasPermissionsChannel(
+			cmd.Worker(), cmd.GuildId(), cmd.UserId(), cmd.ChannelId(),
+			permission.SendMessagesInThreads,
+		) {
+			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCantMessageInThreads, cmd.ChannelId())
 			return database.Ticket{}, nil
 		}
 	}
