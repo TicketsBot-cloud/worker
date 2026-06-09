@@ -3,8 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
@@ -16,6 +19,18 @@ type apiOption struct {
 	Label       string  `json:"label"`
 	Value       string  `json:"value"`
 	Description *string `json:"description,omitempty"`
+}
+
+type apiOptionsCacheEntry struct {
+	expiresAt time.Time
+	options   []database.FormInputOption
+}
+
+var apiOptionsCache = struct {
+	sync.Mutex
+	items map[string]apiOptionsCacheEntry
+}{
+	items: make(map[string]apiOptionsCacheEntry),
 }
 
 func FetchApiOptions(ctx context.Context, formId int, userId uint64, inputs []database.FormInput, inputOptions map[int][]database.FormInputOption) {
@@ -55,6 +70,21 @@ func FetchApiOptions(ctx context.Context, formId int, userId uint64, inputs []da
 }
 
 func fetchOptionsFromApi(ctx context.Context, cfg database.FormInputApiConfig, userId uint64) ([]database.FormInputOption, error) {
+	cacheKey := fmt.Sprintf("%d:%d", cfg.Id, userId)
+	if cfg.CacheDurationSeconds != nil && *cfg.CacheDurationSeconds > 0 {
+		apiOptionsCache.Lock()
+		entry, ok := apiOptionsCache.items[cacheKey]
+		if ok && time.Now().Before(entry.expiresAt) {
+			options := cloneFormInputOptions(entry.options)
+			apiOptionsCache.Unlock()
+			return options, nil
+		}
+		if ok {
+			delete(apiOptionsCache.items, cacheKey)
+		}
+		apiOptionsCache.Unlock()
+	}
+
 	url := substituteplaceholders(cfg.EndpointUrl, userId)
 
 	headers, err := dbclient.Client.FormInputApiHeaders.GetByApiConfig(ctx, cfg.Id)
@@ -95,7 +125,22 @@ func fetchOptionsFromApi(ctx context.Context, cfg database.FormInputApiConfig, u
 		})
 	}
 
+	if cfg.CacheDurationSeconds != nil && *cfg.CacheDurationSeconds > 0 {
+		apiOptionsCache.Lock()
+		apiOptionsCache.items[cacheKey] = apiOptionsCacheEntry{
+			expiresAt: time.Now().Add(time.Duration(*cfg.CacheDurationSeconds) * time.Second),
+			options:   cloneFormInputOptions(options),
+		}
+		apiOptionsCache.Unlock()
+	}
+
 	return options, nil
+}
+
+func cloneFormInputOptions(options []database.FormInputOption) []database.FormInputOption {
+	cloned := make([]database.FormInputOption, len(options))
+	copy(cloned, options)
+	return cloned
 }
 
 func fallbackOptions(cfg database.FormInputApiConfig) []database.FormInputOption {
