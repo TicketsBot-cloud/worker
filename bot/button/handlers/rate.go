@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/premium"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -77,10 +78,20 @@ func (h *RateHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		return
 	}
 
-	feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, guildId)
-	if err != nil {
-		ctx.HandleError(err)
-		return
+	// Load panel for per-panel settings
+	var storeTranscripts, feedbackEnabled bool
+	var panel *database.Panel
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+		if p.PanelId != 0 {
+			panel = &p
+			storeTranscripts = p.StoreTranscripts
+			feedbackEnabled = p.FeedbackEnabled
+		}
 	}
 
 	if !feedbackEnabled {
@@ -100,13 +111,7 @@ func (h *RateHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		return
 	}
 
-	if premiumTier > premium.None && ticket.PanelId != nil {
-		panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
+	if premiumTier > premium.None && panel != nil {
 		if panel.ExitSurveyFormId != nil {
 			row := component.BuildActionRow(component.BuildButton(component.Button{
 				Label:    "Complete survey",
@@ -146,19 +151,13 @@ func (h *RateHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		}
 	}
 
-	settings, err := dbclient.Client.Settings.Get(ctx, guildId)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	hasFeedback, err := dbclient.Client.ExitSurveyResponses.HasResponse(ctx, guildId, ticketId)
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	if err := logic.EditGuildArchiveMessageIfExists(ctx, ctx.Worker(), ticket, settings, hasFeedback, closedBy, reason, &rating); err != nil {
+	if err := logic.EditGuildArchiveMessageIfExists(ctx, ctx.Worker(), ticket, storeTranscripts, hasFeedback, closedBy, reason, &rating); err != nil {
 		ctx.HandleError(err)
 	}
 }

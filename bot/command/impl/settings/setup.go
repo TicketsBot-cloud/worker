@@ -1,0 +1,188 @@
+package settings
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	channel_permissions "github.com/TicketsBot-cloud/gdl/permission"
+	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
+	"github.com/TicketsBot-cloud/worker/i18n"
+)
+
+type SetupCommand struct{}
+
+func (SetupCommand) Properties() registry.Properties {
+	return registry.Properties{
+		Name:            "setup",
+		Description:     i18n.HelpSetup,
+		Type:            interaction.ApplicationCommandTypeChatInput,
+		PermissionLevel: permission.Admin,
+		Category:        command.Settings,
+		InteractionOnly: true,
+		Timeout:         time.Second * 10,
+	}
+}
+
+func (c SetupCommand) GetExecutor() interface{} {
+	return c.Execute
+}
+
+// TODO: Separate into diff functions
+func (SetupCommand) Execute(ctx registry.CommandContext) {
+	interaction, ok := ctx.(*cmdcontext.SlashCommandContext)
+	if !ok {
+		return
+	}
+
+	var supportRoleId, adminRoleId uint64
+	var failed bool
+	var messageContent string
+
+	// create roles
+	switch role, err := ctx.Worker().CreateGuildRole(ctx.GuildId(), rest.GuildRoleData{Name: "Tickets Support"}); err {
+	case nil: // an error occurred creating admin role
+		supportRoleId = role.Id
+
+		// set in db
+		if err := dbclient.Client.RolePermissions.AddSupport(ctx, ctx.GuildId(), role.Id); err != nil {
+			ctx.HandleError(err)
+		}
+
+		switch role, err := ctx.Worker().CreateGuildRole(ctx.GuildId(), rest.GuildRoleData{Name: "Tickets Admin"}); err {
+		case nil:
+			adminRoleId = role.Id
+
+			// set in db
+			if err := dbclient.Client.RolePermissions.AddAdmin(ctx, ctx.GuildId(), role.Id); err != nil {
+				ctx.HandleError(err)
+			}
+
+			messageContent = fmt.Sprintf("✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoRolesSuccess))
+		default:
+			messageContent = fmt.Sprintf("❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoRolesFailure))
+		}
+	default: // an error occurred creating support role
+		failed = true
+		messageContent = fmt.Sprintf("❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoRolesFailure))
+	}
+
+	embed := embed.NewEmbed().
+		SetTitle("Setup").
+		SetColor(getColour(context.Background(), ctx.GuildId(), failed)). // TODO: Propagate context
+		SetDescription(messageContent)
+
+	ctx.ReplyWithEmbed(embed)
+
+	// create transcripts channel
+	switch transcriptChannel, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), getTranscriptChannelData(ctx.GuildId(), supportRoleId, adminRoleId)); err {
+	case nil:
+		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelSuccess, transcriptChannel.Id))
+	default:
+		failed = true
+		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoTranscriptChannelFailure))
+	}
+
+	embed.SetDescription(messageContent)
+
+	shouldEdit := true
+	if err := edit(interaction, embed); err != nil {
+		shouldEdit = false
+	}
+
+	// create category
+	categoryData := rest.CreateChannelData{
+		Name: "Tickets",
+		Type: channel.ChannelTypeGuildCategory,
+	}
+
+	switch _, err := ctx.Worker().CreateGuildChannel(context.Background(), ctx.GuildId(), categoryData); err {
+	case nil:
+		messageContent += fmt.Sprintf("\n✅ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategorySuccess))
+	default:
+		messageContent += fmt.Sprintf("\n❌ %s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCategoryFailure))
+	}
+
+	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoCompleted, fmt.Sprintf("%s/manage/%d/panels", config.Conf.Bot.DashboardUrl, ctx.GuildId()), adminRoleId, supportRoleId))
+	messageContent += fmt.Sprintf("\n\n%s", i18n.GetMessageFromGuild(ctx.GuildId(), i18n.SetupAutoDocs, config.Conf.Bot.DocsUrl))
+
+	if shouldEdit {
+		embed.SetDescription(messageContent)
+		edit(interaction, embed) //nolint:errcheck
+	}
+}
+
+func edit(ctx *cmdcontext.SlashCommandContext, e *embed.Embed) error {
+	data := rest.WebhookEditBody{
+		Embeds: utils.Slice(e),
+	}
+
+	_, err := rest.EditOriginalInteractionResponse(context.Background(), ctx.Interaction.Token, ctx.Worker().RateLimiter, ctx.Worker().BotId, data)
+	return err
+}
+
+func getColour(ctx context.Context, guildId uint64, failed bool) int {
+	var colour customisation.Colour
+	if failed {
+		colour = customisation.Red
+	} else {
+		colour = customisation.Green
+	}
+
+	hex, _ := customisation.GetColour(ctx, guildId, colour)
+	return hex
+}
+
+func getTranscriptChannelData(guildId, supportRoleId, adminRoleId uint64) rest.CreateChannelData {
+	allow := channel_permissions.BuildPermissions(
+		channel_permissions.ViewChannel,
+		channel_permissions.SendMessages,
+		channel_permissions.EmbedLinks,
+		channel_permissions.AttachFiles,
+		channel_permissions.ReadMessageHistory,
+	)
+
+	overwrites := []channel.PermissionOverwrite{
+		{
+			Id:    guildId,
+			Type:  channel.PermissionTypeRole,
+			Allow: 0,
+			Deny:  allow,
+		},
+	}
+
+	if supportRoleId != 0 {
+		overwrites = append(overwrites, channel.PermissionOverwrite{
+			Id:    supportRoleId,
+			Type:  channel.PermissionTypeRole,
+			Allow: allow,
+			Deny:  0,
+		})
+	}
+
+	if adminRoleId != 0 {
+		overwrites = append(overwrites, channel.PermissionOverwrite{
+			Id:    adminRoleId,
+			Type:  channel.PermissionTypeRole,
+			Allow: allow,
+			Deny:  0,
+		})
+	}
+
+	return rest.CreateChannelData{
+		Name:                 "transcripts",
+		Type:                 channel.ChannelTypeGuildText,
+		PermissionOverwrites: overwrites,
+	}
+}

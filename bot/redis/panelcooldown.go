@@ -19,7 +19,7 @@ func TakePanelCooldownToken(ctx context.Context, guildId uint64, panelId int, us
 		return true, 0, nil
 	}
 
-	// Already on cooldown — get remaining TTL
+	// Already on cooldown - get remaining TTL
 	ttl, err := Client.TTL(ctx, key).Result()
 	if err != nil {
 		return false, 0, err

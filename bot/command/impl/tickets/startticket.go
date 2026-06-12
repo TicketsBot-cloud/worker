@@ -100,7 +100,7 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 		outOfHoursColour = colour
 	}
 
-	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+	ticket, err := logic.OpenTicket(ctx, interaction, panel, msg.Content, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourceCommand)
 	if err != nil {
 		// Already handled
 		return
@@ -176,9 +176,12 @@ func addMessageSender(ctx registry.CommandContext, ticket database.Ticket, msg m
 		}
 
 		// Build permissions
-		additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ctx.GuildId())
-		if err != nil {
-			return err
+		var additionalPermissions database.TicketPermissions
+		if ticket.PanelId != nil {
+			additionalPermissions, err = dbclient.Client.PanelTicketPermissions.Get(ctx, *ticket.PanelId)
+			if err != nil {
+				return err
+			}
 		}
 
 		overwrite := logic.BuildUserOverwrite(msg.Author.Id, additionalPermissions)

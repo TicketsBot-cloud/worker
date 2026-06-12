@@ -18,12 +18,6 @@ func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15) // TODO: Propagate context
 	defer cancel()
 
-	settings, err := dbclient.Client.Settings.Get(ctx, e.GuildId)
-	if err != nil {
-		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
-		return
-	}
-
 	ticket, err := dbclient.Client.Tickets.GetByChannelAndGuild(ctx, e.ThreadId, e.GuildId)
 	if err != nil {
 		sentry.ErrorWithContext(err, errorcontext.WorkerErrorContext{Guild: e.GuildId})
@@ -61,10 +55,8 @@ func OnThreadMembersUpdate(worker *worker.Context, e events.ThreadMembersUpdate)
 		}
 
 		var notificationChannel *uint64
-		if panel != nil && panel.TicketNotificationChannel != nil {
+		if panel != nil {
 			notificationChannel = panel.TicketNotificationChannel
-		} else if settings.TicketNotificationChannel != nil {
-			notificationChannel = settings.TicketNotificationChannel
 		}
 
 		if notificationChannel != nil {

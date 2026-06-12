@@ -107,10 +107,6 @@ func main() {
 	cache.Client = &pgCache
 	logger.Info("Connected to cache")
 
-	logger.Info("Connecting to clickhouse")
-	dbclient.ConnectAnalytics(logger.With(zap.String("service", "clickhouse")))
-	logger.Info("Connected to clickhouse")
-
 	// Configure HTTP proxy
 	if config.Conf.Discord.ProxyUrl != "" {
 		logger.Info("Configuring REST proxy", zap.String("url", config.Conf.Discord.ProxyUrl))
@@ -184,6 +180,7 @@ func main() {
 	go messagequeue.ListenCloseReasonUpdate()
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
+	go prometheus.StartProductMetricsLoop(logger.With(zap.String("service", "product_metrics")))
 
 	if config.Conf.WorkerMode == config.WorkerModeInteractions {
 		logger.Info("Starting HTTP server", zap.String("mode", string(config.Conf.WorkerMode)))
@@ -196,27 +193,31 @@ func main() {
 
 		var wg sync.WaitGroup
 
+		hostname, _ := os.Hostname()
+
 		rpcClient, err := rpc.NewClient(
 			logger.With(zap.String("service", "rpc")),
 			rpc.Config{
-				Brokers:             config.Conf.Kafka.Brokers,
+				Redis:               redis.Client,
 				ConsumerGroup:       "worker",
-				ConsumerConcurrency: config.Conf.Kafka.GoroutineLimit,
+				ConsumerName:        hostname,
+				ConsumerConcurrency: config.Conf.Streams.GoroutineLimit,
+				MaxLen:              50000,
 			},
 			map[string]rpc.Listener{
-				// Listen for gateway events over Kafka
-				config.Conf.Kafka.EventsTopic: event.NewKafkaListener(
-					logger.With(zap.String("service", "gateway-events-kafka")),
+				"stream:gateway-events": event.NewEventListener(
+					logger.With(zap.String("service", "gateway-events")),
 					&pgCache,
 				),
-				// TODO: Don't hardcode
-				"tickets.rpc.categoryupdate": listeners.NewTicketStatusUpdater(&pgCache, logger),
+				"stream:rpc:categoryupdate": listeners.NewTicketStatusUpdater(&pgCache, logger),
 			})
 
 		if err != nil {
 			logger.Fatal("Failed to create RPC client", zap.Error(err))
 			return
 		}
+
+		go messagequeue.StartCategoryUpdatePublisher(rpcClient, logger.With(zap.String("service", "category-update-publisher")))
 
 		wg.Add(1)
 		go func() {

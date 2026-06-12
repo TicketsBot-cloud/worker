@@ -19,9 +19,16 @@ func CanClose(ctx context.Context, cmd registry.CommandContext, ticket database.
 	}
 
 	if permissionLevel == permission.Everyone {
-		usersCanClose, err := dbclient.Client.UsersCanClose.Get(ctx, cmd.GuildId())
-		if err != nil {
-			cmd.HandleError(err)
+		usersCanClose := true // default: allow users to close
+		if ticket.PanelId != nil {
+			p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err != nil {
+				cmd.HandleError(err)
+				return false
+			}
+			if p.PanelId != 0 {
+				usersCanClose = p.UsersCanClose
+			}
 		}
 
 		// If they are a normal user, don't let them close if users_can_close=false, or if they are not the opener

@@ -109,13 +109,27 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 
 // GenerateClaimedOverwrites If support reps can still view and type, returns (nil, nil)
 func GenerateClaimedOverwrites(ctx context.Context, worker *worker.Context, ticket database.Ticket, claimer uint64) ([]channel.PermissionOverwrite, error) {
-	// Get claim settings for guild
-	claimSettings, err := dbclient.Client.ClaimSettings.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return nil, err
+	// Get per-panel claim settings (SupportCanView/SupportCanType are on the panel)
+	supportCanView := true  // defaults
+	supportCanType := false
+
+	var additionalPermissions database.TicketPermissions
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			return nil, err
+		}
+		if p.PanelId != 0 {
+			supportCanView = p.SupportCanView
+			supportCanType = p.SupportCanType
+			additionalPermissions, err = dbclient.Client.PanelTicketPermissions.Get(ctx, p.PanelId)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
-	if claimSettings.SupportCanView && claimSettings.SupportCanType {
+	if supportCanView && supportCanType {
 		return nil, nil
 	}
 
@@ -129,23 +143,18 @@ func GenerateClaimedOverwrites(ctx context.Context, worker *worker.Context, tick
 		return nil, err
 	}
 
-	additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return nil, err
-	}
-
 	integrationRoleId, err := GetIntegrationRoleId(ctx, worker, ticket.GuildId)
 	if err != nil {
 		return nil, err
 	}
 
 	// Support can't view the ticket, and therefore can't type either
-	if !claimSettings.SupportCanView {
+	if !supportCanView {
 		return overwritesCantView(claimer, worker.BotId, ticket.UserId, ticket.GuildId, adminUsers, adminRoles, integrationRoleId, additionalPermissions), nil
 	}
 
 	// Support can view the ticket, but can't type
-	if !claimSettings.SupportCanType {
+	if !supportCanType {
 		supportUsers, err := dbclient.Client.Permissions.GetSupportOnly(ctx, ticket.GuildId)
 		if err != nil {
 			return nil, err

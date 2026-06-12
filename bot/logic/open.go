@@ -37,7 +37,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int) (database.Ticket, error) {
+func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int, source database.TicketSource) (database.Ticket, error) {
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
@@ -157,23 +157,9 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, nil
 	}
 
-	span = sentry.StartSpan(rootSpan.Context(), "Load settings")
-	settings, err := cmd.Settings()
-	if err != nil {
-		cmd.HandleError(err)
-		return database.Ticket{}, err
-	}
-	span.Finish()
+	// Determine if we should use threads; panel-less tickets always use channel mode
+	isThread := panel != nil && panel.UseThreads
 
-	// Determine if we should use threads
-	// If a panel is provided, use the panel's setting; otherwise use the global setting
-	isThread := settings.UseThreads
-	if panel != nil && !isThread {
-		isThread = panel.UseThreads
-	}
-
-	// Check if the parent channel is an announcement channel
-	span = sentry.StartSpan(rootSpan.Context(), "Check if parent channel is announcement channel")
 	if isThread {
 		panelChannel, err := cmd.Channel()
 		if err != nil {
@@ -181,18 +167,18 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			return database.Ticket{}, err
 		}
 
+		// Check if the parent channel is an announcement channel
 		if panelChannel.Type != channel.ChannelTypeGuildText {
 			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenThreadAnnouncementChannel)
 			return database.Ticket{}, nil
 		}
-	}
-	span.Finish()
 
-	// Check if the user has Send Messages in Threads
-	if isThread && cmd.InteractionMetadata().Member != nil {
-		member := cmd.InteractionMetadata().Member
-		if member.Permissions > 0 && !permission.HasPermissionRaw(member.Permissions, permission.SendMessagesInThreads) {
-			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCantMessageInThreads)
+		// Check if the user can send messages in threads in the parent channel
+		if !permissionwrapper.HasPermissionsChannel(
+			cmd.Worker(), cmd.GuildId(), cmd.UserId(), cmd.ChannelId(),
+			permission.SendMessagesInThreads,
+		) {
+			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCantMessageInThreads, cmd.ChannelId())
 			return database.Ticket{}, nil
 		}
 	}
@@ -200,15 +186,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	// If we're using a panel, then we need to create the ticket in the specified category
 	span = sentry.StartSpan(rootSpan.Context(), "Get category")
 	var category uint64
-	if panel != nil && panel.TargetCategory != 0 {
+	if panel != nil {
 		category = panel.TargetCategory
-	} else { // else we can just use the default category
-		var err error
-		category, err = dbclient.Client.ChannelCategory.Get(ctx, cmd.GuildId())
-		if err != nil {
-			cmd.HandleError(err)
-			return database.Ticket{}, err
-		}
 	}
 	span.Finish()
 
@@ -220,13 +199,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		if err != nil {
 			useCategory = false
 
-			if restError, ok := err.(request.RestError); ok && restError.StatusCode == 404 {
-				if panel == nil {
-					if err := dbclient.Client.ChannelCategory.Delete(ctx, cmd.GuildId()); err != nil {
-						cmd.HandleError(err)
-					}
-				} // TODO: Else, set panel category to 0
-			}
+			// TODO: Set panel category to 0 when it no longer exists
 		}
 		span.Finish()
 	}
@@ -246,7 +219,15 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Channel count checks
 	if !isThread {
-		newCategoryId, err := checkChannelLimitAndDetermineParentId(ctx, cmd.Worker(), cmd.GuildId(), category, settings, true)
+		var overflowEnabled bool
+		var overflowCategoryId *uint64
+		var panelId int
+		if panel != nil {
+			overflowEnabled = panel.OverflowEnabled
+			overflowCategoryId = panel.OverflowCategoryId
+			panelId = panel.PanelId
+		}
+		newCategoryId, err := checkChannelLimitAndDetermineParentId(ctx, cmd.Worker(), cmd.GuildId(), category, overflowEnabled, overflowCategoryId, panelId, true)
 		if err != nil {
 			if errors.Is(err, errGuildChannelLimitReached) {
 				cmd.Reply(customisation.Red, i18n.Error, i18n.MessageGuildChannelLimitReached)
@@ -269,7 +250,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Create channel
 	span = sentry.StartSpan(rootSpan.Context(), "Create ticket in database")
-	ticketId, err := dbclient.Client.Tickets.Create(ctx, cmd.GuildId(), cmd.UserId(), isThread, panelId)
+	ticketId, err := dbclient.Client.Tickets.Create(ctx, cmd.GuildId(), cmd.UserId(), isThread, panelId, source)
 	if err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
@@ -302,7 +283,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	if isThread {
 		span = sentry.StartSpan(rootSpan.Context(), "Create thread")
 		reasonCtx := request.WithAuditReason(context.Background(), auditReason)
-		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(settings.ThreadArchiveDuration), false)
+		threadArchiveDuration := 10080
+		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(threadArchiveDuration), false)
 		if err != nil {
 			cmd.HandleError(err)
 
@@ -322,13 +304,9 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 		span.Finish()
 
-		// Determine which notification channel to use
-		// Priority: Panel-specific notification channel > Global notification channel
 		var notificationChannel *uint64
-		if panel != nil && panel.TicketNotificationChannel != nil {
+		if panel != nil {
 			notificationChannel = panel.TicketNotificationChannel
-		} else if settings.TicketNotificationChannel != nil {
-			notificationChannel = settings.TicketNotificationChannel
 		}
 
 		if notificationChannel != nil {
@@ -397,7 +375,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 		span.Finish()
 
-		// TODO: Remove
 		if tmp.Id == 0 {
 			cmd.HandleError(fmt.Errorf("channel id is 0"))
 			return database.Ticket{}, fmt.Errorf("channel id is 0")
@@ -579,7 +556,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 				return err
 			}
 
-			if panel != nil && panel.DeleteMentions {
+			if panel != nil && panel.MentionBehaviour == "delete" {
 				span = sentry.StartSpan(rootSpan.Context(), "Delete ping message")
 				_ = cmd.Worker().DeleteMessage(ch.Id, msg.Id)
 				span.Finish()
@@ -688,7 +665,9 @@ func checkChannelLimitAndDetermineParentId(
 	worker *worker.Context,
 	guildId uint64,
 	categoryId uint64,
-	settings database.Settings,
+	overflowEnabled bool,
+	overflowCategoryId *uint64,
+	panelId int,
 	canRetry bool,
 ) (uint64, error) {
 	span := sentry.StartSpan(ctx, "Check < 500 channels")
@@ -709,7 +688,7 @@ func checkChannelLimitAndDetermineParentId(
 					return 0, err
 				}
 
-				return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
+				return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, overflowEnabled, overflowCategoryId, panelId, false)
 			} else {
 				return 0, errGuildChannelLimitReached
 			}
@@ -725,9 +704,9 @@ func checkChannelLimitAndDetermineParentId(
 
 		if categoryChildrenCount >= 50 {
 			// Check if we're already in the overflow category
-			isOverflowCategory := settings.OverflowEnabled &&
-				settings.OverflowCategoryId != nil &&
-				*settings.OverflowCategoryId == categoryId
+			isOverflowCategory := overflowEnabled &&
+				overflowCategoryId != nil &&
+				*overflowCategoryId == categoryId
 
 			if canRetry {
 				canRefresh, err := redis.TakeChannelRefetchToken(ctx, guildId)
@@ -740,7 +719,7 @@ func checkChannelLimitAndDetermineParentId(
 						return 0, err
 					}
 
-					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, settings, false)
+					return checkChannelLimitAndDetermineParentId(ctx, worker, guildId, categoryId, overflowEnabled, overflowCategoryId, panelId, false)
 				} else {
 					// If this is the overflow category and it's full (and we can't refresh), we can't use another overflow
 					if isOverflowCategory {
@@ -750,7 +729,7 @@ func checkChannelLimitAndDetermineParentId(
 
 					// If we can't refresh but overflow is available, try overflow
 					// instead of immediately returning an error
-					if !settings.OverflowEnabled {
+					if !overflowEnabled {
 						return 0, errCategoryChannelLimitReached
 					}
 				}
@@ -763,19 +742,19 @@ func checkChannelLimitAndDetermineParentId(
 			}
 
 			// Try to use the overflow category if there is one
-			if settings.OverflowEnabled {
+			if overflowEnabled {
 				// If overflow is enabled, and the category id is nil, then use the root of the server
-				if settings.OverflowCategoryId == nil {
+				if overflowCategoryId == nil {
 					categoryId = 0
 				} else {
-					categoryId = *settings.OverflowCategoryId
+					categoryId = *overflowCategoryId
 
 					// Verify that the overflow category still exists
 					span := sentry.StartSpan(span.Context(), "Check if overflow category exists")
 					if !utils.ContainsFunc(channels, func(c channel.Channel) bool {
 						return c.Id == categoryId
 					}) {
-						if err := dbclient.Client.Settings.SetOverflow(ctx, guildId, false, nil); err != nil {
+						if err := dbclient.Client.Panel.SetOverflow(ctx, panelId, false, nil); err != nil {
 							return 0, err
 						}
 
@@ -783,7 +762,7 @@ func checkChannelLimitAndDetermineParentId(
 					}
 
 					// Check that the overflow category still has space
-					overflowCategoryChildrenCount := countRealChannels(channels, *settings.OverflowCategoryId)
+					overflowCategoryChildrenCount := countRealChannels(channels, *overflowCategoryId)
 					if overflowCategoryChildrenCount >= 50 {
 						return 0, errCategoryChannelLimitReached
 					}
@@ -826,22 +805,15 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *dat
 
 	group, _ := errgroup.WithContext(ctx)
 
-	// If panel has a per-panel limit, use it and count only panel tickets
 	if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
 		ticketLimit = *panel.TicketLimit
-
 		group.Go(func() (err error) {
 			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
 				ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
 			return
 		})
 	} else {
-		// Use global limit and count all tickets
-		group.Go(func() (err error) {
-			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
-			return
-		})
-
+		ticketLimit = 5
 		group.Go(func() (err error) {
 			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
 			return
@@ -943,24 +915,13 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	}
 
 	// Build permissions
-	additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, cmd.GuildId())
-	if err != nil {
-		return nil, err
-	}
-
-	// Apply panel-level grants on top of global settings (OR logic: panel can only add permissions)
+	var additionalPermissions database.TicketPermissions
 	if panel != nil {
-		panelPerms, err := dbclient.Client.PanelTicketPermissions.Get(ctx, panel.PanelId)
+		var err error
+		additionalPermissions, err = dbclient.Client.PanelTicketPermissions.Get(ctx, panel.PanelId)
 		if err != nil {
 			return nil, err
 		}
-		additionalPermissions.AddReactions = additionalPermissions.AddReactions || panelPerms.AddReactions
-		additionalPermissions.SendTTSMessages = additionalPermissions.SendTTSMessages || panelPerms.SendTTSMessages
-		additionalPermissions.EmbedLinks = additionalPermissions.EmbedLinks || panelPerms.EmbedLinks
-		additionalPermissions.AttachFiles = additionalPermissions.AttachFiles || panelPerms.AttachFiles
-		additionalPermissions.UseExternalEmojis = additionalPermissions.UseExternalEmojis || panelPerms.UseExternalEmojis
-		additionalPermissions.UseExternalStickers = additionalPermissions.UseExternalStickers || panelPerms.UseExternalStickers
-		additionalPermissions.SendVoiceMessages = additionalPermissions.SendVoiceMessages || panelPerms.SendVoiceMessages
 	}
 
 	// Separate permissions apply
@@ -1009,7 +970,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		})
 	}
 
-	// Default team (ticket admins + ticket support) — always StandardPermissions
+	// Default team (ticket admins + ticket support) - always StandardPermissions
 	if panel == nil || panel.WithDefaultTeam {
 		supportUsers, err := dbclient.Client.Permissions.GetSupport(ctx, cmd.GuildId())
 		if err != nil {
@@ -1047,7 +1008,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		}
 	}
 
-	// Panel-specific custom teams — per-team permissions
+	// Panel-specific custom teams - per-team permissions
 	if panel != nil {
 		panelTeamIds, err := dbclient.Client.PanelTeams.GetTeamIds(ctx, panel.PanelId)
 		if err != nil {
@@ -1199,25 +1160,9 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 	// Create ticket name
 	var name string
 
-	// Use server default naming scheme
 	if panel == nil || panel.NamingScheme == nil {
-		namingScheme, err := dbclient.Client.NamingScheme.Get(ctx, guildId)
-		if err != nil {
-			return "", err
-		}
-
 		strTicket := strings.ToLower(i18n.GetMessageFromGuild(guildId, i18n.Ticket))
-		if namingScheme == database.Username {
-			user, err := worker.GetUser(openerId)
-
-			if err != nil {
-				return "", err
-			}
-
-			name = fmt.Sprintf("%s-%s", strTicket, user.Username)
-		} else {
-			name = fmt.Sprintf("%s-%d", strTicket, ticketId)
-		}
+		name = fmt.Sprintf("%s-%d", strTicket, ticketId)
 	} else {
 		var err error
 		name, err = DoSubstitutionsWithParams(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{

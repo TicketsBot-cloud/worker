@@ -77,17 +77,6 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, guildId)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	if !feedbackEnabled {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageFeedbackDisabled)
-		return
-	}
-
 	if ticket.PanelId == nil {
 		ctx.ReplyRaw(customisation.Red, "Error", "The survey is no longer available for this ticket.") // TODO: i18n
 		return
@@ -101,6 +90,11 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 
 	if panel.GuildId != guildId || panel.PanelId != *ticket.PanelId {
 		ctx.HandleError(fmt.Errorf("panel not found"))
+		return
+	}
+
+	if !panel.FeedbackEnabled {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageFeedbackDisabled)
 		return
 	}
 
@@ -131,6 +125,8 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 		ctx.HandleError(err)
 		return
 	}
+
+	FetchApiOptions(ctx, form.Id, ctx.UserId(), formInputs, inputOptions)
 
 	ctx.Modal(button.ResponseModal{
 		Data: interaction.ModalResponseData{

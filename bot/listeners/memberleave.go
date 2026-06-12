@@ -28,49 +28,52 @@ func OnMemberLeave(worker *worker.Context, e events.GuildMemberRemove) {
 		sentry.Error(err)
 	}
 
-	// auto close
-	settings, err := dbclient.Client.AutoClose.Get(ctx, e.GuildId)
+	// auto close on user leave - check per-panel auto-close settings
+	tickets, err := dbclient.Client.Tickets.GetOpenByUser(ctx, e.GuildId, e.User.Id)
 	if err != nil {
 		sentry.Error(err)
 	} else {
-		// check setting is enabled
-		if settings.Enabled && settings.OnUserLeave != nil && *settings.OnUserLeave {
-			// get open tickets by user
-			tickets, err := dbclient.Client.Tickets.GetOpenByUser(ctx, e.GuildId, e.User.Id)
+		for _, ticket := range tickets {
+			if ticket.PanelId == nil {
+				continue
+			}
+
+			autoCloseSettings, err := dbclient.Client.PanelAutoClose.Get(ctx, *ticket.PanelId)
 			if err != nil {
 				sentry.Error(err)
-			} else {
-				for _, ticket := range tickets {
-					isExcluded, err := dbclient.Client.AutoCloseExclude.IsExcluded(ctx, e.GuildId, ticket.Id)
-					if err != nil {
-						sentry.Error(err)
-						continue
-					}
-
-					if isExcluded {
-						continue
-					}
-
-					// verify ticket exists + prevent potential panic
-					if ticket.ChannelId == nil {
-						return
-					}
-
-					// get premium status
-					premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, ticket.GuildId, true, worker.Token, worker.RateLimiter)
-					if err != nil {
-						sentry.Error(err)
-						return
-					}
-
-					ctx, cancel := context.WithTimeout(context.Background(), constants.TimeoutCloseTicket)
-
-					cc := cmdcontext.NewAutoCloseContext(ctx, worker, e.GuildId, *ticket.ChannelId, worker.BotId, premiumTier)
-					logic.CloseTicket(ctx, cc, gdlUtils.StrPtr("Automatically closed due to user leaving the server"), true)
-
-					cancel()
-				}
+				continue
 			}
+
+			if !autoCloseSettings.Enabled || autoCloseSettings.OnUserLeave == nil || !*autoCloseSettings.OnUserLeave {
+				continue
+			}
+
+			isExcluded, err := dbclient.Client.AutoCloseExclude.IsExcluded(ctx, e.GuildId, ticket.Id)
+			if err != nil {
+				sentry.Error(err)
+				continue
+			}
+
+			if isExcluded {
+				continue
+			}
+
+			if ticket.ChannelId == nil {
+				continue
+			}
+
+			premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, ticket.GuildId, true, worker.Token, worker.RateLimiter)
+			if err != nil {
+				sentry.Error(err)
+				continue
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), constants.TimeoutCloseTicket)
+
+			cc := cmdcontext.NewAutoCloseContext(ctx, worker, e.GuildId, *ticket.ChannelId, worker.BotId, premiumTier)
+			logic.CloseTicket(ctx, cc, gdlUtils.StrPtr("Automatically closed due to user leaving the server"), true)
+
+			cancel()
 		}
 	}
 }

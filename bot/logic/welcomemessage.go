@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TicketsBot-cloud/common/integrations/bloxlink"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
@@ -40,11 +39,6 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
-	settings, err := dbclient.Client.Settings.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return 0, err
-	}
-
 	// Build embeds
 	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
@@ -70,13 +64,11 @@ func SendWelcomeMessage(
 		embeds = append(embeds, formAnswersEmbed)
 	}
 
-	hideClose := settings.HideCloseButton
-	hideCloseWithReason := settings.HideCloseWithReasonButton
-	hideClaim := settings.HideClaimButton
+	var hideClose, hideCloseWithReason, hideClaim bool
 	if panel != nil {
-		hideClose = hideClose || panel.HideCloseButton
-		hideCloseWithReason = hideCloseWithReason || panel.HideCloseWithReasonButton
-		hideClaim = hideClaim || panel.HideClaimButton
+		hideClose = panel.HideCloseButton
+		hideCloseWithReason = panel.HideCloseWithReasonButton
+		hideClaim = panel.HideClaimButton
 	}
 
 	var buttons []component.Component
@@ -139,18 +131,8 @@ func BuildWelcomeMessageEmbed(
 	additionalPlaceholders map[string]string,
 ) (*embed.Embed, error) {
 	if panel == nil || panel.WelcomeMessageEmbed == nil {
-		welcomeMessage, err := dbclient.Client.WelcomeMessages.Get(ctx, ticket.GuildId)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(welcomeMessage) == 0 {
-			welcomeMessage = "Thank you for contacting support.\nPlease describe your issue (and provide an invite to your server if applicable) and wait for a response."
-		}
-
-		// Replace variables
+		welcomeMessage := "Thank you for contacting support.\nPlease describe your issue (and provide an invite to your server if applicable) and wait for a response."
 		welcomeMessage = DoPlaceholderSubstitutions(ctx, welcomeMessage, cmd.Worker(), ticket, additionalPlaceholders)
-
 		return utils.BuildEmbedRaw(cmd.GetColour(customisation.Green), subject, welcomeMessage, nil, cmd.PremiumTier()), nil
 	} else {
 		data, err := dbclient.Client.Embeds.GetEmbed(ctx, *panel.WelcomeMessageEmbed)
@@ -211,48 +193,6 @@ func DoPlaceholderSubstitutions(
 
 				lock.Lock()
 				message = strings.Replace(message, formatted, replacement, -1)
-				lock.Unlock()
-
-				return nil
-			})
-		}
-	}
-
-	// Group substitutions
-	for _, substitutor := range groupSubstitutions {
-		substitutor := substitutor
-
-		contains := false
-		for _, placeholder := range substitutor.Placeholders {
-			formatted := fmt.Sprintf("%%%s%%", placeholder)
-			if strings.Contains(message, formatted) {
-				contains = true
-				break
-			}
-		}
-
-		if contains {
-			group.Go(func() error {
-				ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-				defer cancel()
-
-				replacements := substitutor.F(ctx, worker, ticket)
-				if replacements == nil {
-					replacements = make(map[string]string)
-				}
-
-				// Fill any placeholder with N/A that do not have values
-				for _, placeholder := range substitutor.Placeholders {
-					if _, ok := replacements[placeholder]; !ok {
-						replacements[placeholder] = "N/A"
-					}
-				}
-
-				lock.Lock()
-				for placeholder, replacement := range replacements {
-					formatted := fmt.Sprintf("%%%s%%", placeholder)
-					message = strings.Replace(message, formatted, replacement, -1)
-				}
 				lock.Unlock()
 
 				return nil
@@ -522,8 +462,8 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		return strconv.Itoa(len(open))
 	},
 	"total_tickets": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
-		count, _ := dbclient.Analytics.GetTotalTicketCount(ctx, ticket.GuildId)
-		return strconv.FormatUint(count, 10)
+		count, _ := dbclient.Client.Tickets.GetTotalTicketCount(ctx, ticket.GuildId)
+		return strconv.Itoa(count)
 	},
 	"user_open_tickets": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		count, _ := dbclient.Client.Tickets.GetOpenCountByUser(ctx, ticket.GuildId, ticket.UserId)
@@ -533,19 +473,24 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		tickets, _ := dbclient.Client.Tickets.GetTotalCountByUser(ctx, ticket.GuildId, ticket.UserId)
 		return strconv.Itoa(tickets)
 	},
-	"ticket_limit": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
-		limit, _ := dbclient.Client.TicketLimit.Get(ctx, ticket.GuildId)
-		return strconv.Itoa(int(limit))
+	"ticket_limit": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
+		if ticket.PanelId != nil {
+			panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err == nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
+				return strconv.Itoa(int(*panel.TicketLimit))
+			}
+		}
+		return "5"
 	},
 	"rating_count": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
 		ctx, cancel := context.WithTimeout(context.Background(), substitutionTimeout)
 		defer cancel()
 
-		ratingCount, _ := dbclient.Analytics.GetFeedbackCountGuild(ctx, ticket.GuildId)
-		return strconv.FormatUint(ratingCount, 10)
+		ratingCount, _ := dbclient.Client.ServiceRatings.GetCount(ctx, ticket.GuildId)
+		return strconv.Itoa(ratingCount)
 	},
 	"average_rating": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
-		average, _ := dbclient.Analytics.GetAverageFeedbackRatingGuild(ctx, ticket.GuildId)
+		average, _ := dbclient.Client.ServiceRatings.GetAverage(ctx, ticket.GuildId)
 		return fmt.Sprintf("%.1f", average)
 	},
 	"time": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
@@ -573,7 +518,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 			}
 		}
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(ctx, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -594,7 +539,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 			}
 		}
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(ctx, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -618,7 +563,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		context, cancel := context.WithTimeout(context.Background(), time.Millisecond*1500)
 		defer cancel()
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(context, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(context, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -632,45 +577,6 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 	"discord_account_age": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		return fmt.Sprintf("<t:%d:R>", utils.SnowflakeToTime(ticket.UserId).Unix())
 	},
-}
-
-type GroupSubstitutionFunc func(context.Context, *worker.Context, database.Ticket) map[string]string
-
-type GroupSubstitutor struct {
-	Placeholders []string
-	F            GroupSubstitutionFunc
-}
-
-func NewGroupSubstitutor(placeholders []string, f GroupSubstitutionFunc) GroupSubstitutor {
-	return GroupSubstitutor{
-		Placeholders: placeholders,
-		F:            f,
-	}
-}
-
-var groupSubstitutions = []GroupSubstitutor{
-	NewGroupSubstitutor([]string{"roblox_username", "roblox_id", "roblox_display_name", "roblox_profile_url", "roblox_account_age", "roblox_account_created"},
-		func(ctx context.Context, worker *worker.Context, ticket database.Ticket) map[string]string {
-			user, err := integrations.Bloxlink.GetRobloxUser(ctx, ticket.UserId)
-			if err != nil {
-				if err == bloxlink.ErrUserNotFound {
-					return nil
-				} else {
-					sentry.Error(err)
-					return nil
-				}
-			}
-
-			return map[string]string{
-				"roblox_username":        user.Name,
-				"roblox_id":              strconv.Itoa(user.Id),
-				"roblox_display_name":    user.DisplayName,
-				"roblox_profile_url":     fmt.Sprintf("https://www.roblox.com/users/%d/profile", user.Id),
-				"roblox_account_age":     fmt.Sprintf("<t:%d:R>", user.Created.Unix()),
-				"roblox_account_created": fmt.Sprintf("<t:%d:D>", user.Created.Unix()),
-			}
-		},
-	),
 }
 
 func formAnswersToMap(formData map[database.FormInput]string) map[string]*string {

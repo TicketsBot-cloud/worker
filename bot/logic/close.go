@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
+	botcache "github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -61,10 +62,17 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		return
 	}
 
-	settings, err := cmd.Settings()
-	if err != nil {
-		cmd.HandleError(err)
-		return
+	// Load panel for per-panel settings
+	var panel *database.Panel
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			cmd.HandleError(err)
+			return
+		}
+		if p.PanelId != 0 {
+			panel = &p
+		}
 	}
 
 	// Check the channel still exists - if it does not, just set to closed in the database, as this must be a request
@@ -93,7 +101,8 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 	}
 
 	// Archive
-	if settings.StoreTranscripts {
+	storeTranscripts := panel != nil && panel.StoreTranscripts
+	if storeTranscripts {
 		msgs := make([]message.Message, 0, 50)
 
 		const limit = 100
@@ -154,6 +163,12 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		if err := dbclient.Client.Participants.SetBulk(ctx, cmd.GuildId(), ticket.Id, participants.Collect()); err != nil {
 			cmd.HandleError(err)
 			return
+		}
+
+		// Count staff vs user messages for analytics
+		staffMessages, userMessages := countStaffAndUserMessages(ctx, cmd.GuildId(), ticket, msgs)
+		if err := dbclient.Client.TicketMessageCounts.Set(ctx, cmd.GuildId(), ticket.Id, staffMessages, userMessages); err != nil {
+			sentry.ErrorWithContext(err, errorContext)
 		}
 
 		if err := utils.ArchiverClient.Store(ctx, cmd.GuildId(), ticket.Id, msgs); err != nil {
@@ -287,23 +302,9 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 
 	// Delete join thread button
 	if ticket.IsThread && ticket.JoinMessageId != nil {
-		// Determine which notification channel was used
-		// Priority: Panel-specific notification channel > Global notification channel
 		var notificationChannel *uint64
-
-		// Get panel if this ticket has one
-		var panel *database.Panel
-		if ticket.PanelId != nil {
-			p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-			if err == nil && p.PanelId != 0 {
-				panel = &p
-			}
-		}
-
-		if panel != nil && panel.TicketNotificationChannel != nil {
+		if panel != nil {
 			notificationChannel = panel.TicketNotificationChannel
-		} else if settings.TicketNotificationChannel != nil {
-			notificationChannel = settings.TicketNotificationChannel
 		}
 
 		if notificationChannel != nil {
@@ -314,27 +315,17 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		}
 	}
 
-	sendCloseEmbed(ctx, cmd, errorContext, member, settings, ticket, reason)
+	sendCloseEmbed(ctx, cmd, errorContext, member, panel, ticket, reason)
 }
 
-func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, settings database.Settings, ticket database.Ticket, reason *string) {
-	// Send logs to archive channel
-	var archiveChannelId *uint64
+func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorContext sentry.ErrorContext, member member.Member, panel *database.Panel, ticket database.Ticket, reason *string) {
+	storeTranscripts := panel != nil && panel.StoreTranscripts
+	feedbackEnabled := panel != nil && panel.FeedbackEnabled
 
-	if ticket.PanelId != nil {
-		acId, err := dbclient.Client.ArchiveChannel.GetByPanel(ctx, ticket.GuildId, *ticket.PanelId)
-		if err != nil {
-			sentry.ErrorWithContext(err, errorContext)
-			return
-		}
-		archiveChannelId = acId
-	} else {
-		acId, err := dbclient.Client.ArchiveChannel.Get(ctx, ticket.GuildId)
-		if err != nil {
-			sentry.ErrorWithContext(err, errorContext)
-			return
-		}
-		archiveChannelId = acId
+	// Send logs to archive channel (per-panel transcript channel only)
+	var archiveChannelId *uint64
+	if panel != nil {
+		archiveChannelId = panel.TranscriptChannelId
 	}
 
 	var archiveChannelExists bool
@@ -347,7 +338,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 	if archiveChannelExists && archiveChannelId != nil {
 		componentBuilders := [][]CloseEmbedElement{
 			{
-				TranscriptLinkElement(settings.StoreTranscripts),
+				TranscriptLinkElement(storeTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 				EditCloseReasonElement(),
 			},
@@ -377,12 +368,6 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 	dmChannel, ok := getDmChannel(cmd, ticket.UserId)
 	if ok {
 		guild, err := cmd.Guild()
-		if err != nil {
-			sentry.ErrorWithContext(err, errorContext)
-			return
-		}
-
-		feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, cmd.GuildId())
 		if err != nil {
 			sentry.ErrorWithContext(err, errorContext)
 			return
@@ -420,7 +405,7 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 
 		componentBuilders := [][]CloseEmbedElement{
 			{
-				TranscriptLinkElement(settings.StoreTranscripts),
+				TranscriptLinkElement(storeTranscripts),
 				ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 			},
 			{
@@ -514,4 +499,56 @@ func checkChannelExists(ctx registry.CommandContext, ticket database.Ticket) (bo
 	}
 
 	return true, nil
+}
+
+func countStaffAndUserMessages(ctx context.Context, guildId uint64, ticket database.Ticket, msgs []message.Message) (staffMessages, userMessages int) {
+	authorIds := collections.NewSet[uint64]()
+	for _, msg := range msgs {
+		if !msg.Author.Bot {
+			authorIds.Add(msg.Author.Id)
+		}
+	}
+
+	permCache := permission.NewRedisCache(redis.Client)
+	staffSet := collections.NewSet[uint64]()
+	for _, authorId := range authorIds.Collect() {
+		if isStaffUser(ctx, permCache, guildId, authorId) {
+			staffSet.Add(authorId)
+		}
+	}
+
+	for _, msg := range msgs {
+		if msg.Author.Bot {
+			continue
+		}
+		if staffSet.Contains(msg.Author.Id) {
+			staffMessages++
+		} else {
+			userMessages++
+		}
+	}
+
+	return
+}
+
+func isStaffUser(ctx context.Context, permCache *permission.RedisCache, guildId, userId uint64) bool {
+	if cached, err := permCache.GetCachedPermissionLevel(ctx, guildId, userId); err == nil {
+		return cached >= permission.Support
+	}
+
+	if isSupport, err := dbclient.Client.Permissions.IsSupport(ctx, guildId, userId); err == nil && isSupport {
+		return true
+	}
+
+	if isSupport, err := dbclient.Client.SupportTeamMembers.IsSupport(ctx, guildId, userId); err == nil && isSupport {
+		return true
+	}
+
+	if botcache.Client != nil {
+		if owner, err := botcache.Client.GetGuildOwner(ctx, guildId); err == nil && owner == userId {
+			return true
+		}
+	}
+
+	return false
 }
