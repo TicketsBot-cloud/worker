@@ -10,25 +10,25 @@ import (
 	"go.uber.org/zap"
 )
 
-type KafkaConsumer struct {
+type EventListener struct {
 	logger *zap.Logger
 	cache  *cache.PgCache
 }
 
-var _ rpc.Listener = (*KafkaConsumer)(nil)
+var _ rpc.Listener = (*EventListener)(nil)
 
-func NewKafkaListener(logger *zap.Logger, cache *cache.PgCache) *KafkaConsumer {
-	return &KafkaConsumer{
+func NewEventListener(logger *zap.Logger, cache *cache.PgCache) *EventListener {
+	return &EventListener{
 		logger: logger,
 		cache:  cache,
 	}
 }
 
-func (k *KafkaConsumer) BuildContext() (context.Context, context.CancelFunc) {
+func (k *EventListener) BuildContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
 }
 
-func (k *KafkaConsumer) HandleMessage(ctx context.Context, message []byte) {
+func (k *EventListener) HandleMessage(ctx context.Context, message []byte) {
 	var event eventforwarding.Event
 	if err := json.Unmarshal(message, &event); err != nil {
 		k.logger.Error("Failed to unmarshal event", zap.Error(err))
