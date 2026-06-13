@@ -162,7 +162,7 @@ func main() {
 		logger.Info("Workflow envelope HMAC enabled")
 	}
 	workflowProducer, err := workflowbus.NewProducer(
-		config.Conf.Kafka.Brokers,
+		redis.Client,
 		logger.With(zap.String("service", "workflowbus")),
 		workflowSigner,
 	)
@@ -175,6 +175,8 @@ func main() {
 	}
 
 	go messagequeue.ListenTicketClose()
+	go messagequeue.ListenTicketTransfer()
+	go messagequeue.ListenTicketReopen()
 	go messagequeue.ListenAutoClose(logger.With(zap.String("service", "autoclose")))
 	go messagequeue.ListenCloseRequestTimer(logger.With(zap.String("service", "close-request-timer")))
 	go messagequeue.ListenCloseReasonUpdate()

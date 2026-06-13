@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/premium"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
@@ -103,6 +104,12 @@ func (h *RateHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		ctx.HandleError(err)
 		return
 	}
+
+	workflowbus.Emit(ctx, workflowbus.TriggerRatingSubmitted, guildId, ctx.Worker().CausationId, workflowbus.RatingSubmittedPayload{
+		TicketId: ticketId,
+		UserId:   ctx.InteractionUser().Id,
+		Rating:   rating,
+	})
 
 	// Exit survey
 	premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, guildId, true, ctx.Worker().Token, ctx.Worker().RateLimiter)

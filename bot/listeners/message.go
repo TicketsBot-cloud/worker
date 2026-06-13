@@ -10,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
@@ -100,6 +101,20 @@ func OnMessage(worker *worker.Context, e events.MessageCreate) {
 					}
 				})
 			}
+		}
+
+		if isStaffCached != nil {
+			content := e.Content
+			if len(content) > 2000 {
+				content = content[:2000]
+			}
+			workflowbus.Emit(ctx, workflowbus.TriggerMessageSent, e.GuildId, worker.CausationId, workflowbus.MessageSentPayload{
+				TicketId:  ticket.Id,
+				MessageId: e.Id,
+				AuthorId:  e.Author.Id,
+				Content:   content,
+				IsStaff:   *isStaffCached,
+			})
 		}
 	}
 
