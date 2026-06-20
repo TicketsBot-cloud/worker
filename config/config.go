@@ -95,7 +95,6 @@ type (
 		} `envPrefix:"WORKER_REDIS_"`
 
 		Streams struct {
-			EventsStream   string `env:"STREAMS_EVENTS_STREAM" envDefault:"stream:gateway-events"`
 			GoroutineLimit int    `env:"STREAMS_GOROUTINE_LIMIT" envDefault:"1000"`
 		}
 

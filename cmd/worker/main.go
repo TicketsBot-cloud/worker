@@ -183,7 +183,7 @@ func main() {
 				MaxLen:              50000,
 			},
 			map[string]rpc.Listener{
-				config.Conf.Streams.EventsStream: event.NewEventListener(
+				"stream:gateway-events": event.NewEventListener(
 					logger.With(zap.String("service", "gateway-events")),
 					&pgCache,
 				),
