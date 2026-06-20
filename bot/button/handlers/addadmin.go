@@ -72,7 +72,8 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		// Guild owner doesn't need to be added
 		guild, err := ctx.Guild()
 		if err != nil {
@@ -99,7 +100,7 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			ctx.HandleError(err)
 			return
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		if id == ctx.GuildId() {
 			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageAddSupportEveryone)
 			return
@@ -114,15 +115,16 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("invalid mentionable type: %d", mentionableType))
 		return
 	}
 
 	var mention string
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		mention = fmt.Sprintf("<@%d>", id)
-	} else {
+	case context.MentionableTypeRole:
 		mention = fmt.Sprintf("<@&%d>", id)
 	}
 
@@ -141,11 +143,12 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 
 	// Get the name of the user/role being added
 	var targetName string
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		if targetMember, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id); err == nil {
 			targetName = targetMember.User.Username
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		if roles, err := ctx.Worker().GetGuildRoles(ctx.GuildId()); err == nil {
 			for _, role := range roles {
 				if role.Id == id {
@@ -160,7 +163,7 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 	if settings.TicketNotificationChannel != nil {
 		auditReason := "Added admin member/role"
 		if hasMember && targetName != "" {
-			auditReason = fmt.Sprintf("Added admin %s (%s) by %s", mentionableType, targetName, member.User.Username)
+			auditReason = fmt.Sprintf("Added admin %d (%s) by %s", mentionableType, targetName, member.User.Username)
 		} else if hasMember {
 			auditReason = fmt.Sprintf("Added admin member/role by %s", member.User.Username)
 		}
@@ -214,9 +217,13 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			Deny:  0,
 		})
 
+		pos := 0
+		if ch.Position != nil {
+			pos = *ch.Position
+		}
 		data := rest.ModifyChannelData{
 			PermissionOverwrites: overwrites,
-			Position:             ch.Position,
+			Position:             pos,
 		}
 
 		ticketAuditReason := fmt.Sprintf("Added admin to ticket %d", ticket.Id)

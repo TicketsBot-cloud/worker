@@ -32,7 +32,7 @@ func (e CustomEmoji) String() string {
 func (e CustomEmoji) BuildEmoji() *emoji.Emoji {
 	return &emoji.Emoji{
 		Id:       objects.NewNullableSnowflake(e.Id),
-		Name:     e.Name,
+		Name:     &e.Name,
 		Animated: e.Animated,
 	}
 }
@@ -55,7 +55,6 @@ var (
 	EmojiPatreon    = NewCustomEmoji("patreon", config.Conf.Emojis.Patreon, false)
 	EmojiDiscord    = NewCustomEmoji("discord", config.Conf.Emojis.Discord, false)
 	EmojiLogo       = NewCustomEmoji("TicketsLogo", config.Conf.Emojis.Logo, false)
-	//EmojiTime       = NewCustomEmoji("time", 974006684622159952, false)
 )
 
 // PrefixWithEmoji Useful for whitelabel bots

@@ -147,7 +147,7 @@ func buildPanelSettings(ctx *context.ModalContext, selectedPanel *database.Panel
 	if selectedPanel.ChannelId != 0 {
 		channel, err := ctx.Worker().GetChannel(selectedPanel.ChannelId)
 		if err == nil {
-			settings = append(settings, fmt.Sprintf("**Panel Channel:** `#%s` (%d)", channel.Name, selectedPanel.ChannelId))
+			settings = append(settings, fmt.Sprintf("**Panel Channel:** `#%s` (%d)", *channel.Name, selectedPanel.ChannelId))
 		} else {
 			settings = append(settings, fmt.Sprintf("**Panel Channel:** `%d` (channel not found)", selectedPanel.ChannelId))
 		}
@@ -157,7 +157,7 @@ func buildPanelSettings(ctx *context.ModalContext, selectedPanel *database.Panel
 	if !selectedPanel.UseThreads && selectedPanel.TargetCategory != 0 {
 		category, err := ctx.Worker().GetChannel(selectedPanel.TargetCategory)
 		if err == nil {
-			settings = append(settings, fmt.Sprintf("**Target Category:** `%s` (%d)", category.Name, selectedPanel.TargetCategory))
+			settings = append(settings, fmt.Sprintf("**Target Category:** `%s` (%d)", *category.Name, selectedPanel.TargetCategory))
 		} else {
 			settings = append(settings, fmt.Sprintf("**Target Category:** `%d` (category not found)", selectedPanel.TargetCategory))
 		}
@@ -167,7 +167,7 @@ func buildPanelSettings(ctx *context.ModalContext, selectedPanel *database.Panel
 	if selectedPanel.TranscriptChannelId != nil {
 		channel, err := ctx.Worker().GetChannel(*selectedPanel.TranscriptChannelId)
 		if err == nil {
-			settings = append(settings, fmt.Sprintf("**Transcript Channel:** `#%s` (%d)", channel.Name, *selectedPanel.TranscriptChannelId))
+			settings = append(settings, fmt.Sprintf("**Transcript Channel:** `#%s` (%d)", *channel.Name, *selectedPanel.TranscriptChannelId))
 		} else {
 			settings = append(settings, fmt.Sprintf("**Transcript Channel:** `%d` (channel not found)", *selectedPanel.TranscriptChannelId))
 		}

@@ -89,7 +89,7 @@ func parseModalComponents(actionRows []interaction.ModalSubmitInteractionActionR
 			c := actionRow.Component
 			var answer string
 			switch c.Type {
-			case component.ComponentSelectMenu, component.ComponentCheckboxGroup:
+			case component.ComponentStringSelect, component.ComponentCheckboxGroup:
 				answer = strings.Join(c.Values, ", ")
 			case component.ComponentInputText:
 				answer = c.Value

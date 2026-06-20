@@ -148,7 +148,6 @@ func buildOption(cmd registry.Command) interaction.ApplicationCommandOption {
 			Type:         argument.Type,
 			Name:         argument.Name,
 			Description:  argument.Description,
-			Default:      false,
 			Required:     argument.Required,
 			Choices:      nil,
 			Autocomplete: argument.AutoCompleteHandler != nil,
@@ -165,16 +164,15 @@ func buildOption(cmd registry.Command) interaction.ApplicationCommandOption {
 	options := append(required, optional...)
 
 	// Determine the correct type based on whether this command has children
-	optionType := interaction.OptionTypeSubCommand
+	optionType := interaction.ApplicationCommandOptionTypeSubCommand
 	if len(properties.Children) > 0 {
-		optionType = interaction.OptionTypeSubCommandGroup
+		optionType = interaction.ApplicationCommandOptionTypeSubCommandGroup
 	}
 
 	return interaction.ApplicationCommandOption{
 		Type:        optionType,
 		Name:        properties.Name,
 		Description: i18n.GetMessage(i18n.LocaleEnglish, properties.Description),
-		Default:     false,
 		Required:    false,
 		Choices:     nil,
 		Options:     options,

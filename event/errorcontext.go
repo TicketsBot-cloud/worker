@@ -45,14 +45,6 @@ func NewMessageComponentInteractionErrorContext(data interaction.InteractionMeta
 		m["user_id"] = strconv.FormatUint(data.User.Id, 10)
 	}
 
-	/*
-		if data.Data.Type() == component.ComponentButton {
-			m["custom_id"] = data.Data.AsButton().CustomId
-		} else if data.Data.Type() == component.ComponentSelectMenu {
-			m["custom_id"] = data.Data.AsSelectMenu().CustomId
-		}
-	*/
-
 	return InteractionErrorContext{
 		data: m,
 	}

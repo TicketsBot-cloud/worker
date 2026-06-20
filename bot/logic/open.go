@@ -357,12 +357,12 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		data := rest.CreateChannelData{
 			Name:                 name,
 			Type:                 channel.ChannelTypeGuildText,
-			Topic:                subject,
+			Topic:                &subject,
 			PermissionOverwrites: overwrites,
 		}
 
 		if useCategory {
-			data.ParentId = category
+			data.ParentId = &category
 		}
 
 		span = sentry.StartSpan(rootSpan.Context(), "Create channel")
@@ -566,9 +566,9 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 				Content: content,
 				AllowedMentions: message.AllowedMention{
 					Parse: []message.AllowedMentionType{
-						message.EVERYONE,
-						message.USERS,
-						message.ROLES,
+						message.AllowedMentionTypeEveryone,
+						message.AllowedMentionTypeUsers,
+						message.AllowedMentionTypeRoles,
 					},
 				},
 			})
@@ -908,7 +908,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	overwrites := []channel.PermissionOverwrite{ // @everyone
 		{
 			Id:    cmd.GuildId(),
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: 0,
 			Deny:  permission.BuildPermissions(permission.ViewChannel),
 		},
@@ -968,14 +968,14 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	if integrationRoleId == nil {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    cmd.Worker().BotId,
-			Type:  channel.PermissionTypeMember,
+			Type:  channel.PermissionOverwriteTypeMember,
 			Allow: permission.BuildPermissions(selfAllow[:]...),
 			Deny:  0,
 		})
 	} else {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    *integrationRoleId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: permission.BuildPermissions(selfAllow[:]...),
 			Deny:  0,
 		})
@@ -1003,7 +1003,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 
 			overwrites = append(overwrites, channel.PermissionOverwrite{
 				Id:    member,
-				Type:  channel.PermissionTypeMember,
+				Type:  channel.PermissionOverwriteTypeMember,
 				Allow: permission.BuildPermissions(allow...),
 				Deny:  0,
 			})
@@ -1012,7 +1012,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 		for _, role := range supportRoles {
 			overwrites = append(overwrites, channel.PermissionOverwrite{
 				Id:    role,
-				Type:  channel.PermissionTypeRole,
+				Type:  channel.PermissionOverwriteTypeRole,
 				Allow: permission.BuildPermissions(StandardPermissions[:]...),
 				Deny:  0,
 			})
@@ -1232,12 +1232,10 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 			}),
 			// %nickname%
 			NewSubstitutor("nickname", false, true, func(user user.User, member member.Member) string {
-				nickname := member.Nick
-				if len(nickname) == 0 {
-					nickname = member.User.Username
+				if member.Nick != nil && len(*member.Nick) > 0 {
+					return *member.Nick
 				}
-
-				return nickname
+				return user.Username
 			}),
 		}, []ParameterizedSubstitutor{
 			// %date% or %date:FORMAT% (e.g., %date:yyyy-mm-dd%)
@@ -1380,7 +1378,7 @@ func countRealChannels(channels []channel.Channel, parentId uint64) int {
 
 	for _, ch := range channels {
 		// Ignore threads
-		if ch.Type == channel.ChannelTypeGuildPublicThread || ch.Type == channel.ChannelTypeGuildPrivateThread || ch.Type == channel.ChannelTypeGuildNewsThread {
+		if ch.Type == channel.ChannelTypePublicThread || ch.Type == channel.ChannelTypePrivateThread || ch.Type == channel.ChannelTypeAnnouncementThread {
 			continue
 		}
 

@@ -149,7 +149,7 @@ func (c *ModalContext) ReplyWith(response command.MessageResponse) (msg message.
 			Data: response,
 		}
 	} else {
-		if time.Now().Sub(utils.SnowflakeToTime(c.interaction.Id)) > time.Minute*14 {
+		if time.Since(utils.SnowflakeToTime(c.interaction.Id)) > time.Minute*14 {
 			return
 		}
 
@@ -197,7 +197,7 @@ func (c *ModalContext) User() (user.User, error) {
 
 func (c *ModalContext) InteractionUser() user.User {
 	if c.Interaction.Member != nil {
-		return c.Interaction.Member.User
+		return *c.Interaction.Member.User
 	} else if c.Interaction.User != nil {
 		return *c.Interaction.User
 	} else { // Infallible

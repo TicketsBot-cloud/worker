@@ -63,10 +63,14 @@ func (StartTicketCommand) Execute(ctx registry.CommandContext) {
 		return
 	}
 
-	messageId := interaction.Interaction.Data.TargetId
+	if interaction.Interaction.Data.TargetId == nil {
+		ctx.HandleError(errors.New("TargetId missing from interaction data"))
+		return
+	}
+	messageId := *interaction.Interaction.Data.TargetId
 
 	msg, ok := interaction.ResolvedMessage(messageId)
-	if err != nil {
+	if !ok {
 		ctx.HandleError(errors.New("Message missing from resolved data"))
 		return
 	}
@@ -193,11 +197,14 @@ func addMessageSender(ctx registry.CommandContext, ticket database.Ticket, msg m
 }
 
 func sendMovedMessage(ctx registry.CommandContext, ticket database.Ticket, msg message.Message) {
+	channelId := ctx.ChannelId()
+	guildId := ctx.GuildId()
+	failIfNotExists := false
 	reference := &message.MessageReference{
-		MessageId:       msg.Id,
-		ChannelId:       ctx.ChannelId(),
-		GuildId:         ctx.GuildId(),
-		FailIfNotExists: false,
+		MessageId:       &msg.Id,
+		ChannelId:       &channelId,
+		GuildId:         &guildId,
+		FailIfNotExists: &failIfNotExists,
 	}
 
 	msgEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.Ticket, i18n.MessageMovedToTicket, nil, *ticket.ChannelId)

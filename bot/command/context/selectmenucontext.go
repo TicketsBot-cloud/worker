@@ -118,23 +118,6 @@ func (c *SelectMenuContext) ReplyWith(response command.MessageResponse) (msg mes
 		Data: response,
 	}
 
-	/*
-		if !hasReplied {
-			c.responseChannel <- button.ResponseMessage{
-				Data: response,
-			}
-		} else {
-			if time.Now().Sub(utils.SnowflakeToTime(c.interaction.Id)) > time.Minute*14 {
-				return
-			}
-
-			msg, err = rest.CreateFollowupMessage(context.Background(), c.Interaction.Token, c.worker.RateLimiter, c.worker.BotId, response.IntoWebhookBody())
-			if err != nil {
-				sentry.LogWithContext(err, c.ToErrorContext())
-			}
-		}
-	*/
-
 	return
 }
 
@@ -173,7 +156,7 @@ func (c *SelectMenuContext) User() (user.User, error) {
 
 func (c *SelectMenuContext) InteractionUser() user.User {
 	if c.Interaction.Member != nil {
-		return c.Interaction.Member.User
+		return *c.Interaction.Member.User
 	} else if c.Interaction.User != nil {
 		return *c.Interaction.User
 	} else { // Infallible

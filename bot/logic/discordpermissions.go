@@ -85,7 +85,7 @@ func BuildUserOverwrite(userId uint64, additionalPermissions database.TicketPerm
 
 	return channel.PermissionOverwrite{
 		Id:    userId,
-		Type:  channel.PermissionTypeMember,
+		Type:  channel.PermissionOverwriteTypeMember,
 		Allow: permission.BuildPermissions(allow...),
 		Deny:  permission.BuildPermissions(deny...),
 	}
@@ -139,7 +139,7 @@ func BuildRoleOverwrite(roleId uint64, additionalPermissions database.TicketPerm
 
 	return channel.PermissionOverwrite{
 		Id:    roleId,
-		Type:  channel.PermissionTypeRole,
+		Type:  channel.PermissionOverwriteTypeRole,
 		Allow: permission.BuildPermissions(allow...),
 		Deny:  permission.BuildPermissions(deny...),
 	}
@@ -176,7 +176,7 @@ func BuildStaffUserOverwrite(userId uint64, p database.SupportTeamPermissions) c
 	allow, deny := buildStaffPermissions(p)
 	return channel.PermissionOverwrite{
 		Id:    userId,
-		Type:  channel.PermissionTypeMember,
+		Type:  channel.PermissionOverwriteTypeMember,
 		Allow: permission.BuildPermissions(allow...),
 		Deny:  permission.BuildPermissions(deny...),
 	}
@@ -187,7 +187,7 @@ func BuildStaffRoleOverwrite(roleId uint64, p database.SupportTeamPermissions) c
 	allow, deny := buildStaffPermissions(p)
 	return channel.PermissionOverwrite{
 		Id:    roleId,
-		Type:  channel.PermissionTypeRole,
+		Type:  channel.PermissionOverwriteTypeRole,
 		Allow: permission.BuildPermissions(allow...),
 		Deny:  permission.BuildPermissions(deny...),
 	}

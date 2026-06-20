@@ -26,7 +26,7 @@ func (TransferCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Support,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user", "Support representative to transfer the ticket to", interaction.OptionTypeUser, i18n.MessageInvalidUser),
+			command.NewRequiredArgument("user", "Support representative to transfer the ticket to", interaction.ApplicationCommandOptionTypeUser, i18n.MessageInvalidUser),
 		),
 		Timeout: constants.TimeoutOpenTicket,
 	}

@@ -96,7 +96,7 @@ func EmbedField(guildId uint64, name string, value i18n.MessageId, inline bool, 
 
 func BuildEmoji(emote string) *emoji.Emoji {
 	return &emoji.Emoji{
-		Name: emote,
+		Name: &emote,
 	}
 }
 

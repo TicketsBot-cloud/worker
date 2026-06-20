@@ -23,8 +23,8 @@ func (ThreadsSetupCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Admin,
 		Category:        command.Settings,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("use_threads", "Whether or not private threads should be used for ticket", interaction.OptionTypeBoolean, "infallible"),
-			command.NewOptionalArgument("ticket_notification_channel", "The channel that ticket open notifications should be sent to", interaction.OptionTypeChannel, "infallible"),
+			command.NewRequiredArgument("use_threads", "Whether or not private threads should be used for ticket", interaction.ApplicationCommandOptionTypeBoolean, "infallible"),
+			command.NewOptionalArgument("ticket_notification_channel", "The channel that ticket open notifications should be sent to", interaction.ApplicationCommandOptionTypeChannel, "infallible"),
 		),
 		InteractionOnly: true,
 		Timeout:         time.Second * 5,

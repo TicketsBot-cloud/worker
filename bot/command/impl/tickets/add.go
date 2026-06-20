@@ -27,7 +27,7 @@ func (AddCommand) Properties() registry.Properties {
 		PermissionLevel: permcache.Everyone,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to add to the ticket", interaction.OptionTypeMentionable, i18n.MessageAddNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to add to the ticket", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageAddNoMembers),
 		),
 		Timeout: constants.TimeoutOpenTicket,
 	}
@@ -78,7 +78,8 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		// Add user to ticket in DB
 		if err := dbclient.Client.TicketMembers.Add(ctx, ctx.GuildId(), ticket.Id, id); err != nil {
 			ctx.HandleError(err)
@@ -88,7 +89,7 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 		if ticket.IsThread {
 			if err := ctx.Worker().AddThreadMember(*ticket.ChannelId, id); err != nil {
 				if err, ok := err.(request.RestError); ok && (err.ApiError.Code == 50001 || err.ApiError.Code == 50013) {
-					ch, err := ctx.Channel()
+					ch, err := ctx.Worker().GetChannel(ctx.ChannelId())
 					if err != nil {
 						ctx.HandleError(err)
 						return
@@ -130,7 +131,7 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 				return
 			}
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		// Handle role addition
 		additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ctx.GuildId())
 		if err != nil {
@@ -153,7 +154,7 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 			ctx.HandleError(err)
 			return
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("unknown mentionable type: %d", mentionableType))
 		return
 	}

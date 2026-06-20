@@ -45,7 +45,7 @@ func (c GDPRCommand) Properties() registry.Properties {
 		Contexts:        []interaction.InteractionContextType{interaction.InteractionContextBotDM},
 		IgnoreBlacklist: true,
 		Arguments: command.Arguments(
-			command.NewOptionalAutocompleteableArgument("lang", "Language for GDPR messages", interaction.OptionTypeString, i18n.GdprLanguageOption, c.LanguageAutoCompleteHandler),
+			command.NewOptionalAutocompleteableArgument("lang", "Language for GDPR messages", interaction.ApplicationCommandOptionTypeString, i18n.GdprLanguageOption, c.LanguageAutoCompleteHandler),
 		),
 	}
 }
@@ -81,10 +81,10 @@ func buildGDPRComponents(ctx registry.CommandContext, locale *i18n.Locale) []com
 		buildTextSection(i18n.GetMessage(locale, i18n.GdprIntro)),
 		component.BuildSeparator(component.Separator{}),
 		buildTextSection(i18n.GetMessage(locale, i18n.GdprTranscriptSectionTitle)),
-		buildButtonRow(ctx, locale, transcriptButtons),
+		buildButtonRow(locale, transcriptButtons),
 		component.BuildSeparator(component.Separator{}),
 		buildTextSection(i18n.GetMessage(locale, i18n.GdprMessageSectionTitle)),
-		buildButtonRow(ctx, locale, messageButtons),
+		buildButtonRow(locale, messageButtons),
 		component.BuildSeparator(component.Separator{}),
 		buildTextSection(i18n.GetMessage(locale, i18n.GdprWarningText)),
 		component.BuildSeparator(component.Separator{}),
@@ -99,7 +99,7 @@ func buildTextSection(content string) component.Component {
 	return component.BuildTextDisplay(component.TextDisplay{Content: content})
 }
 
-func buildButtonRow(ctx registry.CommandContext, locale *i18n.Locale, buttons []gdprButton) component.Component {
+func buildButtonRow(locale *i18n.Locale, buttons []gdprButton) component.Component {
 	buttonComponents := make([]component.Component, len(buttons))
 	for i, btn := range buttons {
 		customId := fmt.Sprintf("%s_%s", btn.CustomID, locale.IsoShortCode)

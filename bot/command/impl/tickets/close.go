@@ -27,7 +27,7 @@ func (c CloseCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Everyone,
 		Category:        command.Tickets,
 		Arguments: command.Arguments(
-			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.OptionTypeString, "infallible", c.AutoCompleteHandler), // should never fail
+			command.NewOptionalAutocompleteableArgument("reason", "The reason the ticket was closed", interaction.ApplicationCommandOptionTypeString, "infallible", c.AutoCompleteHandler), // should never fail
 		),
 		Timeout: constants.TimeoutCloseTicket,
 	}

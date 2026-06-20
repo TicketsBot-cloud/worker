@@ -114,7 +114,7 @@ func FeedbackRowElement(condition bool) CloseEmbedElement {
 				CustomId: fmt.Sprintf("rate_%d_%d_%d", ticket.GuildId, ticket.Id, i),
 				Style:    style,
 				Emoji: &emoji.Emoji{
-					Name: "⭐",
+					Name: utils.Ptr("⭐"),
 				},
 			})
 		}
@@ -272,7 +272,12 @@ func EditDMMessageIfExists(
 	}
 
 	closeEmbed, closeComponents := BuildCloseEmbed(ctx, w, ticket, closedBy, reason, rating, componentBuilders)
-	closeEmbed.SetAuthor(guild.Name, "", fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, guild.Icon))
+
+	guildIconUrl := ""
+	if guild.Icon != nil {
+		guildIconUrl = fmt.Sprintf("https://cdn.discordapp.com/icons/%d/%s.png", guild.Id, *guild.Icon)
+	}
+	closeEmbed.SetAuthor(guild.Name, "", guildIconUrl)
 
 	_, err = w.EditMessage(dmChannel.Id, dmMessage.MessageId, rest.EditMessageData{
 		Embeds:     utils.Slice(closeEmbed),

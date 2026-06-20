@@ -22,7 +22,7 @@ func (LimitSetupCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Admin,
 		Category:        command.Settings,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("limit", "The maximum amount of tickets a user can have open simultaneously", interaction.OptionTypeInteger, i18n.SetupLimitInvalid),
+			command.NewRequiredArgument("limit", "The maximum amount of tickets a user can have open simultaneously", interaction.ApplicationCommandOptionTypeInteger, i18n.SetupLimitInvalid),
 		),
 		Timeout: time.Second * 3,
 	}

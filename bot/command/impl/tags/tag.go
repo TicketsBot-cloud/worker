@@ -35,7 +35,7 @@ func (c TagCommand) Properties() registry.Properties {
 		Category:         command.Tags,
 		DisableAutoDefer: true,
 		Arguments: command.Arguments(
-			command.NewRequiredAutocompleteableArgument("id", "The ID of the tag to be sent to the channel", interaction.OptionTypeString, i18n.MessageTagInvalidArguments, c.AutoCompleteHandler),
+			command.NewRequiredAutocompleteableArgument("id", "The ID of the tag to be sent to the channel", interaction.ApplicationCommandOptionTypeString, i18n.MessageTagInvalidArguments, c.AutoCompleteHandler),
 		),
 		Timeout: time.Second * 5,
 	}
@@ -86,9 +86,9 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 		Embeds:  embeds,
 		AllowedMentions: message.AllowedMention{
 			Parse: []message.AllowedMentionType{
-				message.EVERYONE,
-				message.USERS,
-				message.ROLES,
+				message.AllowedMentionTypeRoles,
+				message.AllowedMentionTypeUsers,
+				message.AllowedMentionTypeEveryone,
 			},
 		},
 	}

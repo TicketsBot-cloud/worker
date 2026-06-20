@@ -10,7 +10,6 @@ import (
 	"strings"
 	"unicode"
 
-	_ "github.com/TicketsBot-cloud/gdl/gateway/payloads/events"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -45,10 +44,6 @@ func main() {
 		typeName := strings.TrimPrefix(object.Type().String(), PackageName+".")
 
 		if typeName == object.Name() {
-			if typeName == "EventBus" {
-				continue
-			}
-
 			// Check if underlying type is a struct
 			underlying := object.Type().Underlying()
 			if _, ok := underlying.(*types.Struct); ok {

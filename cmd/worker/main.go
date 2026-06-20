@@ -32,8 +32,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/event"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"go.uber.org/zap"
-
-	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
@@ -160,11 +158,12 @@ func main() {
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
 
-	if config.Conf.WorkerMode == config.WorkerModeInteractions {
+	switch config.Conf.WorkerMode {
+	case config.WorkerModeInteractions:
 		logger.Info("Starting HTTP server", zap.String("mode", string(config.Conf.WorkerMode)))
 
 		event.HttpListen(redis.Client, &pgCache)
-	} else if config.Conf.WorkerMode == config.WorkerModeGateway {
+	case config.WorkerModeGateway:
 		logger.Info("Starting event listeners", zap.String("mode", string(config.Conf.WorkerMode)))
 
 		go event.HttpListen(redis.Client, &pgCache)
@@ -218,7 +217,7 @@ func main() {
 		if !sentry.Flush(2 * time.Second) {
 			logger.Warn("Sentry flush timed out, some events may be lost")
 		}
-	} else {
+	default:
 		logger.Fatal("Invalid worker mode", zap.String("mode", string(config.Conf.WorkerMode)))
 	}
 }

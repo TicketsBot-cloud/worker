@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"golang.org/x/sync/errgroup"
 )
@@ -72,7 +73,7 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 	shouldUpdateName := true
 	// But skip if the user has manually renamed the channel (doesn't match old unclaimed name)
 	oldChannelName, _ := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
-	if currentChannel.Name != oldChannelName {
+	if currentChannel.Name == nil || *currentChannel.Name != oldChannelName {
 		shouldUpdateName = false
 	}
 
@@ -193,7 +194,7 @@ func overwritesCantView(claimer, selfId, openerId, guildId uint64, adminUsers, a
 	overwrites = append(overwrites, BuildUserOverwrite(openerId, additionalPermissions),
 		channel.PermissionOverwrite{ // @everyone
 			Id:    guildId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: 0,
 			Deny:  permission.BuildPermissions(permission.ViewChannel),
 		},
@@ -218,7 +219,7 @@ func overwritesCantView(claimer, selfId, openerId, guildId uint64, adminUsers, a
 	for _, userId := range adminUserTargets {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
-			Type:  channel.PermissionTypeMember,
+			Type:  channel.PermissionOverwriteTypeMember,
 			Allow: permission.BuildPermissions(StandardPermissions[:]...),
 			Deny:  0,
 		})
@@ -227,7 +228,7 @@ func overwritesCantView(claimer, selfId, openerId, guildId uint64, adminUsers, a
 	for _, roleId := range adminRoleTargets {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: permission.BuildPermissions(StandardPermissions[:]...),
 			Deny:  0,
 		})
@@ -244,7 +245,7 @@ func overwritesCantType(claimerId, selfId, openerId, guildId uint64, supportUser
 	overwrites = append(overwrites, BuildUserOverwrite(openerId, additionalPermissions),
 		channel.PermissionOverwrite{ // @everyone
 			Id:    guildId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: 0,
 			Deny:  permission.BuildPermissions(permission.ViewChannel),
 		},
@@ -268,7 +269,7 @@ func overwritesCantType(claimerId, selfId, openerId, guildId uint64, supportUser
 	for _, userId := range adminUserTargets {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
-			Type:  channel.PermissionTypeMember,
+			Type:  channel.PermissionOverwriteTypeMember,
 			Allow: permission.BuildPermissions(StandardPermissions[:]...),
 			Deny:  0,
 		})
@@ -277,7 +278,7 @@ func overwritesCantType(claimerId, selfId, openerId, guildId uint64, supportUser
 	for _, roleId := range adminRoleTargets {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: permission.BuildPermissions(StandardPermissions[:]...),
 			Deny:  0,
 		})
@@ -297,7 +298,7 @@ func overwritesCantType(claimerId, selfId, openerId, guildId uint64, supportUser
 
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
-			Type:  channel.PermissionTypeMember,
+			Type:  channel.PermissionOverwriteTypeMember,
 			Allow: permission.BuildPermissions(readOnlyAllowed...),
 			Deny:  permission.BuildPermissions(readOnlyDenied...),
 		})
@@ -317,7 +318,7 @@ func overwritesCantType(claimerId, selfId, openerId, guildId uint64, supportUser
 
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: permission.BuildPermissions(readOnlyAllowed...),
 			Deny:  permission.BuildPermissions(readOnlyDenied...),
 		})
@@ -360,7 +361,7 @@ func UpdateWelcomeMessageClaimButton(ctx context.Context, worker *worker.Context
 							Label:    cmd.GetMessage(i18n.TitleUnclaim),
 							CustomId: "unclaim",
 							Style:    component.ButtonStyleSecondary,
-							Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+							Emoji:    &emoji.Emoji{Name: utils.Ptr("🙋‍♂️")},
 						})
 						updated = true
 						break
@@ -370,7 +371,7 @@ func UpdateWelcomeMessageClaimButton(ctx context.Context, worker *worker.Context
 							Label:    cmd.GetMessage(i18n.TitleClaim),
 							CustomId: "claim",
 							Style:    component.ButtonStyleSuccess,
-							Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+							Emoji:    &emoji.Emoji{Name: utils.Ptr("🙋‍♂️")},
 						})
 						updated = true
 						break

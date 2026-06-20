@@ -6,11 +6,11 @@ go 1.25.0
 
 //replace github.com/TicketsBot-cloud/common => ../common
 
-//replace github.com/TicketsBot-cloud/gdl => ../gdl
+replace github.com/TicketsBot-cloud/gdl => ../gdl
 
 //replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
 
-//replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
+replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
 require (
 	cloud.google.com/go/profiler v0.4.2

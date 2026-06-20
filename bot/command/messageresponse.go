@@ -46,14 +46,14 @@ func NewEmbedMessageResponseWithComponents(e *embed.Embed, components []componen
 func NewMessageResponseWithComponents(components []component.Component) MessageResponse {
 	return MessageResponse{
 		Components: components,
-		Flags:      message.SumFlags(message.FlagComponentsV2),
+		Flags:      message.SumFlags(message.FlagIsComponentsV2),
 	}
 }
 
 func NewEphemeralMessageResponseWithComponents(components []component.Component) MessageResponse {
 	return MessageResponse{
 		Components: components,
-		Flags:      message.SumFlags(message.FlagEphemeral, message.FlagComponentsV2),
+		Flags:      message.SumFlags(message.FlagEphemeral, message.FlagIsComponentsV2),
 	}
 }
 

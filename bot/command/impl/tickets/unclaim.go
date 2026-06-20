@@ -133,7 +133,7 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		if !claimerHasAccess {
 			filteredOverwrites := make([]channel.PermissionOverwrite, 0, len(overwrites))
 			for _, ow := range overwrites {
-				if ow.Id != whoClaimed || ow.Type != channel.PermissionTypeMember {
+				if ow.Id != whoClaimed || ow.Type != channel.PermissionOverwriteTypeMember {
 					filteredOverwrites = append(filteredOverwrites, ow)
 				}
 			}
@@ -143,14 +143,14 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 			case database.SwitchPanelKeepAccess:
 				overwrites = append(overwrites, channel.PermissionOverwrite{
 					Id:    whoClaimed,
-					Type:  channel.PermissionTypeMember,
+					Type:  channel.PermissionOverwriteTypeMember,
 					Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
 					Deny:  0,
 				})
 			case database.SwitchPanelRemoveOnUnclaim:
 				overwrites = append(overwrites, channel.PermissionOverwrite{
 					Id:    whoClaimed,
-					Type:  channel.PermissionTypeMember,
+					Type:  channel.PermissionOverwriteTypeMember,
 					Allow: 0,
 					Deny:  discordpermission.BuildPermissions(discordpermission.ViewChannel),
 				})
@@ -168,7 +168,7 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 	// Always update the name to match the new panel's naming scheme
 	shouldUpdateName := true
 	claimedChannelName, _ := logic.GenerateChannelName(ctx.Context, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &whoClaimed)
-	if ch.Name != claimedChannelName {
+	if ch.Name == nil || *ch.Name != claimedChannelName {
 		shouldUpdateName = false
 	}
 

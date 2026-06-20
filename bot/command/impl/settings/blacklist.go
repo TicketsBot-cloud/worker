@@ -29,7 +29,7 @@ func (BlacklistCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Support,
 		Category:        command.Settings,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to blacklist or unblacklist", interaction.OptionTypeMentionable, i18n.MessageBlacklistNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to blacklist or unblacklist", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageBlacklistNoMembers),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 5,
@@ -53,7 +53,8 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 		return
 	}
 
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		member, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id)
 		if err != nil {
 			ctx.HandleError(err)
@@ -109,7 +110,7 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistAdd, member.User.Id)
 		}
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		// Check if role is staff
 		isSupport, err := dbclient.Client.RolePermissions.IsSupport(ctx, id)
 		if err != nil {
@@ -167,7 +168,7 @@ func (BlacklistCommand) Execute(ctx registry.CommandContext, id uint64) {
 
 			ctx.Reply(customisation.Green, i18n.TitleBlacklist, i18n.MessageBlacklistAddRole, id)
 		}
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("infallible"))
 		return
 	}

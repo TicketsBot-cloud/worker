@@ -89,10 +89,6 @@ func (c *AutoCloseContext) ToErrorContext() errorcontext.WorkerErrorContext {
 	}
 }
 
-func (c *AutoCloseContext) openDm() (uint64, bool) {
-	return 0, false
-}
-
 func (c *AutoCloseContext) ReplyWith(response command.MessageResponse) (message.Message, error) {
 	return message.Message{}, nil
 }

@@ -121,74 +121,6 @@ func getGuildsWithUserMessages(ctx *cmdcontext.ButtonContext, userId uint64) ([]
 	return batchFetchGuildsInfo(ctx, guildIds)
 }
 
-func batchFetchOwnedGuilds(ctx *cmdcontext.ButtonContext, guildIds []uint64, userId uint64) ([]guildInfo, error) {
-	retriever := utils.ToRetriever(ctx.Worker())
-
-	type result struct {
-		info guildInfo
-		ok   bool
-	}
-
-	resultChan := make(chan result, len(guildIds))
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10)
-
-	for _, guildId := range guildIds {
-		wg.Add(1)
-		go func(gId uint64) {
-			defer wg.Done()
-
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			ownerId, err := retriever.GetGuildOwner(ctx, gId)
-			if err != nil {
-				resultChan <- result{ok: false}
-				return
-			}
-
-			if ownerId != userId {
-				resultChan <- result{ok: false}
-				return
-			}
-
-			guild, err := ctx.Worker().GetGuild(gId)
-			if err != nil {
-				resultChan <- result{
-					info: guildInfo{
-						GuildID: gId,
-						Name:    strconv.FormatUint(gId, 10),
-					},
-					ok: true,
-				}
-				return
-			}
-
-			resultChan <- result{
-				info: guildInfo{
-					GuildID: gId,
-					Name:    guild.Name,
-				},
-				ok: true,
-			}
-		}(guildId)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	var guilds []guildInfo
-	for res := range resultChan {
-		if res.ok {
-			guilds = append(guilds, res.info)
-		}
-	}
-
-	return guilds, nil
-}
-
 func batchFetchGuildsInfo(ctx *cmdcontext.ButtonContext, guildIds []uint64) ([]guildInfo, error) {
 	type result struct {
 		info guildInfo
@@ -611,7 +543,7 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 		if actionRow.Component != nil {
 			switch actionRow.Component.CustomId {
 			case "server_id":
-				if actionRow.Component.Values != nil && len(actionRow.Component.Values) > 0 {
+				if len(actionRow.Component.Values) > 0 {
 					serverId = actionRow.Component.Values[0]
 				} else if actionRow.Component.Value != "" {
 					serverId = actionRow.Component.Value
@@ -623,7 +555,7 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 			for _, component := range actionRow.Components {
 				switch component.CustomId {
 				case "server_id":
-					if component.Values != nil && len(component.Values) > 0 {
+					if len(component.Values) > 0 {
 						serverId = component.Values[0]
 					} else if component.Value != "" {
 						serverId = component.Value
@@ -806,7 +738,7 @@ func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 		if actionRow.Component != nil {
 			switch actionRow.Component.CustomId {
 			case "server_id":
-				if actionRow.Component.Values != nil && len(actionRow.Component.Values) > 0 {
+				if len(actionRow.Component.Values) > 0 {
 					serverId = actionRow.Component.Values[0]
 				} else if actionRow.Component.Value != "" {
 					serverId = actionRow.Component.Value
@@ -818,7 +750,7 @@ func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 			for _, component := range actionRow.Components {
 				switch component.CustomId {
 				case "server_id":
-					if component.Values != nil && len(component.Values) > 0 {
+					if len(component.Values) > 0 {
 						serverId = component.Values[0]
 					} else if component.Value != "" {
 						serverId = component.Value

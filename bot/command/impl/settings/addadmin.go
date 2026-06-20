@@ -27,7 +27,7 @@ func (AddAdminCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		InteractionOnly: true,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("user_or_role", "User or role to apply the administrator permission to", interaction.OptionTypeMentionable, i18n.MessageAddAdminNoMembers),
+			command.NewRequiredArgument("user_or_role", "User or role to apply the administrator permission to", interaction.ApplicationCommandOptionTypeMentionable, i18n.MessageAddAdminNoMembers),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 3,
@@ -52,11 +52,12 @@ func (c AddAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 	}
 
 	var mention string
-	if mentionableType == context.MentionableTypeUser {
+	switch mentionableType {
+	case context.MentionableTypeUser:
 		mention = fmt.Sprintf("<@%d>", id)
-	} else if mentionableType == context.MentionableTypeRole {
+	case context.MentionableTypeRole:
 		mention = fmt.Sprintf("<@&%d>", id)
-	} else {
+	default:
 		ctx.HandleError(fmt.Errorf("unknown mentionable type: %d", mentionableType))
 		return
 	}

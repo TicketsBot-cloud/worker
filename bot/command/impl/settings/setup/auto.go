@@ -21,8 +21,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-const freePanelLimit = 3
-
 type AutoSetupCommand struct {
 }
 
@@ -173,7 +171,7 @@ func getTranscriptChannelData(guildId, supportRoleId, adminRoleId uint64) rest.C
 	overwrites := []channel.PermissionOverwrite{
 		{ // deny everyone else access to channel
 			Id:    guildId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: 0,
 			Deny:  allow,
 		},
@@ -182,7 +180,7 @@ func getTranscriptChannelData(guildId, supportRoleId, adminRoleId uint64) rest.C
 	if supportRoleId != 0 {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    supportRoleId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: allow,
 			Deny:  0,
 		})
@@ -191,7 +189,7 @@ func getTranscriptChannelData(guildId, supportRoleId, adminRoleId uint64) rest.C
 	if adminRoleId != 0 {
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    adminRoleId,
-			Type:  channel.PermissionTypeRole,
+			Type:  channel.PermissionOverwriteTypeRole,
 			Allow: allow,
 			Deny:  0,
 		})

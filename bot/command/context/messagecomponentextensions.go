@@ -60,8 +60,6 @@ func (e *MessageComponentExtensions) Edit(data command.MessageResponse) {
 			sentry.LogWithContext(err, e.ctx.ToErrorContext())
 		}
 	}
-
-	return
 }
 
 func (e *MessageComponentExtensions) EditWith(colour customisation.Colour, title, content i18n.MessageId, format ...interface{}) {

@@ -229,7 +229,7 @@ func checkUserTicketPermissions(ctx *context.ModalContext, worker *w.Context, gu
 
 		// Check support roles
 		supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, guildId)
-		if err == nil && ticketPermLevel != "**Ticket Permission:** Admin" && ticketPermLevel != "**Ticket Permission:** Server Owner" && ticketPermLevel != "**Ticket Permission:** Admin" {
+		if err == nil && ticketPermLevel != "**Ticket Permission:** Admin" && ticketPermLevel != "**Ticket Permission:** Server Owner" {
 			var supportRoleNames []string
 			for _, roleId := range member.Roles {
 				if utils.Contains(supportRoles, roleId) {

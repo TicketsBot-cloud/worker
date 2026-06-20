@@ -16,9 +16,9 @@ const (
 func (m MentionableType) OverwriteType() channel.PermissionOverwriteType {
 	switch m {
 	case MentionableTypeUser:
-		return channel.PermissionTypeMember
+		return channel.PermissionOverwriteTypeMember
 	case MentionableTypeRole:
-		return channel.PermissionTypeRole
+		return channel.PermissionOverwriteTypeRole
 	default:
 		return -1
 	}

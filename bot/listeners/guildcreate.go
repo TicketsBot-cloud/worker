@@ -3,6 +3,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -34,7 +35,7 @@ func OnGuildCreate(worker *worker.Context, e events.GuildCreate) {
 		return
 	}
 
-	if time.Now().Sub(e.JoinedAt) < time.Minute {
+	if time.Since(e.JoinedAt) < time.Minute {
 		statsd.Client.IncrementKey(statsd.KeyJoins)
 
 		sendIntroMessage(ctx, worker, e.Guild, e.Guild.OwnerId)
@@ -92,7 +93,7 @@ func sendIntroMessage(ctx context.Context, worker *worker.Context, guild guild.G
 
 func getInviter(worker *worker.Context, guildId uint64) (userId uint64) {
 	data := rest.GetGuildAuditLogData{
-		ActionType: auditlog.EventBotAdd,
+		ActionType: auditlog.AuditLogEventBotAdd,
 		Limit:      50,
 	}
 
@@ -102,12 +103,15 @@ func getInviter(worker *worker.Context, guildId uint64) (userId uint64) {
 		return
 	}
 
+	botIdStr := strconv.FormatUint(worker.BotId, 10)
 	for _, entry := range auditLog.Entries {
-		if entry.ActionType != auditlog.EventBotAdd || entry.TargetId != worker.BotId {
+		if entry.ActionType != auditlog.AuditLogEventBotAdd || entry.TargetId == nil || *entry.TargetId != botIdStr {
 			continue
 		}
 
-		userId = entry.UserId
+		if entry.UserId != nil {
+			userId = *entry.UserId
+		}
 		break
 	}
 

@@ -24,7 +24,7 @@ func (ManageTagsDeleteCommand) Properties() registry.Properties {
 		PermissionLevel: permission.Support,
 		Category:        command.Tags,
 		Arguments: command.Arguments(
-			command.NewRequiredArgument("id", "ID of the tag to delete", interaction.OptionTypeString, i18n.MessageTagDeleteInvalidArguments),
+			command.NewRequiredArgument("id", "ID of the tag to delete", interaction.ApplicationCommandOptionTypeString, i18n.MessageTagDeleteInvalidArguments),
 		),
 		DefaultEphemeral: true,
 		Timeout:          time.Second * 3,
