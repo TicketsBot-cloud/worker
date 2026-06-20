@@ -35,8 +35,8 @@ var (
 	ForwardedDashboardMessages = newCounter("forwarded_dashboard_messages")
 
 	Events         = newCounterVec("events", "event_type")
-	KafkaBatchSize = newHistogram("kafka_batch_size")
-	KafkaMessages  = newHistogramVec("kafka_messages", "topic")
+	StreamBatchSize = newHistogram("stream_batch_size")
+	StreamMessages  = newHistogramVec("stream_messages", "stream")
 
 	CategoryUpdates = newCounter("category_updates")
 )
