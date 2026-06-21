@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
@@ -148,7 +149,7 @@ func (h *UnclaimHandler) Execute(ctx *context.ButtonContext) {
 				overwrites = append(overwrites, channel.PermissionOverwrite{
 					Id:    whoClaimed,
 					Type:  channel.PermissionTypeMember,
-					Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
+					Allow: discordpermission.BuildPermissions(botpermissions.StandardPermissions...),
 					Deny:  0,
 				})
 			case database.SwitchPanelRemoveOnUnclaim:

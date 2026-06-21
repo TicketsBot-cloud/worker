@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -941,8 +942,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 	}
 
 	// Add the bot to the overwrites
-	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+2)
-	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
+	selfAllow := append([]permission.Permission{}, botpermissions.StandardPermissions...)
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
 
@@ -998,8 +998,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 				continue // Already added overwrite above
 			}
 
-			allow := make([]permission.Permission, len(StandardPermissions))
-			copy(allow, StandardPermissions[:])
+			allow := append([]permission.Permission{}, botpermissions.StandardPermissions...)
 
 			overwrites = append(overwrites, channel.PermissionOverwrite{
 				Id:    member,
@@ -1013,7 +1012,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, user
 			overwrites = append(overwrites, channel.PermissionOverwrite{
 				Id:    role,
 				Type:  channel.PermissionTypeRole,
-				Allow: permission.BuildPermissions(StandardPermissions[:]...),
+				Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 				Deny:  0,
 			})
 		}

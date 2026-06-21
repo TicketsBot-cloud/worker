@@ -14,7 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -238,7 +238,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 				Id:    id,
 				Type:  channel.PermissionTypeMember,
 				Allow: 0,
-				Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
+				Deny:  permission.BuildPermissions(botpermissions.StandardPermissions...),
 			}
 
 			if err := ctx.Worker().EditChannelPermissions(reasonCtx, ticketChannelId, data); err != nil {
@@ -322,7 +322,7 @@ func (RemoveCommand) Execute(ctx registry.CommandContext, id uint64) {
 			Id:    id,
 			Type:  channel.PermissionTypeRole,
 			Allow: 0,
-			Deny:  permission.BuildPermissions(logic.StandardPermissions[:]...),
+			Deny:  permission.BuildPermissions(botpermissions.StandardPermissions...),
 		}
 
 		executor, err := ctx.Member()
