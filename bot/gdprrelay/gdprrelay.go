@@ -16,6 +16,8 @@ const (
 	RequestTypeSpecificTranscripts
 	RequestTypeAllMessages
 	RequestTypeSpecificMessages
+	RequestTypeExportGuild
+	RequestTypeExportUser
 )
 
 type GDPRRequest struct {

@@ -356,3 +356,133 @@ func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, title, components)
 	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 }
+
+type GDPRConfirmExportGuildHandler struct{}
+
+func (h *GDPRConfirmExportGuildHandler) Matcher() matcher.Matcher {
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_confirm_export_guild_")
+	})
+}
+
+func (h *GDPRConfirmExportGuildHandler) Properties() registry.Properties {
+	return registry.Properties{
+		Flags:   registry.SumFlags(registry.DMsAllowed),
+		Timeout: constants.TimeoutGDPR,
+	}
+}
+
+func (h *GDPRConfirmExportGuildHandler) Execute(ctx *cmdcontext.ButtonContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
+
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+		return
+	}
+
+	guildIds := utils.ParseGuildIds(ctx.InteractionData.CustomId)
+	if len(guildIds) == 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
+		return
+	}
+
+	guildNames := utils.FetchGuildNames(ctx, guildIds)
+
+	request := gdprrelay.GDPRRequest{
+		Type:               gdprrelay.RequestTypeExportGuild,
+		UserId:             ctx.UserId(),
+		GuildIds:           guildIds,
+		GuildNames:         guildNames,
+		Language:           locale.IsoLongCode,
+		InteractionToken:   ctx.Interaction.Token,
+		InteractionGuildId: ctx.GuildId(),
+		ApplicationId:      ctx.Worker().BotId,
+	}
+
+	scrambledId := sha256.New()
+	fmt.Fprintf(scrambledId, "%d", ctx.UserId())
+	id, err := dbclient.Client.GdprLogs.InsertLog(fmt.Sprintf("%x", scrambledId.Sum(nil)), "ExportGuild", "Queued")
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	guildDisplays := make([]string, len(guildIds))
+	for i, guildId := range guildIds {
+		guildDisplays[i] = utils.FormatGuildDisplay(guildId, guildNames)
+	}
+
+	var queuedContent string
+	if len(guildIds) == 1 {
+		queuedContent = i18n.GetMessage(locale, i18n.GdprQueuedExportGuild, guildDisplays[0])
+	} else {
+		queuedContent = i18n.GetMessage(locale, i18n.GdprQueuedExportGuildMulti, strings.Join(guildDisplays, "\n* "))
+	}
+	queuedContent += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
+
+	queuedComponents := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: queuedContent})}
+	queuedTitle := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
+	queuedContainer := utils.BuildContainerWithComponents(ctx, customisation.Green, queuedTitle, queuedComponents)
+	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{queuedContainer}))
+}
+
+type GDPRConfirmExportUserHandler struct{}
+
+func (h *GDPRConfirmExportUserHandler) Matcher() matcher.Matcher {
+	return matcher.NewFuncMatcher(func(customId string) bool {
+		return strings.HasPrefix(customId, "gdpr_confirm_export_user_")
+	})
+}
+
+func (h *GDPRConfirmExportUserHandler) Properties() registry.Properties {
+	return registry.Properties{
+		Flags:   registry.SumFlags(registry.DMsAllowed),
+		Timeout: constants.TimeoutGDPR,
+	}
+}
+
+func (h *GDPRConfirmExportUserHandler) Execute(ctx *cmdcontext.ButtonContext) {
+	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
+
+	if !gdprrelay.IsWorkerAlive(redis.Client) {
+		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
+		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+		return
+	}
+
+	request := gdprrelay.GDPRRequest{
+		Type:               gdprrelay.RequestTypeExportUser,
+		UserId:             ctx.UserId(),
+		Language:           locale.IsoLongCode,
+		InteractionToken:   ctx.Interaction.Token,
+		InteractionGuildId: ctx.GuildId(),
+		ApplicationId:      ctx.Worker().BotId,
+	}
+
+	scrambledId := sha256.New()
+	fmt.Fprintf(scrambledId, "%d", ctx.UserId())
+	id, err := dbclient.Client.GdprLogs.InsertLog(fmt.Sprintf("%x", scrambledId.Sum(nil)), "ExportUser", "Queued")
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+		return
+	}
+
+	exportContent := i18n.GetMessage(locale, i18n.GdprQueuedExportUser)
+	exportContent += i18n.GetMessage(locale, i18n.GdprQueuedFooter)
+
+	exportComponents := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: exportContent})}
+	exportTitle := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
+	exportContainer := utils.BuildContainerWithComponents(ctx, customisation.Green, exportTitle, exportComponents)
+	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{exportContainer}))
+}
