@@ -171,21 +171,23 @@ func main() {
 
 		var wg sync.WaitGroup
 
+		hostname, _ := os.Hostname()
+
 		rpcClient, err := rpc.NewClient(
 			logger.With(zap.String("service", "rpc")),
 			rpc.Config{
-				Brokers:             config.Conf.Kafka.Brokers,
+				Redis:               redis.Client,
 				ConsumerGroup:       "worker",
-				ConsumerConcurrency: config.Conf.Kafka.GoroutineLimit,
+				ConsumerName:        hostname,
+				ConsumerConcurrency: config.Conf.Streams.GoroutineLimit,
+				MaxLen:              50000,
 			},
 			map[string]rpc.Listener{
-				// Listen for gateway events over Kafka
-				config.Conf.Kafka.EventsTopic: event.NewKafkaListener(
-					logger.With(zap.String("service", "gateway-events-kafka")),
+				"stream:gateway-events": event.NewEventListener(
+					logger.With(zap.String("service", "gateway-events")),
 					&pgCache,
 				),
-				// TODO: Don't hardcode
-				"tickets.rpc.categoryupdate": listeners.NewTicketStatusUpdater(&pgCache, logger),
+				"stream:rpc:categoryupdate": listeners.NewTicketStatusUpdater(&pgCache, logger),
 			})
 
 		if err != nil {
