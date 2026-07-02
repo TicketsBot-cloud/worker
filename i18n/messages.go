@@ -203,8 +203,9 @@ var (
 	MessageOpenCantMessageInThreads MessageId = "commands.open.threads.cant_message_in_threads"
 
 	MessageCloseRequested           MessageId = "commands.close_request.success"
-	MessageCloseRequestNoReason     MessageId = "commands.close_request.no_reason"
-	MessageCloseRequestWithReason   MessageId = "commands.close_request.with_reason"
+	MessageCloseRequestCloseAt      MessageId = "commands.close_request.close_at"
+	MessageCloseRequestIntro        MessageId = "commands.close_request.intro"
+	MessageCloseRequestPrompt       MessageId = "commands.close_request.prompt"
 	MessageCloseRequestNoPermission MessageId = "commands.close_request.no_permission"
 	MessageCloseRequestDenied       MessageId = "commands.close_request.denied"
 	MessageCloseRequestAccept       MessageId = "commands.close_request.accept"
