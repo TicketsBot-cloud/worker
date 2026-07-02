@@ -20,6 +20,7 @@ import (
 	"github.com/TicketsBot-cloud/common/workflowbus"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
+	"github.com/TicketsBot-cloud/worker/bot/integrationowners"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
@@ -182,6 +183,7 @@ func main() {
 	go messagequeue.ListenCloseReasonUpdate()
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
+	go integrationowners.StartCacheRefreshLoop(logger.With(zap.String("service", "integration_owner_refresh")))
 	go prometheus.StartProductMetricsLoop(logger.With(zap.String("service", "product_metrics")))
 
 	if config.Conf.WorkerMode == config.WorkerModeInteractions {
