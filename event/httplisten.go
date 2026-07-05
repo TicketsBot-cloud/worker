@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -271,11 +272,21 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 				return
 			}
 
-			ctx.JSON(200, interaction.NewResponseDeferredMessageUpdate())
+			var probe struct {
+				Message *stdjson.RawMessage `json:"message"`
+			}
+			_ = json.Unmarshal(payload.Event, &probe)
+			hasSourceMessage := probe.Message != nil
+
+			if hasSourceMessage {
+				ctx.JSON(200, interaction.NewResponseDeferredMessageUpdate())
+			} else {
+				ctx.JSON(200, interaction.NewResponseAckWithSource(message.SumFlags(message.FlagEphemeral)))
+			}
 			ctx.Writer.Flush()
 
 			responseCh := make(chan button.Response, 1)
-			btn_manager.HandleModalInteraction(ctx, buttonManager, worker, interactionData, responseCh)
+			btn_manager.HandleModalInteraction(ctx, buttonManager, worker, interactionData, responseCh, hasSourceMessage)
 
 			go handleButtonResponseAfterDefer(interactionData.InteractionMetadata, worker, time.Now(), responseCh)
 		}

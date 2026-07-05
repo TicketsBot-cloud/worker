@@ -35,6 +35,7 @@ func (OpenCommand) Properties() registry.Properties {
 			command.NewRequiredAutocompleteableArgument("panel", "The panel to open a ticket with", interaction.OptionTypeString, i18n.MessageInvalidArgument, OpenCommand{}.AutoCompleteHandler),
 		),
 		DefaultEphemeral: true,
+		DisableAutoDefer: true,
 		Timeout:          constants.TimeoutOpenTicket,
 	}
 }
