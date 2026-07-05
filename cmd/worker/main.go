@@ -180,7 +180,7 @@ func main() {
 				ConsumerGroup:       "worker",
 				ConsumerName:        hostname,
 				ConsumerConcurrency: config.Conf.Streams.GoroutineLimit,
-				MaxLen:              50000,
+				MaxLen:              int64(config.Conf.Streams.MaxLen),
 			},
 			map[string]rpc.Listener{
 				"stream:gateway-events": event.NewEventListener(
