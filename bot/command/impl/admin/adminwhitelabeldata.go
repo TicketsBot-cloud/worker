@@ -141,10 +141,24 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 		}),
 	}
 
-	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(utils.BuildContainerWithComponents(
-		ctx,
-		customisation.Green,
-		"Admin - Whitelabel Data",
-		innerComponents,
-	))))
+	components := []component.Component{
+		utils.BuildContainerWithComponents(ctx, customisation.Green, "Admin - Whitelabel Data", innerComponents),
+	}
+
+	if data.BotId != 0 {
+		components = append(components, component.BuildActionRow(
+			component.BuildButton(component.Button{
+				Label:    "Resync Bot",
+				Style:    component.ButtonStylePrimary,
+				CustomId: fmt.Sprintf("whitelabel_resync_%d", userId),
+			}),
+			component.BuildButton(component.Button{
+				Label:    "Re-create Slash Commands",
+				Style:    component.ButtonStyleSecondary,
+				CustomId: fmt.Sprintf("whitelabel_recreate_commands_%d", userId),
+			}),
+		))
+	}
+
+	ctx.ReplyWith(command.NewMessageResponseWithComponents(components))
 }
