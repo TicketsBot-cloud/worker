@@ -134,8 +134,6 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 	}
 
 	innerComponents := []component.Component{
-		component.BuildTextDisplay(component.TextDisplay{Content: "## Whitelabel"}),
-		component.BuildSeparator(component.Separator{}),
 		component.BuildTextDisplay(component.TextDisplay{
 			Content: tds,
 		}),
