@@ -145,12 +145,17 @@ func (h *UnclaimHandler) Execute(ctx *context.ButtonContext) {
 
 			switch claimSettings.SwitchPanelClaimBehavior {
 			case database.SwitchPanelKeepAccess:
-				overwrites = append(overwrites, channel.PermissionOverwrite{
-					Id:    whoClaimed,
-					Type:  channel.PermissionTypeMember,
-					Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
-					Deny:  0,
-				})
+				// Preserve the claimer's existing overwrite, falling back to the full set
+				if existing, ok := logic.FindMemberOverwrite(ch.PermissionOverwrites, whoClaimed); ok {
+					overwrites = append(overwrites, existing)
+				} else {
+					overwrites = append(overwrites, channel.PermissionOverwrite{
+						Id:    whoClaimed,
+						Type:  channel.PermissionTypeMember,
+						Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
+						Deny:  0,
+					})
+				}
 			case database.SwitchPanelRemoveOnUnclaim:
 				overwrites = append(overwrites, channel.PermissionOverwrite{
 					Id:    whoClaimed,

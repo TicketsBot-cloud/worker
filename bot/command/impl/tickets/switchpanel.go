@@ -292,15 +292,21 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 
-		// GenerateClaimedOverwrites returns nil if the permissions are the same as an unclaimed ticket
-		// so if this is the case, we still need to calculate permissions
+		// If nil, calculate the base permissions and pin the claimer at the user level
 		if overwrites == nil {
-			membersWithClaimer := append(members, claimer)
-			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, membersWithClaimer...)
+			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, members...)
 			if err != nil {
 				ctx.HandleError(err)
 				return
 			}
+
+			claimerOverwrite, err := logic.BuildClaimerOverwrite(ctx.Context, ctx.Worker(), ticket, claimer)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			overwrites = logic.UpsertMemberOverwrite(overwrites, claimerOverwrite)
 		}
 	}
 
