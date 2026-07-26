@@ -130,29 +130,15 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Ensure that the panel isn't disabled
 	span = sentry.StartSpan(rootSpan.Context(), "Check if panel is disabled")
-	if panel != nil && panel.ForceDisabled {
-		// Build premium command mention
-		var premiumCommand string
-		commands, err := command.LoadCommandIds(cmd.Worker(), cmd.Worker().BotId)
-		if err != nil {
-			sentry.Error(err)
-			return database.Ticket{}, err
-		}
-
-		if id, ok := commands["premium"]; ok {
-			premiumCommand = fmt.Sprintf("</premium:%d>", id)
-		} else {
-			premiumCommand = "`/premium`"
-		}
-
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelForceDisabled, premiumCommand)
-		return database.Ticket{}, nil
-	}
-
+	panelUnavailable, err := replyIfPanelUnavailable(cmd, panel)
 	span.Finish()
 
-	if panel != nil && panel.Disabled {
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelDisabled)
+	if err != nil {
+		sentry.Error(err)
+		return database.Ticket{}, err
+	}
+
+	if panelUnavailable {
 		return database.Ticket{}, nil
 	}
 
@@ -417,6 +403,11 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	// Variable to store welcome message ID for pinning later
 	var welcomeMessageId uint64
 
+	// The ping and the welcome message are sent from separate goroutines, so
+	// without a handoff whichever request finishes first lands first. Closed by
+	// the mention goroutine once there is nothing further it will post.
+	mentionsSent := make(chan struct{})
+
 	// Welcome message
 	group.Go(func() error {
 		span = sentry.StartSpan(rootSpan.Context(), "Fetch custom integration placeholders")
@@ -431,6 +422,10 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			cmd.HandleError(err)
 		}
 		span.Finish()
+
+		// Placeholder lookups above run in parallel with the ping; only the send
+		// itself has to wait, so the welcome message always ends up underneath.
+		<-mentionsSent
 
 		span = sentry.StartSpan(rootSpan.Context(), "Send welcome message")
 		msgId, err := SendWelcomeMessage(ctx, cmd, ticket, subject, panel, formData, additionalPlaceholders)
@@ -454,6 +449,10 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Send mentions
 	group.Go(func() error {
+		// Deferred so the welcome message is released on the error paths below
+		// and when there is nothing to ping, not just after a successful send.
+		defer close(mentionsSent)
+
 		span := sentry.StartSpan(rootSpan.Context(), "Load guild metadata from database")
 		metadata, err := dbclient.Client.GuildMetadata.Get(ctx, cmd.GuildId())
 		span.Finish()
@@ -533,7 +532,10 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		}
 
 		if content != "" {
-			content = fmt.Sprintf("-# ||%s||", content)
+			if panel == nil || panel.MentionBehaviour != "none" {
+				content = fmt.Sprintf("-# ||%s||", content)
+			}
+
 			if len(content) > 2000 {
 				content = content[:2000]
 			}
