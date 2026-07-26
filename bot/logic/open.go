@@ -130,29 +130,15 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Ensure that the panel isn't disabled
 	span = sentry.StartSpan(rootSpan.Context(), "Check if panel is disabled")
-	if panel != nil && panel.ForceDisabled {
-		// Build premium command mention
-		var premiumCommand string
-		commands, err := command.LoadCommandIds(cmd.Worker(), cmd.Worker().BotId)
-		if err != nil {
-			sentry.Error(err)
-			return database.Ticket{}, err
-		}
-
-		if id, ok := commands["premium"]; ok {
-			premiumCommand = fmt.Sprintf("</premium:%d>", id)
-		} else {
-			premiumCommand = "`/premium`"
-		}
-
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelForceDisabled, premiumCommand)
-		return database.Ticket{}, nil
-	}
-
+	panelUnavailable, err := replyIfPanelUnavailable(cmd, panel)
 	span.Finish()
 
-	if panel != nil && panel.Disabled {
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelDisabled)
+	if err != nil {
+		sentry.Error(err)
+		return database.Ticket{}, err
+	}
+
+	if panelUnavailable {
 		return database.Ticket{}, nil
 	}
 
