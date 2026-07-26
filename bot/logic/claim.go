@@ -104,7 +104,7 @@ func ClaimTicket(ctx context.Context, cmd registry.CommandContext, ticket databa
 // GenerateClaimedOverwrites If support reps can still view and type, returns (nil, nil)
 func GenerateClaimedOverwrites(ctx context.Context, worker *worker.Context, ticket database.Ticket, claimer uint64) ([]channel.PermissionOverwrite, error) {
 	// Get per-panel claim settings (SupportCanView/SupportCanType are on the panel)
-	supportCanView := true  // defaults
+	supportCanView := true // defaults
 	supportCanType := false
 
 	var additionalPermissions database.TicketPermissions

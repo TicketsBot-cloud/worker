@@ -49,7 +49,6 @@ func (c RemoveSupportCommand) Execute(ctx registry.CommandContext, id uint64) {
 		Inline: false,
 	}
 
-
 	mentionableType, valid := context.DetermineMentionableType(ctx, id)
 	if !valid {
 		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageRemoveSupportNoMembers, utils.ToSlice(usageEmbed))

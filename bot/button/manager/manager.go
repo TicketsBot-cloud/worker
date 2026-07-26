@@ -72,6 +72,8 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.GDPRConfirmAllMessagesHandler),
 		new(handlers.GDPRConfirmMessagesHandler),
 		new(handlers.JoinThreadHandler),
+		new(handlers.KBNavigationHandler),
+		new(handlers.KBCreateTicketHandler),
 		new(handlers.OpenSurveyHandler),
 		new(handlers.PanelHandler),
 		new(handlers.PremiumCheckAgain),
@@ -94,6 +96,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
+		new(handlers.KBCategorySelectHandler),
 		new(handlers.LanguageSelectorHandler),
 		new(handlers.MultiPanelHandler),
 		new(handlers.PremiumKeyOpenHandler),

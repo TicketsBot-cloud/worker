@@ -116,10 +116,15 @@ func (r *MessageResponse) IntoWebhookBody() rest.WebhookBody {
 
 func (r *MessageResponse) IntoWebhookEditBody() rest.WebhookEditBody {
 	data := rest.WebhookEditBody{
-		Content:         r.Content,
-		Embeds:          r.Embeds,
 		AllowedMentions: r.AllowedMentions,
 		Components:      r.Components,
+	}
+
+	// Components V2 messages cannot carry content or embeds. The V2 flag is sticky
+	// on the message once sent, so it does not need re-applying when editing.
+	if !r.isComponentsV2() {
+		data.Content = r.Content
+		data.Embeds = r.Embeds
 	}
 
 	// Discord API doesn't remove if null
@@ -131,11 +136,15 @@ func (r *MessageResponse) IntoWebhookEditBody() rest.WebhookEditBody {
 }
 
 func (r *MessageResponse) IntoUpdateMessageResponse() (res interaction.ResponseUpdateMessageData) {
-	if r.Content != "" {
-		res.Content = &r.Content
+	// Components V2 messages cannot carry content or embeds. The V2 flag is sticky
+	// on the message once sent, so it does not need re-applying when editing.
+	if !r.isComponentsV2() {
+		if r.Content != "" {
+			res.Content = &r.Content
+		}
+		res.Embeds = r.Embeds
 	}
 
-	res.Embeds = r.Embeds
 	res.Components = r.Components
 
 	// Discord API doesn't remove if null
@@ -144,6 +153,10 @@ func (r *MessageResponse) IntoUpdateMessageResponse() (res interaction.ResponseU
 	}
 
 	return
+}
+
+func (r *MessageResponse) isComponentsV2() bool {
+	return r.Flags&uint(message.FlagComponentsV2) != 0
 }
 
 func MessageIntoMessageResponse(msg message.Message) MessageResponse {

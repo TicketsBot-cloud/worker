@@ -34,7 +34,7 @@ var (
 
 	ForwardedDashboardMessages = newCounter("forwarded_dashboard_messages")
 
-	Events         = newCounterVec("events", "event_type")
+	Events          = newCounterVec("events", "event_type")
 	StreamBatchSize = newHistogram("stream_batch_size")
 	StreamMessages  = newHistogramVec("stream_messages", "stream")
 

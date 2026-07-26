@@ -58,6 +58,15 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 			return
 		}
 
+		// If the panel has linked knowledge base categories with published articles,
+		// show the deflection card first instead of opening immediately.
+		if deflected, err := tryPanelDeflection(ctx, panel); err != nil {
+			ctx.HandleError(err)
+			return
+		} else if deflected {
+			return
+		}
+
 		if panel.FormId == nil {
 			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
 		} else {

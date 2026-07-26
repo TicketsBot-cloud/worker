@@ -38,60 +38,78 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	if ok {
-		// TODO: Log this
-		if panel.GuildId != ctx.GuildId() {
-			return
-		}
-
-		// Validate panel access
-		canProceed, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, err := logic.ValidatePanelAccess(ctx, panel)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if !canProceed {
-			return
-		}
-
-		if panel.FormId == nil {
-			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
-		} else {
-			form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			if !ok {
-				ctx.HandleError(errors.New("Form not found"))
-				return
-			}
-
-			inputs, err := dbclient.Client.FormInput.GetInputs(ctx, form.Id)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			inputOptions, err := dbclient.Client.FormInputOption.GetOptionsByForm(ctx, form.Id)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
-
-			if len(inputs) == 0 { // Don't open a blank form
-				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
-			} else {
-				modal := buildForm(panel, form, inputs, inputOptions)
-				ctx.Modal(modal)
-			}
-		}
-
+	if !ok {
 		return
+	}
+
+	// TODO: Log this
+	if panel.GuildId != ctx.GuildId() {
+		return
+	}
+
+	// Validate panel access
+	canProceed, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, err := logic.ValidatePanelAccess(ctx, panel)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if !canProceed {
+		return
+	}
+
+	// If the panel has linked knowledge base categories with published articles, show
+	// the deflection card first instead of opening immediately.
+	if deflected, err := tryPanelDeflection(ctx, panel); err != nil {
+		ctx.HandleError(err)
+		return
+	} else if deflected {
+		return
+	}
+
+	openPanelOrForm(ctx, panel, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+}
+
+// openPanelOrForm either opens a ticket directly or, if the panel has a form,
+// shows the form modal (opening directly when the form has no inputs). Shared by the
+// normal panel click and the "Create ticket anyway" deflection button so both entry
+// points behave identically.
+func openPanelOrForm(ctx *context.ButtonContext, panel database.Panel, outOfHoursTitle, outOfHoursWarning *string, outOfHoursColour *int) {
+	if panel.FormId == nil {
+		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
+		return
+	}
+
+	form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if !ok {
+		ctx.HandleError(errors.New("Form not found"))
+		return
+	}
+
+	inputs, err := dbclient.Client.FormInput.GetInputs(ctx, form.Id)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	inputOptions, err := dbclient.Client.FormInputOption.GetOptionsByForm(ctx, form.Id)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
+
+	if len(inputs) == 0 { // Don't open a blank form
+		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
+	} else {
+		modal := buildForm(panel, form, inputs, inputOptions)
+		ctx.Modal(modal)
 	}
 }
 
