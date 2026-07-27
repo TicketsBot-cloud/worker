@@ -151,6 +151,7 @@ func main() {
 	integrations.InitIntegrations()
 
 	go messagequeue.ListenTicketClose()
+	go messagequeue.ListenTicketClaim()
 	go messagequeue.ListenAutoClose(logger.With(zap.String("service", "autoclose")))
 	go messagequeue.ListenCloseRequestTimer(logger.With(zap.String("service", "close-request-timer")))
 	go messagequeue.ListenCloseReasonUpdate()

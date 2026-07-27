@@ -878,7 +878,7 @@ func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int,
 	return nil
 }
 
-func CreateOverwrites(ctx context.Context, cmd registry.InteractionContext, userId uint64, panel *database.Panel, categoryId uint64, otherUsers ...uint64) ([]channel.PermissionOverwrite, error) {
+func CreateOverwrites(ctx context.Context, cmd registry.CommandContext, userId uint64, panel *database.Panel, categoryId uint64, otherUsers ...uint64) ([]channel.PermissionOverwrite, error) {
 	overwrites := []channel.PermissionOverwrite{ // @everyone
 		{
 			Id:    cmd.GuildId(),

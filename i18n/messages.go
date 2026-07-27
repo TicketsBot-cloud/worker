@@ -132,6 +132,7 @@ var (
 	MessageBlacklistRemoveRole MessageId = "commands.blacklist.remove_role.success"
 
 	MessageClaimed           MessageId = "commands.claim.success"
+	MessageAlreadyClaimed    MessageId = "commands.claim.already_claimed"
 	MessageClaimNoPermission MessageId = "commands.claim.no_permission"
 	MessageClaimThread       MessageId = "commands.claim.thread"
 
