@@ -61,7 +61,12 @@ func (h *WhitelabelResyncHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	if err := commonwl.ReapplyIntents(ctx, bot.Token); err != nil {
-		ctx.HandleError(err)
+		if commonwl.IsIntentsRejection(err) {
+			ctx.ReplyRaw(customisation.Red, "Error", commonwl.IntentsRejectedMessage)
+		} else {
+			ctx.HandleError(err)
+		}
+
 		return
 	}
 
