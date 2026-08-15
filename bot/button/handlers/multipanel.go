@@ -93,7 +93,7 @@ func (h *MultiPanelHandler) Execute(ctx *context.SelectMenuContext) {
 				return
 			}
 
-			FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
+			FetchApiOptions(ctx, form, panel, inputs, inputOptions)
 
 			if len(inputs) == 0 { // Don't open a blank form
 				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)

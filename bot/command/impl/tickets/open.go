@@ -146,7 +146,7 @@ func openWithPanel(ctx *cmdcontext.SlashCommandContext, panel database.Panel) {
 		return
 	}
 
-	handlers.FetchApiOptions(ctx, form.Id, ctx.UserId(), inputs, inputOptions)
+	handlers.FetchApiOptions(ctx, form, panel, inputs, inputOptions)
 
 	if len(inputs) == 0 {
 		logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourceCommand)

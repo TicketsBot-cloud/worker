@@ -126,7 +126,7 @@ func (h *OpenSurveyHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	FetchApiOptions(ctx, form.Id, ctx.UserId(), formInputs, inputOptions)
+	FetchApiOptions(ctx, form, panel, formInputs, inputOptions)
 
 	ctx.Modal(button.ResponseModal{
 		Data: interaction.ModalResponseData{
