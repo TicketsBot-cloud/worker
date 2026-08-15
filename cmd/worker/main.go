@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -12,15 +13,18 @@ import (
 
 	"cloud.google.com/go/profiler"
 	"github.com/TicketsBot-cloud/archiverclient"
+	"github.com/TicketsBot-cloud/common/featureflags"
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/observability"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/rpc"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/exposures"
 	"github.com/TicketsBot-cloud/worker/bot/integrationowners"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
 	"github.com/TicketsBot-cloud/worker/bot/listeners/messagequeue"
@@ -129,6 +133,41 @@ func main() {
 		[]byte(config.Conf.Archiver.AesKey),
 	)
 
+	logger.Info("Configuring feature flags")
+	utils.ExposureRecorder = featureflags.NewRecorder(
+		logger.With(zap.String("service", "feature_flag_exposures")),
+		featureflags.SinkFunc(func(ctx context.Context, exposures []featureflags.RecordedExposure) error {
+			rows := make([]database.ExperimentExposure, 0, len(exposures))
+			for _, exposure := range exposures {
+				rows = append(rows, database.ExperimentExposure{
+					ExperimentKey:  exposure.ExperimentKey,
+					VariationId:    exposure.VariationId,
+					IdentifierType: exposure.IdentifierType,
+					Identifier:     exposure.Identifier,
+					FeatureKey:     exposure.FeatureKey,
+					ExposedAt:      exposure.ExposedAt,
+				})
+			}
+
+			return dbclient.Client.ExperimentExposures.InsertBatch(ctx, rows)
+		}),
+		featureflags.NewRedisDeduper(redis.Client),
+		featureflags.RecorderConfig{},
+	)
+
+	// A GrowthBook outage must not stop the worker booting, so a failure here is
+	// logged and evaluation degrades to every flag off.
+	utils.FeatureFlags, err = featureflags.New(
+		context.Background(),
+		config.Conf.FeatureFlags,
+		logger.With(zap.String("service", "feature_flags")),
+		redis.Client,
+		utils.ExposureRecorder,
+	)
+	if err != nil {
+		logger.Error("Failed to configure feature flags, all flags will evaluate to off", zap.Error(err))
+	}
+
 	logger.Info("Starting Prometheus server")
 	prometheus.StartServer(config.Conf.Prometheus.Address)
 	logger.Info("Started Prometheus server")
@@ -159,6 +198,8 @@ func main() {
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
 	go integrationowners.StartCacheRefreshLoop(logger.With(zap.String("service", "integration_owner_refresh")))
 	go prometheus.StartProductMetricsLoop(logger.With(zap.String("service", "product_metrics")))
+	go prometheus.StartFeatureFlagMetricsLoop(logger.With(zap.String("service", "feature_flag_metrics")))
+	go exposures.StartRetentionLoop(logger.With(zap.String("service", "exposure_retention")))
 
 	if config.Conf.WorkerMode == config.WorkerModeInteractions {
 		logger.Info("Starting HTTP server", zap.String("mode", string(config.Conf.WorkerMode)))
@@ -214,6 +255,18 @@ func main() {
 			logger.Info("Shutdown completed gracefully")
 		} else {
 			logger.Warn("Graceful shutdown timed out, exiting now")
+		}
+
+		// Flush queued exposures before exit, otherwise a rolling restart silently
+		// discards whatever each pod had accepted but not yet written.
+		if err := utils.FeatureFlags.Close(); err != nil {
+			logger.Warn("Failed to close feature flag client", zap.Error(err))
+		}
+
+		if utils.ExposureRecorder != nil {
+			if err := utils.ExposureRecorder.Close(); err != nil {
+				logger.Warn("Failed to flush exposure recorder", zap.Error(err))
+			}
 		}
 
 		// Flush any buffered sentry events before exit

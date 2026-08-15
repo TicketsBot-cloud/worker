@@ -3,6 +3,7 @@ package config
 import (
 	"time"
 
+	"github.com/TicketsBot-cloud/common/featureflags"
 	"github.com/caarlos0/env/v10"
 	"github.com/google/uuid"
 	"go.uber.org/zap/zapcore"
@@ -92,6 +93,15 @@ type (
 		Prometheus struct {
 			Address string `env:"PROMETHEUS_SERVER_ADDR"`
 		}
+
+		// FeatureFlags carries its own fully qualified GROWTHBOOK_* env tags, so
+		// it needs no envPrefix here. Leaving it unset disables flag evaluation
+		// rather than failing startup.
+		FeatureFlags featureflags.Config
+
+		// ExperimentExposureRetention bounds the growth of experiment_exposures.
+		// Zero or negative disables the purge. Default is 90 days.
+		ExperimentExposureRetention time.Duration `env:"EXPERIMENT_EXPOSURE_RETENTION" envDefault:"2160h"`
 
 		Statsd struct {
 			Address string `env:"ADDR"`
