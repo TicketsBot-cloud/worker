@@ -95,6 +95,7 @@ var (
 	MessageOpenPanelCooldown             MessageId = "open.panel_cooldown"
 	MessageOpenPanelForceDisabled        MessageId = "open.panel_force_disabled"
 	MessageOpenPanelDisabled             MessageId = "open.panel_disabled"
+	MessageOpenFeatureUnavailable        MessageId = "open.feature_unavailable"
 	MessageOutsideSupportHoursTitle      MessageId = "open.outside_support_hours.title"
 	MessageOutsideSupportHours           MessageId = "open.outside_support_hours.message"
 	MessageTicketOpened                  MessageId = "open.success"

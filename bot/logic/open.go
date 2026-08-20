@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/TicketsBot-cloud/common/featureflags"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -37,6 +38,17 @@ import (
 )
 
 func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *database.Panel, subject string, formData map[database.FormInput]string, outOfHoursTitle *string, outOfHoursWarning *string, outOfHoursColour *int, source database.TicketSource) (database.Ticket, error) {
+	// Kill switch: lets us lock down ticket creation for every guild without a
+	// deploy if an already-published panel/multipanel/form turns out to be
+	// exploitable (e.g. a cross-guild channel misconfiguration). Rejecting here,
+	// rather than only in the dashboard, is what actually stops a live exploit,
+	// since existing panel buttons in Discord are unaffected by the dashboard-side
+	// guard on panel create/update.
+	if !utils.FeatureFlags.IsEnabled(ctx, "202608_FEATURE_TICKETS", featureflags.ForGuild(cmd.GuildId())) {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenFeatureUnavailable)
+		return database.Ticket{}, nil
+	}
+
 	rootSpan := sentry.StartSpan(ctx, "Ticket open")
 	rootSpan.SetTag("guild", strconv.FormatUint(cmd.GuildId(), 10))
 	defer rootSpan.Finish()
