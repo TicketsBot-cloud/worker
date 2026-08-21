@@ -443,7 +443,11 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		return strconv.Itoa(ticket.Id)
 	},
 	"channel": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
-		return fmt.Sprintf("<#%d>", ticket.ChannelId)
+		if ticket.ChannelId == nil {
+			return ""
+		}
+
+		return fmt.Sprintf("<#%d>", *ticket.ChannelId)
 	},
 	"username": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		user, _ := worker.GetUser(ticket.UserId)
