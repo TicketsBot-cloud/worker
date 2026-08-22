@@ -158,6 +158,27 @@ func DoPlaceholderSubstitutions(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) string {
+	return doPlaceholderSubstitutions(ctx, message, worker, ticket, additionalPlaceholders, false)
+}
+
+func DoPlainTextPlaceholderSubstitutions(
+	ctx context.Context,
+	message string,
+	worker *worker.Context,
+	ticket database.Ticket,
+	additionalPlaceholders map[string]string,
+) string {
+	return doPlaceholderSubstitutions(ctx, message, worker, ticket, additionalPlaceholders, true)
+}
+
+func doPlaceholderSubstitutions(
+	ctx context.Context,
+	message string,
+	worker *worker.Context,
+	ticket database.Ticket,
+	additionalPlaceholders map[string]string,
+	plainTextOnly bool,
+) string {
 	// Handle escaped placeholders first: \%...\% -> temporary marker
 	escapedPlaceholderRegex := regexp.MustCompile(`\\%([a-z_]+(?::[^%\\]+)?)\\%`)
 	escapedPlaceholders := make(map[string]string)
@@ -172,7 +193,7 @@ func DoPlaceholderSubstitutions(
 	})
 
 	// Process parameterized placeholders first (e.g., %date_days:30%)
-	message = doParameterizedSubstitutions(ctx, message, worker, ticket)
+	message = doParameterizedSubstitutions(ctx, message, worker, ticket, plainTextOnly)
 
 	var lock sync.Mutex
 
@@ -181,6 +202,12 @@ func DoPlaceholderSubstitutions(
 	for placeholder, f := range substitutions {
 		placeholder := placeholder
 		f := f
+
+		if plainTextOnly {
+			if _, isMarkup := markupPlaceholders[placeholder]; isMarkup {
+				continue
+			}
+		}
 
 		formatted := fmt.Sprintf("%%%s%%", placeholder)
 
@@ -400,6 +427,7 @@ func doParameterizedSubstitutions(
 	message string,
 	worker *worker.Context,
 	ticket database.Ticket,
+	plainTextOnly bool,
 ) string {
 	// Find all parameterized placeholder matches
 	matches := parameterizedPlaceholderRegex.FindAllStringSubmatchIndex(message, -1)
@@ -418,6 +446,12 @@ func doParameterizedSubstitutions(
 			continue
 		}
 
+		if plainTextOnly {
+			if _, isMarkup := markupPlaceholders[placeholderName]; isMarkup {
+				continue
+			}
+		}
+
 		// Extract parameters
 		paramString := message[match[4]:match[5]]
 		params := strings.Split(paramString, ":")
@@ -430,6 +464,24 @@ func doParameterizedSubstitutions(
 	}
 
 	return message
+}
+
+const AvatarUrlPlaceholder = "%avatar_url%"
+
+const defaultAvatarUrl = "https://cdn.discordapp.com/embed/avatars/0.png"
+
+var markupPlaceholders = map[string]struct{}{
+	"user":                          {},
+	"channel":                       {},
+	"time":                          {},
+	"date":                          {},
+	"datetime":                      {},
+	"discord_account_creation_date": {},
+	"discord_account_age":           {},
+	"date_days":                     {},
+	"date_weeks":                    {},
+	"date_months":                   {},
+	"date_timestamp":                {},
 }
 
 var substitutions = map[string]PlaceholderSubstitutionFunc{
@@ -641,6 +693,22 @@ func getFormDataFields(formData map[database.FormInput]string) []embed.EmbedFiel
 	return fields
 }
 
+const (
+	embedTitleLimit      = 256
+	embedAuthorNameLimit = 256
+	embedFooterTextLimit = 2048
+	embedFieldNameLimit  = 256
+)
+
+func truncateRunes(s string, limit int) string {
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+
+	return string(runes[:limit])
+}
+
 func BuildCustomEmbed(
 	ctx context.Context, worker *worker.Context,
 	ticket database.Ticket,
@@ -650,15 +718,30 @@ func BuildCustomEmbed(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) *embed.Embed {
-	description := utils.ValueOrZero(customEmbed.Description)
-	if ticket.Id != 0 {
-		description = DoPlaceholderSubstitutions(ctx, description, worker, ticket, additionalPlaceholders)
+	substitute := func(s string) string {
+		if ticket.Id == 0 {
+			return s
+		}
+
+		return DoPlaceholderSubstitutions(ctx, s, worker, ticket, additionalPlaceholders)
+	}
+
+	resolveAvatarUrl := func(url string) string {
+		return replaceAvatarPlaceholder(worker, ticket, url)
+	}
+
+	plainTextSubstitute := func(s string, limit int) string {
+		if ticket.Id == 0 {
+			return s
+		}
+
+		return truncateRunes(DoPlainTextPlaceholderSubstitutions(ctx, s, worker, ticket, additionalPlaceholders), limit)
 	}
 
 	e := &embed.Embed{
-		Title:       utils.ValueOrZero(customEmbed.Title),
-		Description: description,
-		Url:         utils.ValueOrZero(customEmbed.Url),
+		Title:       plainTextSubstitute(utils.ValueOrZero(customEmbed.Title), embedTitleLimit),
+		Description: substitute(utils.ValueOrZero(customEmbed.Description)),
+		Url:         resolveAvatarUrl(utils.ValueOrZero(customEmbed.Url)),
 		Timestamp:   customEmbed.Timestamp,
 		Color:       int(customEmbed.Colour),
 	}
@@ -666,43 +749,54 @@ func BuildCustomEmbed(
 	if branding {
 		e.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 	} else if customEmbed.FooterText != nil {
-		e.SetFooter(*customEmbed.FooterText, utils.ValueOrZero(customEmbed.FooterIconUrl))
+		e.SetFooter(
+			plainTextSubstitute(*customEmbed.FooterText, embedFooterTextLimit),
+			resolveAvatarUrl(utils.ValueOrZero(customEmbed.FooterIconUrl)),
+		)
 	}
 
-	if customEmbed.ImageUrl != nil {
-		imageUrl := replaceImagePlaceholder(worker, ticket, *customEmbed.ImageUrl)
+	if imageUrl := resolveAvatarUrl(utils.ValueOrZero(customEmbed.ImageUrl)); imageUrl != "" {
 		e.SetImage(imageUrl)
 	}
 
-	if customEmbed.ThumbnailUrl != nil {
-		imageUrl := replaceImagePlaceholder(worker, ticket, *customEmbed.ThumbnailUrl)
-		e.SetThumbnail(imageUrl)
+	if thumbnailUrl := resolveAvatarUrl(utils.ValueOrZero(customEmbed.ThumbnailUrl)); thumbnailUrl != "" {
+		e.SetThumbnail(thumbnailUrl)
 	}
 
 	if customEmbed.AuthorName != nil {
-		e.SetAuthor(*customEmbed.AuthorName, utils.ValueOrZero(customEmbed.AuthorUrl), utils.ValueOrZero(customEmbed.AuthorIconUrl))
+		if authorName := plainTextSubstitute(*customEmbed.AuthorName, embedAuthorNameLimit); authorName != "" {
+			e.SetAuthor(
+				authorName,
+				resolveAvatarUrl(utils.ValueOrZero(customEmbed.AuthorUrl)),
+				resolveAvatarUrl(utils.ValueOrZero(customEmbed.AuthorIconUrl)),
+			)
+		}
 	}
 
 	for _, field := range fields {
-		value := field.Value
-		if ticket.Id != 0 {
-			value = DoPlaceholderSubstitutions(ctx, value, worker, ticket, additionalPlaceholders)
+		name := plainTextSubstitute(field.Name, embedFieldNameLimit)
+		if name == "" {
+			name = truncateRunes(field.Name, embedFieldNameLimit)
 		}
 
-		e.AddField(field.Name, value, field.Inline)
+		e.AddField(name, substitute(field.Value), field.Inline)
 	}
 
 	return e
 }
 
-func replaceImagePlaceholder(worker *worker.Context, ticket database.Ticket, imageUrl string) string {
-	if imageUrl != "%avatar_url%" {
-		return imageUrl
+func replaceAvatarPlaceholder(worker *worker.Context, ticket database.Ticket, url string) string {
+	if url != AvatarUrlPlaceholder {
+		return url
+	}
+
+	if ticket.UserId == 0 {
+		return defaultAvatarUrl
 	}
 
 	user, err := worker.GetUser(ticket.UserId)
 	if err != nil {
-		return ""
+		return defaultAvatarUrl
 	}
 
 	return user.AvatarUrl(256)
