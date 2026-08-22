@@ -133,17 +133,17 @@ func callCommand(
 
 		v.Execute(ctx, arg0)
 	case admin.AdminRecacheCommand:
-		var arg0 *string
+		var arg0 string
 
 		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
 		if !ok0 {
-			arg0 = nil
+			return ErrArgumentNotFound
 		} else {
 			argValue, ok := opt0.Value.(string)
 			if !ok {
 				return fmt.Errorf("option %s was not a string", opt0.Name)
 			}
-			arg0 = &argValue
+			arg0 = argValue
 		}
 
 		v.Execute(ctx, arg0)
