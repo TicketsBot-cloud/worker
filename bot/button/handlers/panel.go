@@ -118,7 +118,7 @@ func buildFormComponents(inputs []database.FormInput, inputOptions map[int][]dat
 	for i, input := range inputs {
 		var minLength, maxLength *int
 		var minLength32, maxLength32 *uint32
-		if input.MinLength != nil && *input.MinLength > 0 {
+		if input.MinLength != nil && (*input.MinLength > 0 || !input.Required) {
 			minLength = utils.Ptr(int(*input.MinLength))
 			minLength32 = utils.Ptr(uint32(*input.MinLength))
 		}
