@@ -28,7 +28,7 @@ func (AdminRecacheCommand) Properties() registry.Properties {
 		Category:        command.Settings,
 		HelperOnly:      true,
 		Arguments: command.Arguments(
-			command.NewOptionalArgument("guildid", "ID of the guild to recache", interaction.OptionTypeString, i18n.MessageInvalidArgument),
+			command.NewRequiredArgument("guild_id", "ID of the guild to recache", interaction.OptionTypeString, i18n.MessageInvalidArgument),
 		),
 		Timeout: time.Second * 10,
 	}
@@ -38,17 +38,11 @@ func (c AdminRecacheCommand) GetExecutor() interface{} {
 	return c.Execute
 }
 
-func (AdminRecacheCommand) Execute(ctx registry.CommandContext, providedGuildId *string) {
-	var guildId uint64
-	if providedGuildId != nil {
-		var err error
-		guildId, err = strconv.ParseUint(*providedGuildId, 10, 64)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-	} else {
-		guildId = ctx.GuildId()
+func (AdminRecacheCommand) Execute(ctx registry.CommandContext, guildIdRaw string) {
+	guildId, err := strconv.ParseUint(guildIdRaw, 10, 64)
+	if err != nil {
+		ctx.ReplyRaw(customisation.Red, ctx.GetMessage(i18n.Error), "Invalid guild ID provided")
+		return
 	}
 
 	if onCooldown, cooldownTime := redis.GetRecacheCooldown(guildId); onCooldown {

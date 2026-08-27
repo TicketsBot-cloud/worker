@@ -64,14 +64,14 @@ func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoC
 			panelId = ticket.PanelId
 		}
 
-		reasons, err = dbclient.Analytics.GetTopCloseReasons(ctx, data.GuildId.Value, panelId)
+		reasons, err = dbclient.Client.CloseReason.GetTopCloseReasons(ctx, data.GuildId.Value, panelId, 10)
 	} else {
 		var panelId *int
 		if ticket.Id != 0 {
 			panelId = ticket.PanelId
 		}
 
-		reasons, err = dbclient.Analytics.GetTopCloseReasonsContaining(ctx, data.GuildId.Value, panelId, value)
+		reasons, err = dbclient.Client.CloseReason.GetTopCloseReasonsContaining(ctx, data.GuildId.Value, panelId, value, 10)
 	}
 
 	if err != nil {

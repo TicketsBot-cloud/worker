@@ -5,8 +5,8 @@ import (
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/general"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/kb"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings"
-	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings/setup"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/statistics"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tags"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tickets"
@@ -45,10 +45,12 @@ func (cm *CommandManager) RegisterCommands() {
 	cm.registry["removeadmin"] = settings.RemoveAdminCommand{}
 	cm.registry["removesupport"] = settings.RemoveSupportCommand{}
 	cm.registry["premium"] = settings.PremiumCommand{}
-	cm.registry["setup"] = setup.SetupCommand{}
+	cm.registry["setup"] = settings.SetupCommand{}
 	cm.registry["viewstaff"] = settings.ViewStaffCommand{}
 
 	cm.registry["stats"] = statistics.StatsCommand{}
+
+	cm.registry["kb"] = kb.KBCommand{}
 
 	cm.registry["managetags"] = tags.ManageTagsCommand{}
 	cm.registry["tag"] = tags.TagCommand{}

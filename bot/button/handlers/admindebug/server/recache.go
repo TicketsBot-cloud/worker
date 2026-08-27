@@ -35,7 +35,7 @@ func (h *AdminDebugServerRecacheHandler) Properties() registry.Properties {
 }
 
 func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
-	if !utils.IsBotHelper(ctx.UserId()) {
+	if !utils.IsBotHelper(ctx, ctx.UserId()) {
 		ctx.ReplyRaw(customisation.Red, "Error", "You do not have permission to use this button.")
 	}
 

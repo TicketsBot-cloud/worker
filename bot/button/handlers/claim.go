@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -56,6 +57,12 @@ func (h *ClaimHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	if err := logic.ClaimTicket(ctx.Context, ctx, ticket, ctx.UserId()); err != nil {
+		var alreadyClaimed logic.AlreadyClaimedError
+		if errors.As(err, &alreadyClaimed) {
+			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageAlreadyClaimed, fmt.Sprintf("<@%d>", alreadyClaimed.ClaimerId))
+			return
+		}
+
 		ctx.HandleError(err)
 		return
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/config"
 )
 
-func HandleModalInteraction(ctx context.Context, manager *ComponentInteractionManager, worker *worker.Context, data interaction.ModalSubmitInteraction, responseCh chan button.Response) bool {
+func HandleModalInteraction(ctx context.Context, manager *ComponentInteractionManager, worker *worker.Context, data interaction.ModalSubmitInteraction, responseCh chan button.Response, hasSourceMessage bool) bool {
 	// Safety checks
 	if data.GuildId.Value != 0 && data.Member == nil {
 		return false
@@ -48,7 +48,7 @@ func HandleModalInteraction(ctx context.Context, manager *ComponentInteractionMa
 
 	ctx, cancel := context.WithTimeout(ctx, handler.Properties().Timeout)
 
-	cc := cmdcontext.NewModalContext(ctx, worker, data, premiumTier, responseCh)
+	cc := cmdcontext.NewModalContext(ctx, worker, data, premiumTier, responseCh, hasSourceMessage)
 	shouldExecute, canEdit := doPropertiesChecks(lookupCtx, data.GuildId.Value, cc, handler.Properties())
 	if shouldExecute {
 		go func() {

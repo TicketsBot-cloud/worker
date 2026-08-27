@@ -216,12 +216,7 @@ func buildPanelSettings(ctx *context.ModalContext, selectedPanel *database.Panel
 	}
 	settings = append(settings, fmt.Sprintf("**Status:** `%s`", status))
 
-	// Delete mentions
-	deleteMentions := "Disabled"
-	if selectedPanel.DeleteMentions {
-		deleteMentions = "Enabled"
-	}
-	settings = append(settings, fmt.Sprintf("**Delete Mentions:** `%s`", deleteMentions))
+	settings = append(settings, fmt.Sprintf("**Mention Behaviour:** `%s`", selectedPanel.MentionBehaviour))
 
 	return strings.Join(settings, "\n")
 }

@@ -81,17 +81,6 @@ func (h *ExitSurveySubmitHandler) Execute(cmd *cmdcontext.ModalContext) {
 		return
 	}
 
-	feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, guildId)
-	if err != nil {
-		cmd.HandleError(err)
-		return
-	}
-
-	if !feedbackEnabled {
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageFeedbackDisabled)
-		return
-	}
-
 	if ticket.PanelId == nil {
 		cmd.ReplyRaw(customisation.Red, "Error", "The survey is no longer available for this ticket.") // TODO: i18n
 		return
@@ -105,6 +94,11 @@ func (h *ExitSurveySubmitHandler) Execute(cmd *cmdcontext.ModalContext) {
 
 	if panel.GuildId != guildId || panel.PanelId != *ticket.PanelId {
 		cmd.HandleError(fmt.Errorf("panel not found"))
+		return
+	}
+
+	if !panel.FeedbackEnabled {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageFeedbackDisabled)
 		return
 	}
 
@@ -161,10 +155,15 @@ func (h *ExitSurveySubmitHandler) Execute(cmd *cmdcontext.ModalContext) {
 }
 
 func addViewFeedbackButton(ctx context.Context, cmd *cmdcontext.ModalContext, ticket database.Ticket) error {
-	// Get archive message
-	settings, err := cmd.Settings()
-	if err != nil {
-		return err
+	var storeTranscripts bool
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			return err
+		}
+		if p.PanelId != 0 {
+			storeTranscripts = p.StoreTranscripts
+		}
 	}
 
 	closeMetadata, ok, err := dbclient.Client.CloseReason.Get(ctx, ticket.GuildId, ticket.Id)
@@ -191,5 +190,5 @@ func addViewFeedbackButton(ctx context.Context, cmd *cmdcontext.ModalContext, ti
 		return fmt.Errorf("exit survey was completed, but no rating was found (%d:%d)", ticket.GuildId, ticket.Id)
 	}
 
-	return logic.EditGuildArchiveMessageIfExists(ctx, cmd.Worker(), ticket, settings, true, closedBy, reason, &rating)
+	return logic.EditGuildArchiveMessageIfExists(ctx, cmd.Worker(), ticket, storeTranscripts, true, closedBy, reason, &rating)
 }

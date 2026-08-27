@@ -48,12 +48,6 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 		Inline: false,
 	}
 
-	settings, err := ctx.Settings()
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	mentionableType, valid := context.DetermineMentionableType(ctx, id)
 	if !valid {
 		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageRemoveAdminNoMembers, utils.ToSlice(usageEmbed))
@@ -113,12 +107,11 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 		utils.BuildEmbed(ctx, customisation.Green, i18n.TitleRemoveAdmin, i18n.MessageRemoveAdminSuccess, nil, mention),
 	))
 
-	// Remove user / role from thread notification channel
-	if settings.TicketNotificationChannel != nil {
+	// Remove user / role from each panel's thread notification channel
+	{
 		member, err := ctx.Member()
 		auditReason := "Removed admin member/role"
 
-		// Get the name of the user/role being removed
 		var targetName string
 		if mentionableType == context.MentionableTypeUser {
 			if targetMember, err := ctx.Worker().GetGuildMember(ctx.GuildId(), id); err == nil {
@@ -141,12 +134,24 @@ func (c RemoveAdminCommand) Execute(ctx registry.CommandContext, id uint64) {
 			auditReason = fmt.Sprintf("Removed admin member/role by %s", member.User.Username)
 		}
 
-		reasonCtx := request.WithAuditReason(ctx, auditReason)
-		_ = ctx.Worker().EditChannelPermissions(reasonCtx, *settings.TicketNotificationChannel, channel.PermissionOverwrite{
-			Id:    id,
-			Type:  mentionableType.OverwriteType(),
-			Allow: 0,
-			Deny:  permission.BuildPermissions(permission.ViewChannel),
-		})
+		panels, _ := dbclient.Client.Panel.GetByGuild(ctx, ctx.GuildId())
+		seen := make(map[uint64]struct{})
+		for _, p := range panels {
+			if p.TicketNotificationChannel == nil {
+				continue
+			}
+			chId := *p.TicketNotificationChannel
+			if _, already := seen[chId]; already {
+				continue
+			}
+			seen[chId] = struct{}{}
+			reasonCtx := request.WithAuditReason(ctx, auditReason)
+			_ = ctx.Worker().EditChannelPermissions(reasonCtx, chId, channel.PermissionOverwrite{
+				Id:    id,
+				Type:  mentionableType.OverwriteType(),
+				Allow: 0,
+				Deny:  permission.BuildPermissions(permission.ViewChannel),
+			})
+		}
 	}
 }

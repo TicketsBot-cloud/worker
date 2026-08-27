@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -12,15 +13,19 @@ import (
 
 	"cloud.google.com/go/profiler"
 	"github.com/TicketsBot-cloud/archiverclient"
+	"github.com/TicketsBot-cloud/common/featureflags"
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/observability"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/rpc"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/exposures"
+	"github.com/TicketsBot-cloud/worker/bot/integrationowners"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
 	"github.com/TicketsBot-cloud/worker/bot/listeners/messagequeue"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
@@ -106,10 +111,6 @@ func main() {
 	cache.Client = &pgCache
 	logger.Info("Connected to cache")
 
-	logger.Info("Connecting to clickhouse")
-	dbclient.ConnectAnalytics(logger.With(zap.String("service", "clickhouse")))
-	logger.Info("Connected to clickhouse")
-
 	// Configure HTTP proxy
 	if config.Conf.Discord.ProxyUrl != "" {
 		logger.Info("Configuring REST proxy", zap.String("url", config.Conf.Discord.ProxyUrl))
@@ -131,6 +132,68 @@ func main() {
 		archiverclient.NewProxyRetriever(config.Conf.Archiver.Url),
 		[]byte(config.Conf.Archiver.AesKey),
 	)
+
+	logger.Info("Configuring feature flags")
+	utils.ExposureRecorder = featureflags.NewRecorder(
+		logger.With(zap.String("service", "feature_flag_exposures")),
+		featureflags.SinkFunc(func(ctx context.Context, exposures []featureflags.RecordedExposure) error {
+			rows := make([]database.ExperimentExposure, 0, len(exposures))
+			for _, exposure := range exposures {
+				rows = append(rows, database.ExperimentExposure{
+					ExperimentKey:  exposure.ExperimentKey,
+					VariationId:    exposure.VariationId,
+					IdentifierType: exposure.IdentifierType,
+					Identifier:     exposure.Identifier,
+					FeatureKey:     exposure.FeatureKey,
+					ExposedAt:      exposure.ExposedAt,
+				})
+			}
+
+			return dbclient.Client.ExperimentExposures.InsertBatch(ctx, rows)
+		}),
+		featureflags.NewRedisDeduper(redis.Client),
+		featureflags.RecorderConfig{},
+	)
+
+	// A GrowthBook outage must not stop the worker booting, so a failure here is
+	// logged. New only errors on genuine misconfiguration (not on GrowthBook
+	// simply being unreachable, which it retries in the background). A nil
+	// utils.FeatureFlags evaluates every flag as enabled, which is correct when
+	// GrowthBook was never configured at all, but wrong when it was configured
+	// and construction still failed - that deployment intended to use
+	// GrowthBook, so it must keep failing closed like an unreachable backend
+	// does, not fail open.
+	utils.FeatureFlags, err = featureflags.New(
+		context.Background(),
+		config.Conf.FeatureFlags,
+		logger.With(zap.String("service", "feature_flags")),
+		redis.Client,
+		utils.ExposureRecorder,
+	)
+	if err != nil {
+		logger.Error("Failed to configure feature flags", zap.Error(err))
+
+		if config.Conf.FeatureFlags.Attempted() {
+			// Some GrowthBook configuration was supplied and New still failed, so
+			// this is not the self-hosted "no GrowthBook at all" case - that
+			// includes a partial config (only one of ApiHost/ClientKey set), which
+			// New now rejects as an error rather than silently falling through to
+			// unconfigured. Using Attempted rather than Enabled here matters: Enabled
+			// is false for a partial config too, and gating on it would route this
+			// exact failure back to the fail-open default. Build a fail-closed
+			// client with an empty ruleset instead of leaving utils.FeatureFlags
+			// nil, which would otherwise evaluate every flag, including kill
+			// switches, as enabled.
+			utils.FeatureFlags, err = featureflags.NewOffline(context.Background(), logger, "{}", utils.ExposureRecorder)
+			if err != nil {
+				logger.Error("Failed to build fail-closed feature flags fallback, every flag will evaluate to enabled", zap.Error(err))
+			} else {
+				logger.Warn("Feature flags falling back to a fail-closed client: every flag evaluates to off until this is fixed")
+			}
+		} else {
+			logger.Warn("Feature flags unavailable with GrowthBook not configured: every flag evaluates to enabled")
+		}
+	}
 
 	logger.Info("Starting Prometheus server")
 	prometheus.StartServer(config.Conf.Prometheus.Address)
@@ -154,11 +217,16 @@ func main() {
 	integrations.InitIntegrations()
 
 	go messagequeue.ListenTicketClose()
+	go messagequeue.ListenTicketClaim()
 	go messagequeue.ListenAutoClose(logger.With(zap.String("service", "autoclose")))
 	go messagequeue.ListenCloseRequestTimer(logger.With(zap.String("service", "close-request-timer")))
 	go messagequeue.ListenCloseReasonUpdate()
 
 	go blacklist.StartCacheRefreshLoop(logger.With(zap.String("service", "blacklist_refresh")))
+	go integrationowners.StartCacheRefreshLoop(logger.With(zap.String("service", "integration_owner_refresh")))
+	go prometheus.StartProductMetricsLoop(logger.With(zap.String("service", "product_metrics")))
+	go prometheus.StartFeatureFlagMetricsLoop(logger.With(zap.String("service", "feature_flag_metrics")))
+	go exposures.StartRetentionLoop(logger.With(zap.String("service", "exposure_retention")))
 
 	if config.Conf.WorkerMode == config.WorkerModeInteractions {
 		logger.Info("Starting HTTP server", zap.String("mode", string(config.Conf.WorkerMode)))
@@ -195,6 +263,8 @@ func main() {
 			return
 		}
 
+		go messagequeue.StartCategoryUpdatePublisher(rpcClient, logger.With(zap.String("service", "category-update-publisher")))
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -212,6 +282,18 @@ func main() {
 			logger.Info("Shutdown completed gracefully")
 		} else {
 			logger.Warn("Graceful shutdown timed out, exiting now")
+		}
+
+		// Flush queued exposures before exit, otherwise a rolling restart silently
+		// discards whatever each pod had accepted but not yet written.
+		if err := utils.FeatureFlags.Close(); err != nil {
+			logger.Warn("Failed to close feature flag client", zap.Error(err))
+		}
+
+		if utils.ExposureRecorder != nil {
+			if err := utils.ExposureRecorder.Close(); err != nil {
+				logger.Warn("Failed to flush exposure recorder", zap.Error(err))
+			}
 		}
 
 		// Flush any buffered sentry events before exit

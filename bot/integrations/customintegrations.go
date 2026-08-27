@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	blacklistedHeaders        = []string{"user-agent", "x-real-ip", "cache-control", "content-type", "content-length", "expect", "max-forwards", "pragma", "range", "te", "if-match", "if-none-match", "if-modified-since", "if-unmodified-since", "if-range", "accept", "from", "referer"}
+	blacklistedHeaders        = []string{"user-agent", "x-real-ip", "cache-control", "content-type", "content-length", "expect", "max-forwards", "pragma", "range", "te", "if-match", "if-none-match", "if-modified-since", "if-unmodified-since", "if-range", "accept", "from", "referer", "host", "authorization", "cookie", "set-cookie", "connection", "transfer-encoding", "upgrade", "proxy-authorization"}
 	blacklistedHeaderPrefixes = []string{
 		"x-forwarded-",
 		"x-proxy-",
@@ -58,7 +58,7 @@ func Fetch(
 	// Apply headers
 	headerMap := make(map[string]string)
 	for _, header := range headers {
-		if isHeaderBlacklisted(header.Name) {
+		if IsHeaderBlacklisted(header.Name) {
 			continue
 		}
 
@@ -139,7 +139,7 @@ outer:
 	return parsed
 }
 
-func isHeaderBlacklisted(name string) bool {
+func IsHeaderBlacklisted(name string) bool {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, " ", "")
 

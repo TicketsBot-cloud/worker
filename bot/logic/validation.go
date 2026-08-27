@@ -15,6 +15,38 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
+// replyIfPanelUnavailable reports whether the panel is switched off, replying with
+// the reason when it is. OpenTicket repeats this check as a last line of defence;
+// doing it here too means a form-backed panel is rejected on click, rather than
+// after the user has filled the modal in.
+func replyIfPanelUnavailable(cmd registry.InteractionContext, panel *database.Panel) (bool, error) {
+	if panel == nil {
+		return false, nil
+	}
+
+	if panel.ForceDisabled {
+		commands, err := command.LoadCommandIds(cmd.Worker(), cmd.Worker().BotId)
+		if err != nil {
+			return true, err
+		}
+
+		premiumCommand := "`/premium`"
+		if id, ok := commands["premium"]; ok {
+			premiumCommand = fmt.Sprintf("</premium:%d>", id)
+		}
+
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelForceDisabled, premiumCommand)
+		return true, nil
+	}
+
+	if panel.Disabled {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenPanelDisabled)
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // ValidatePanelAccess checks if the user can access the given panel.
 // Returns (canProceed, outOfHoursWarningTitle, outOfHoursWarning, outOfHoursColour, error).
 // outOfHoursWarning is non-nil when the panel is outside support hours but the behaviour is allow_with_warning.
@@ -24,6 +56,16 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 	var outOfHoursWarningTitle *string
 	var outOfHoursWarningMessage *string
 	var outOfHoursWarningColour *int
+
+	// Check the panel is switched on before anything else
+	unavailable, err := replyIfPanelUnavailable(ctx, &panel)
+	if err != nil {
+		return false, nil, nil, nil, err
+	}
+
+	if unavailable {
+		return false, nil, nil, nil, nil
+	}
 
 	// Check support hours
 	hasSupportHours, err := dbclient.Client.PanelSupportHours.HasSupportHours(ctx, panel.PanelId)

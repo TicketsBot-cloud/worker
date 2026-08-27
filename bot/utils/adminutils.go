@@ -1,29 +1,39 @@
 package utils
 
 import (
+	"context"
+
+	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/config"
 )
 
-func IsBotAdmin(id uint64) bool {
-	for _, admin := range config.Conf.Bot.Admins {
-		if admin == id {
-			return true
-		}
-	}
-
-	return false
+func IsBotOwner(id uint64) bool {
+	return config.Conf.Bot.Owner != 0 && config.Conf.Bot.Owner == id
 }
 
-func IsBotHelper(id uint64) bool {
-	if IsBotAdmin(id) {
+func IsBotAdmin(ctx context.Context, id uint64) bool {
+	if IsBotOwner(id) {
 		return true
 	}
 
-	for _, helper := range config.Conf.Bot.Helpers {
-		if helper == id {
-			return true
-		}
+	tier, err := dbclient.Client.BotStaff.GetTier(ctx, id)
+	if err != nil {
+		return false
 	}
 
-	return false
+	return tier == database.BotStaffTierAdmin
+}
+
+func IsBotHelper(ctx context.Context, id uint64) bool {
+	if IsBotOwner(id) {
+		return true
+	}
+
+	tier, err := dbclient.Client.BotStaff.GetTier(ctx, id)
+	if err != nil {
+		return false
+	}
+
+	return tier != ""
 }

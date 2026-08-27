@@ -1,15 +1,8 @@
 package tickets
 
 import (
-	"fmt"
-
 	"github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
-	discordpermission "github.com/TicketsBot-cloud/gdl/permission"
-	"github.com/TicketsBot-cloud/gdl/rest"
-	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
@@ -81,118 +74,8 @@ func (UnclaimCommand) Execute(ctx *context.SlashCommandContext) {
 		return
 	}
 
-	// Set to unclaimed in DB
-	if err := dbclient.Client.TicketClaims.Delete(ctx, ctx.GuildId(), ticket.Id); err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	// get panel
-	var panel *database.Panel
-	if ticket.PanelId != nil {
-		var derefPanel database.Panel
-		derefPanel, err = dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-
-		if derefPanel.PanelId != 0 {
-			panel = &derefPanel
-		}
-	}
-
-	// Use the actual ticket channel ID, not the current channel (which might be a notes thread)
-	ticketChannelId := *ticket.ChannelId
-
-	// Get the channel to determine its parent category
-	ch, err := ctx.Worker().GetChannel(ticketChannelId)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	overwrites, err := logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, panel, ch.ParentId.Value)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	// Handle claimer access based on SwitchPanelClaimBehavior setting
-	claimSettings, err := dbclient.Client.ClaimSettings.Get(ctx, ctx.GuildId())
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	if claimSettings.SwitchPanelClaimBehavior == database.SwitchPanelKeepAccess ||
-		claimSettings.SwitchPanelClaimBehavior == database.SwitchPanelRemoveOnUnclaim {
-
-		claimerHasAccess, err := logic.HasPermissionForPanel(ctx.Context, ctx.Worker(), ctx.GuildId(), panel, whoClaimed)
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
-		if !claimerHasAccess {
-			filteredOverwrites := make([]channel.PermissionOverwrite, 0, len(overwrites))
-			for _, ow := range overwrites {
-				if ow.Id != whoClaimed || ow.Type != channel.PermissionTypeMember {
-					filteredOverwrites = append(filteredOverwrites, ow)
-				}
-			}
-			overwrites = filteredOverwrites
-
-			switch claimSettings.SwitchPanelClaimBehavior {
-			case database.SwitchPanelKeepAccess:
-				// Preserve the claimer's existing overwrite, falling back to the full set
-				if existing, ok := logic.FindMemberOverwrite(ch.PermissionOverwrites, whoClaimed); ok {
-					overwrites = append(overwrites, existing)
-				} else {
-					overwrites = append(overwrites, channel.PermissionOverwrite{
-						Id:    whoClaimed,
-						Type:  channel.PermissionTypeMember,
-						Allow: discordpermission.BuildPermissions(logic.StandardPermissions[:]...),
-						Deny:  0,
-					})
-				}
-			case database.SwitchPanelRemoveOnUnclaim:
-				overwrites = append(overwrites, channel.PermissionOverwrite{
-					Id:    whoClaimed,
-					Type:  channel.PermissionTypeMember,
-					Allow: 0,
-					Deny:  discordpermission.BuildPermissions(discordpermission.ViewChannel),
-				})
-			}
-		}
-	}
-
-	// Generate new channel name
-	newChannelName, err := logic.GenerateChannelName(ctx.Context, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	// Always update the name to match the new panel's naming scheme
-	shouldUpdateName := true
-	claimedChannelName, _ := logic.GenerateChannelName(ctx.Context, ctx.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, &whoClaimed)
-	if ch.Name != claimedChannelName {
-		shouldUpdateName = false
-	}
-
-	// Update channel
-	data := rest.ModifyChannelData{
-		PermissionOverwrites: overwrites,
-	}
-	if shouldUpdateName {
-		data.Name = newChannelName
-	}
-
-	member, err := ctx.Member()
-	auditReason := fmt.Sprintf("Unclaimed ticket %d", ticket.Id)
-	if err == nil {
-		auditReason = fmt.Sprintf("Unclaimed ticket %d by %s", ticket.Id, member.User.Username)
-	}
-
-	reasonCtx := request.WithAuditReason(ctx, auditReason)
-	if _, err := ctx.Worker().ModifyChannel(reasonCtx, ticketChannelId, data); err != nil {
+	// Unclaim the ticket
+	if err := logic.UnclaimTicket(ctx.Context, ctx, ticket, whoClaimed); err != nil {
 		ctx.HandleError(err)
 		return
 	}

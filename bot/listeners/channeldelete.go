@@ -28,10 +28,4 @@ func OnChannelDelete(worker *worker.Context, e events.ChannelDelete) {
 		sentry.Error(err)
 	}
 
-	// if this is an archive channel, delete it
-	if err := sentry.WithSpan1(ctx, "Delete archive channel by channel", func(span *sentry.Span) error {
-		return dbclient.Client.ArchiveChannel.DeleteByChannel(ctx, e.Id)
-	}); err != nil {
-		sentry.Error(err)
-	}
 }

@@ -62,10 +62,17 @@ func ListenCloseReasonUpdate() {
 				closedBy = *closeMetadata.ClosedBy
 			}
 
-			settings, err := dbclient.Client.Settings.Get(ctx, payload.GuildId)
-			if err != nil {
-				sentry.Error(err)
-				return
+			var storeTranscripts, feedbackEnabled bool
+			if ticket.PanelId != nil {
+				p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+				if err != nil {
+					sentry.Error(err)
+					return
+				}
+				if p.PanelId != 0 {
+					storeTranscripts = p.StoreTranscripts
+					feedbackEnabled = p.FeedbackEnabled
+				}
 			}
 
 			var rating *uint8
@@ -79,11 +86,11 @@ func ListenCloseReasonUpdate() {
 				return
 			}
 
-			if err := logic.EditGuildArchiveMessageIfExists(ctx, workerCtx, ticket, settings, hasFeedback, closedBy, closeMetadata.Reason, rating); err != nil {
+			if err := logic.EditGuildArchiveMessageIfExists(ctx, workerCtx, ticket, storeTranscripts, hasFeedback, closedBy, closeMetadata.Reason, rating); err != nil {
 				sentry.Error(err)
 			}
 
-			if err := logic.EditDMMessageIfExists(ctx, workerCtx, ticket, settings, closedBy, closeMetadata.Reason, rating); err != nil {
+			if err := logic.EditDMMessageIfExists(ctx, workerCtx, ticket, storeTranscripts, feedbackEnabled, closedBy, closeMetadata.Reason, rating); err != nil {
 				sentry.Error(err)
 			}
 		}()
