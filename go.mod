@@ -15,8 +15,8 @@ replace github.com/TicketsBot-cloud/common => ../common
 require (
 	cloud.google.com/go/profiler v0.4.2
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20251015181023-f0b66a074704
-	github.com/TicketsBot-cloud/common v0.0.0-20260620182815-55fda9a14c01
-	github.com/TicketsBot-cloud/database v0.0.0-20260423165031-495c2e8a5bc7
+	github.com/TicketsBot-cloud/common v0.0.0-20260827064609-69131fc7bd3e
+	github.com/TicketsBot-cloud/database v0.0.0-20260827064551-53077b598c5f
 	github.com/TicketsBot-cloud/gdl v0.0.0-20260426095953-999472e6e538
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
@@ -35,11 +35,11 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/atomic v1.11.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
-	golang.org/x/net v0.52.0
-	golang.org/x/sync v0.20.0
-	golang.org/x/tools v0.43.0
+	golang.org/x/net v0.57.0
+	golang.org/x/sync v0.22.0
+	golang.org/x/tools v0.48.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 )
 
@@ -128,12 +128,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.17.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/mod v0.34.0 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/term v0.42.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.232.0 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
