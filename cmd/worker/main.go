@@ -10,6 +10,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"cloud.google.com/go/profiler"
 	"github.com/TicketsBot-cloud/archiverclient"
