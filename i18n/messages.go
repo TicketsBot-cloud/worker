@@ -377,7 +377,6 @@ var (
 	MessageKbNoArticlesFound    MessageId = "commands.kb.no_articles_found"
 	MessageKbSearchResults      MessageId = "commands.kb.search_results"
 	MessageKbSelectCategory     MessageId = "commands.kb.select_category"
-	MessageKbArticleSent        MessageId = "commands.kb.article_sent"
 	MessageKbArticleNotFound    MessageId = "commands.kb.article_not_found"
 	MessageKbNoCategories       MessageId = "commands.kb.no_categories"
 	MessageKbSuggestTitle       MessageId = "commands.kb.suggest_title"
