@@ -14,7 +14,7 @@ import (
 func BuildContainer(ctx registry.CommandContext, colour customisation.Colour, titleId, contentId i18n.MessageId, format ...any) component.Component {
 	var (
 		title   = ctx.GetMessage(titleId)
-		content = ctx.GetMessage(contentId, format)
+		content = ctx.GetMessage(contentId, format...)
 	)
 
 	return BuildContainerWithComponents(ctx, colour, title, Slice(component.BuildTextDisplay(component.TextDisplay{
