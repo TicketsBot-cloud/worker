@@ -12,9 +12,13 @@ import (
 )
 
 const (
-	categoryUpdateTopic    = "tickets.rpc.categoryupdate"
-	categoryUpdateDelay    = 30 * time.Second
-	categoryUpdateInterval = 10 * time.Second
+	CategoryUpdateStream = "stream:rpc:categoryupdate"
+
+	categoryUpdateDelay    = 10 * time.Minute
+	categoryUpdateInterval = time.Minute
+
+	// Separate from the interval: the queue read is destructive, so expiring mid-publish drops rows.
+	categoryUpdateTimeout = 5 * time.Minute
 )
 
 func StartCategoryUpdatePublisher(client *rpc.Client, logger *zap.Logger) {
@@ -28,7 +32,7 @@ func StartCategoryUpdatePublisher(client *rpc.Client, logger *zap.Logger) {
 }
 
 func publishReadyCategoryUpdates(client *rpc.Client, logger *zap.Logger) {
-	ctx, cancel := context.WithTimeout(context.Background(), categoryUpdateInterval)
+	ctx, cancel := context.WithTimeout(context.Background(), categoryUpdateTimeout)
 	defer cancel()
 
 	items, err := dbclient.Client.CategoryUpdateQueue.GetReadyForUpdate(ctx, categoryUpdateDelay)
@@ -53,7 +57,7 @@ func publishReadyCategoryUpdates(client *rpc.Client, logger *zap.Logger) {
 			continue
 		}
 
-		if err := client.ProduceSyncJson(ctx, categoryUpdateTopic, rpcmodel.TicketStatusUpdate{
+		if err := client.ProduceSyncJson(ctx, CategoryUpdateStream, rpcmodel.TicketStatusUpdate{
 			Ticket: rpcmodel.Ticket{
 				GuildId: item.GuildId,
 				Id:      item.TicketId,

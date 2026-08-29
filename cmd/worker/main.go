@@ -255,7 +255,7 @@ func main() {
 					logger.With(zap.String("service", "gateway-events")),
 					&pgCache,
 				),
-				"stream:rpc:categoryupdate": listeners.NewTicketStatusUpdater(&pgCache, logger),
+				messagequeue.CategoryUpdateStream: listeners.NewTicketStatusUpdater(&pgCache, logger),
 			})
 
 		if err != nil {
