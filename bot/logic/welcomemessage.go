@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
@@ -145,7 +146,7 @@ func BuildWelcomeMessageEmbed(
 			return nil, err
 		}
 
-		e := BuildCustomEmbed(ctx, cmd.Worker(), ticket, data, fields, cmd.PremiumTier() == premium.None, additionalPlaceholders)
+		e := BuildCustomEmbed(ctx, cmd.Worker(), ticket, data, fields, FooterPolicyForContext(ctx, cmd), additionalPlaceholders)
 		return e, nil
 	}
 }
@@ -709,12 +710,31 @@ func truncateRunes(s string, limit int) string {
 	return string(runes[:limit])
 }
 
+type FooterPolicy struct {
+	ShowBranding bool
+	AllowCustom  bool
+}
+
+func FooterPolicyForContext(ctx context.Context, cmd registry.CommandContext) FooterPolicy {
+	if cmd.PremiumTier() == premium.None {
+		return FooterPolicy{ShowBranding: true}
+	}
+
+	_, source, err := utils.PremiumClient.GetTierByGuildIdWithSource(ctx, cmd.GuildId(), cmd.Worker().Token, cmd.Worker().RateLimiter)
+	if err != nil {
+		sentry.Error(err)
+		return FooterPolicy{AllowCustom: true}
+	}
+
+	return FooterPolicy{AllowCustom: source != model.EntitlementSourceVoting}
+}
+
 func BuildCustomEmbed(
 	ctx context.Context, worker *worker.Context,
 	ticket database.Ticket,
 	customEmbed database.CustomEmbed,
 	fields []database.EmbedField,
-	branding bool,
+	footer FooterPolicy,
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) *embed.Embed {
@@ -746,9 +766,9 @@ func BuildCustomEmbed(
 		Color:       int(customEmbed.Colour),
 	}
 
-	if branding {
+	if footer.ShowBranding {
 		e.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
-	} else if customEmbed.FooterText != nil {
+	} else if footer.AllowCustom && customEmbed.FooterText != nil {
 		e.SetFooter(
 			plainTextSubstitute(*customEmbed.FooterText, embedFooterTextLimit),
 			resolveAvatarUrl(utils.ValueOrZero(customEmbed.FooterIconUrl)),

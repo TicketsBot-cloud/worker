@@ -91,7 +91,7 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 	var embeds []*embed.Embed
 	if tag.Embed != nil {
 		embeds = []*embed.Embed{
-			logic.BuildCustomEmbed(ctx, ctx.Worker(), ticket, *tag.Embed.CustomEmbed, tag.Embed.Fields, false, nil),
+			logic.BuildCustomEmbed(ctx, ctx.Worker(), ticket, *tag.Embed.CustomEmbed, tag.Embed.Fields, logic.FooterPolicy{AllowCustom: true}, nil),
 		}
 	}
 
