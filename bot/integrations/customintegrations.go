@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	blacklistedHeaders        = []string{"user-agent", "x-real-ip", "cache-control", "content-type", "content-length", "expect", "max-forwards", "pragma", "range", "te", "if-match", "if-none-match", "if-modified-since", "if-unmodified-since", "if-range", "accept", "from", "referer", "host", "authorization", "cookie", "set-cookie", "connection", "transfer-encoding", "upgrade", "proxy-authorization"}
+	blacklistedHeaders        = []string{"user-agent", "x-real-ip", "cache-control", "content-type", "content-length", "expect", "max-forwards", "pragma", "range", "te", "if-match", "if-none-match", "if-modified-since", "if-unmodified-since", "if-range", "accept", "from", "referer", "host", "connection", "transfer-encoding", "upgrade"}
 	blacklistedHeaderPrefixes = []string{
 		"x-forwarded-",
 		"x-proxy-",
