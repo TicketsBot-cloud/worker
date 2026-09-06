@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -10,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/featureflags"
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -40,6 +43,10 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
+	if panel != nil && panel.WelcomeMessageUsesComponentsV2 && utils.FeatureFlags.IsEnabled(ctx, "202608_COMPONENTS_V2_BUILDER", featureflags.ForGuild(ticket.GuildId)) {
+		return sendWelcomeMessageV2(ctx, cmd, ticket, panel, formData, additionalPlaceholders)
+	}
+
 	// Build embeds
 	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
@@ -120,6 +127,152 @@ func SendWelcomeMessage(
 	}
 
 	return msg.Id, nil
+}
+
+const (
+	componentsV2MaxTopLevel = 10
+	componentsV2MaxTotal    = 30
+)
+
+// sendWelcomeMessageV2 sends a welcome message built from a panel's Components V2 tree,
+// rather than the classic embed-based welcome message.
+func sendWelcomeMessageV2(
+	ctx context.Context,
+	cmd registry.CommandContext,
+	ticket database.Ticket,
+	panel *database.Panel,
+	formData map[database.FormInput]string,
+	// Only custom integration placeholders for now - prevent making duplicate requests
+	additionalPlaceholders map[string]string,
+) (uint64, error) {
+	if ticket.ChannelId == nil {
+		return 0, fmt.Errorf("channel is nil")
+	}
+
+	if panel.WelcomeMessageComponents == nil {
+		return 0, fmt.Errorf("panel %d has components v2 welcome message enabled but no components stored", panel.PanelId)
+	}
+
+	var tree []component.Component
+	if err := json.Unmarshal([]byte(*panel.WelcomeMessageComponents), &tree); err != nil {
+		return 0, fmt.Errorf("unmarshal welcome message components: %w", err)
+	}
+
+	var buttons []component.Component
+	if !panel.HideCloseButton {
+		buttons = append(buttons, component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleClose),
+			CustomId: "close",
+			Style:    component.ButtonStyleDanger,
+			Emoji:    &emoji.Emoji{Name: "🔒"},
+		}))
+	}
+
+	if !panel.HideCloseWithReasonButton {
+		buttons = append(buttons, component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleCloseWithReason),
+			CustomId: "close_with_reason",
+			Style:    component.ButtonStyleDanger,
+			Emoji:    &emoji.Emoji{Name: "🔒"},
+		}))
+	}
+
+	if !panel.HideClaimButton && !ticket.IsThread {
+		buttons = append(buttons, component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleClaim),
+			CustomId: "claim",
+			Style:    component.ButtonStyleSuccess,
+			Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+		}))
+	}
+
+	// Work out how much of Discord's 10 top-level / 30 total component budget is
+	// left over for form-answer content, after the panel's own tree and the button
+	// row. This can only be known at send time, since the panel's tree is opaque
+	// JSON authored in the dashboard.
+	usedTopLevel := len(tree)
+	usedTotal := countComponents(tree)
+	if len(buttons) > 0 {
+		usedTopLevel++                // the action row itself
+		usedTotal += 1 + len(buttons) // the action row plus its buttons
+	}
+
+	budget := componentsV2MaxTopLevel - usedTopLevel
+	if remaining := componentsV2MaxTotal - usedTotal; remaining < budget {
+		budget = remaining
+	}
+
+	fields := getFormDataFields(formData)
+
+	var formComponents []component.Component
+	truncated := false
+	for _, field := range fields {
+		if budget <= 0 {
+			truncated = true
+			break
+		}
+
+		formComponents = append(formComponents, component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("**%s**\n%s", field.Name, utils.EscapeMarkdown(field.Value)),
+		}))
+		budget--
+	}
+
+	if truncated {
+		sentry.Log("welcome message v2: form answers truncated, component budget exceeded", map[string]interface{}{
+			"guild_id":  ticket.GuildId,
+			"ticket_id": ticket.Id,
+			"panel_id":  panel.PanelId,
+		})
+	}
+
+	finalTree := make([]component.Component, 0, len(tree)+len(formComponents)+1)
+	finalTree = append(finalTree, tree...)
+	finalTree = append(finalTree, formComponents...)
+	if len(buttons) > 0 {
+		finalTree = append(finalTree, component.BuildActionRow(buttons...))
+	}
+
+	// formComponents' TextDisplay content is attacker-controlled (the ticket-opener's own
+	// form answers), and unlike embed fields, Components V2 text content is parsed for
+	// mentions. AllowedMentions is left as its zero value deliberately: CreateMessageData
+	// has no `omitempty` on that field, so it is always sent as an explicit empty object
+	// (`{"replied_user":false}`, no "parse"/"roles"/"users"), which Discord treats as
+	// suppressing every mention type - the same protection tag.go/closerequest.go apply
+	// explicitly elsewhere in this codebase for other user-controlled message content.
+	data := rest.CreateMessageData{
+		Flags:      message.SumFlags(message.FlagComponentsV2),
+		Components: finalTree,
+	}
+
+	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
+	if err != nil {
+		return 0, err
+	}
+
+	return msg.Id, nil
+}
+
+// countComponents recursively counts a component tree, including components nested
+// within action rows, containers and sections, to approximate Discord's 30-component
+// total limit.
+func countComponents(components []component.Component) int {
+	count := len(components)
+	for _, c := range components {
+		switch data := c.ComponentData.(type) {
+		case component.ActionRow:
+			count += countComponents(data.Components)
+		case component.Container:
+			count += countComponents(data.Components)
+		case component.Section:
+			count += countComponents(data.Components)
+			if data.Accessory.ComponentData != nil {
+				count++
+			}
+		}
+	}
+
+	return count
 }
 
 func BuildWelcomeMessageEmbed(
