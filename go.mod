@@ -2,7 +2,7 @@ module github.com/TicketsBot-cloud/worker
 
 go 1.25.0
 
-// replace github.com/TicketsBot-cloud/database => ../database
+replace github.com/TicketsBot-cloud/database => ../database
 
 // replace github.com/TicketsBot-cloud/common => ../common
 

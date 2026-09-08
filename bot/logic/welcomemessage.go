@@ -531,13 +531,29 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		return strconv.Itoa(tickets)
 	},
 	"ticket_limit": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
+		var panelLimit uint8
 		if ticket.PanelId != nil {
 			panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
-			if err == nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
-				return strconv.Itoa(int(*panel.TicketLimit))
+			if err == nil && panel.TicketLimit != nil {
+				panelLimit = *panel.TicketLimit
 			}
 		}
-		return "5"
+
+		guildLimit := database.DefaultTicketLimit
+		if settings, err := dbclient.Client.Settings.Get(ctx, ticket.GuildId); err == nil {
+			guildLimit = settings.TicketLimit
+		}
+
+		effective := guildLimit
+		if panelLimit > 0 && (effective == 0 || panelLimit < effective) {
+			effective = panelLimit
+		}
+
+		if effective == 0 {
+			return "unlimited"
+		}
+
+		return strconv.Itoa(int(effective))
 	},
 	"rating_count": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
 		ctx, cancel := context.WithTimeout(context.Background(), substitutionTimeout)

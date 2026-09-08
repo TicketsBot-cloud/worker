@@ -65,6 +65,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		var isBlacklisted bool
 		var totalTickets int
 		var openTickets int
+		var ticketLimit uint8
 
 		group, _ := errgroup.WithContext(ctx)
 
@@ -97,6 +98,19 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			return err
 		})
 
+		group.Go(func() (err error) {
+			span := sentry.StartSpan(span.Context(), "TicketLimit")
+			defer span.Finish()
+
+			settings, err := dbclient.Client.Settings.Get(ctx, ctx.GuildId())
+			if err != nil {
+				return err
+			}
+
+			ticketLimit = settings.TicketLimit
+			return nil
+		})
+
 		if err := group.Wait(); err != nil {
 			ctx.HandleError(err)
 			return
@@ -109,7 +123,7 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 			fmt.Sprintf("**Permission Level**: Regular"),
 			fmt.Sprintf("**Is Blacklisted**: %s", strconv.FormatBool(isBlacklisted)),
 			fmt.Sprintf("**Total Tickets**: %d", totalTickets),
-			fmt.Sprintf("**Open Tickets**: %d", openTickets),
+			fmt.Sprintf("**Open Tickets**: %s", formatOpenTickets(openTickets, ticketLimit)),
 		}
 
 		var topSection []component.Component
@@ -389,4 +403,12 @@ func (StatsUserCommand) Execute(ctx registry.CommandContext, userId uint64) {
 
 		span.Finish()
 	}
+}
+
+func formatOpenTickets(openTickets int, ticketLimit uint8) string {
+	if ticketLimit == 0 {
+		return strconv.Itoa(openTickets)
+	}
+
+	return fmt.Sprintf("%d / %d", openTickets, ticketLimit)
 }
