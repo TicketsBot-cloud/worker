@@ -69,7 +69,13 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 		}
 
 		if openTicketCount >= int(ticketLimit) {
-			cmd.Reply(customisation.Green, i18n.Error, i18n.MessageTicketLimitReached)
+			// TODO: Use translation of tickets
+			ticketsPluralised := "ticket"
+			if ticketLimit > 1 {
+				ticketsPluralised += "s"
+			}
+
+			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageTicketLimitReached, ticketLimit, ticketsPluralised)
 			return
 		}
 	}
