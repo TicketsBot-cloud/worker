@@ -130,6 +130,7 @@ func BuildCloseEmbed(
 	closedBy uint64,
 	reason *string,
 	rating *uint8,
+	panel *database.Panel,
 	components [][]CloseEmbedElement,
 ) (*embed.Embed, []component.Component) {
 	var formattedReason string
@@ -162,9 +163,14 @@ func BuildCloseEmbed(
 		colour = customisation.Green.Default()
 	}
 
+	panelName := "No Panel Title"
+	if panel != nil {
+		panelName = panel.Title
+	}
+
 	// TODO: Translate titles
 	closeEmbed := embed.NewEmbed().
-		SetTitle("Ticket Closed").
+		SetTitle(fmt.Sprintf("Ticket Closed from: <%s>", panelName)).
 		SetColor(colour).
 		AddField(formatTitle("Ticket ID", customisation.EmojiId, worker.IsWhitelabel), strconv.Itoa(ticket.Id), true).
 		AddField(formatTitle("Opened By", customisation.EmojiOpen, worker.IsWhitelabel), fmt.Sprintf("<@%d>", ticket.UserId), true).
