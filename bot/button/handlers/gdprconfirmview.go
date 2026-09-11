@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -114,15 +113,4 @@ func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRCo
 	}
 
 	return []component.Component{container}
-}
-
-func buildAllMessagesConfirmationComponents(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, userId uint64) []component.Component {
-	data := GDPRConfirmationData{
-		RequestType:     GDPRAllMessages,
-		UserId:          userId,
-		Locale:          locale,
-		ConfirmButtonId: fmt.Sprintf("gdpr_confirm_all_messages_%s", locale.IsoShortCode),
-	}
-
-	return buildGDPRConfirmationView(ctx, locale, data)
 }

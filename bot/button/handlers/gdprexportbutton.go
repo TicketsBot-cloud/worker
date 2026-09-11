@@ -18,8 +18,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-// GDPRExportGuildHandler handles the "Export Guild Data" button click.
-// Shows a guild selection modal (same pattern as transcript deletion).
 type GDPRExportGuildHandler struct{}
 
 func (h *GDPRExportGuildHandler) Matcher() matcher.Matcher {
@@ -76,10 +74,11 @@ func buildExportGuildModal(locale *i18n.Locale, guilds []guildInfo) interaction.
 			component.BuildLabel(component.Label{
 				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
 				Component: component.BuildSelectMenu(component.SelectMenu{
-					CustomId:  "server_ids",
-					MinValues: &minVal,
-					MaxValues: &maxVal,
-					Options:   options,
+					CustomId:    "server_ids",
+					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
+					MinValues:   &minVal,
+					MaxValues:   &maxVal,
+					Options:     options,
 				}),
 			}),
 		},
@@ -88,7 +87,7 @@ func buildExportGuildModal(locale *i18n.Locale, guilds []guildInfo) interaction.
 
 func buildExportGuildTextModal(locale *i18n.Locale) interaction.ModalResponseData {
 	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_export_guild_%s", locale.IsoShortCode),
+		CustomId: fmt.Sprintf("gdpr_modal_export_guild_text_%s", locale.IsoShortCode),
 		Title:    i18n.GetMessage(locale, i18n.GdprModalExportGuildTitle),
 		Components: []component.Component{
 			component.BuildLabel(component.Label{
@@ -106,8 +105,7 @@ func buildExportGuildTextModal(locale *i18n.Locale) interaction.ModalResponseDat
 	}
 }
 
-// GDPRExportUserHandler handles the "Export My Data" button click.
-// Skips guild selection and goes directly to confirmation.
+// Skips guild selection and goes straight to confirmation.
 type GDPRExportUserHandler struct{}
 
 func (h *GDPRExportUserHandler) Matcher() matcher.Matcher {
@@ -137,5 +135,7 @@ func (h *GDPRExportUserHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	}
 
 	components := buildGDPRConfirmationView(ctx, locale, data)
-	ctx.Edit(command.NewMessageResponseWithComponents(components))
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
+		ctx.HandleError(err)
+	}
 }
