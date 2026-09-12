@@ -29,6 +29,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/integrationowners"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
 	"github.com/TicketsBot-cloud/worker/bot/listeners/messagequeue"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
@@ -65,6 +66,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	logging.Logger = logger
 
 	if len(config.Conf.DebugMode) == 0 {
 		logger.Info("Connecting to sentry")

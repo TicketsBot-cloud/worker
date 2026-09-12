@@ -22,6 +22,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
@@ -133,7 +134,7 @@ func (r *Replyable) HandleError(err error) {
 		fmt.Printf("ctx.HandleError: %s\n", err.Error())
 	}
 
-	eventId := sentry.ErrorWithContext(err, r.ctx.ToErrorContext())
+	eventId := logging.ErrorWithContext(err, r.ctx.ToErrorContext())
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return
@@ -151,7 +152,7 @@ func (r *Replyable) HandleError(err error) {
 }
 
 func (r *Replyable) HandleWarning(err error) {
-	eventId := sentry.LogWithContext(err, r.ctx.ToErrorContext())
+	eventId := logging.WarnWithContext(err, r.ctx.ToErrorContext())
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return

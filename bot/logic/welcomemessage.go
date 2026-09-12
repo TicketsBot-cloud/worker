@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -22,10 +23,13 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -247,15 +251,20 @@ func doPlaceholderSubstitutions(
 	return message
 }
 
+type integrationPlaceholderResult struct {
+	Placeholders map[string]string
+	UserErrors   []string // messages an integration explicitly asked to show the ticket opener
+}
+
 func fetchCustomIntegrationPlaceholders(
 	ctx context.Context,
 	ticket database.Ticket,
 	formAnswers map[string]*string,
-) (map[string]string, error) {
+) (integrationPlaceholderResult, error) {
 	// Custom integrations
 	guildIntegrations, err := dbclient.Client.CustomIntegrationGuilds.GetGuildIntegrations(ctx, ticket.GuildId)
 	if err != nil {
-		return nil, err
+		return integrationPlaceholderResult{}, err
 	}
 
 	// Fetch integrations
@@ -267,7 +276,7 @@ func fetchCustomIntegrationPlaceholders(
 
 		placeholders, err := dbclient.Client.CustomIntegrationPlaceholders.GetAllActivatedInGuild(ctx, ticket.GuildId)
 		if err != nil {
-			return nil, err
+			return integrationPlaceholderResult{}, err
 		}
 
 		// Determine which integrations we need to fetch
@@ -282,12 +291,12 @@ func fetchCustomIntegrationPlaceholders(
 
 		secrets, err := dbclient.Client.CustomIntegrationSecretValues.GetAll(ctx, ticket.GuildId, integrationIds)
 		if err != nil {
-			return nil, err
+			return integrationPlaceholderResult{}, err
 		}
 
 		headers, err := dbclient.Client.CustomIntegrationHeaders.GetAll(ctx, integrationIds)
 		if err != nil {
-			return nil, err
+			return integrationPlaceholderResult{}, err
 		}
 
 		// Replace placeholders
@@ -295,6 +304,8 @@ func fetchCustomIntegrationPlaceholders(
 
 		var lock sync.Mutex
 		m := make(map[string]string) // Merge responses into 1 map
+		var failedIntegrationIds []int
+		var userErrors []string
 
 		for _, integration := range guildIntegrations {
 			integration := integration
@@ -302,12 +313,25 @@ func fetchCustomIntegrationPlaceholders(
 
 			group.Go(func() error {
 				response, err := integrations.Fetch(ctx, integration, ticket, integrationSecrets, headers[integration.Id], placeholderMap[integration.Id], formAnswers)
-				if err != nil {
-					return err
-				}
 
 				lock.Lock()
 				defer lock.Unlock()
+
+				if err != nil {
+					// A single failing integration shouldn't discard every other
+					// integration's already-fetched placeholders, so don't fail the group.
+					failedIntegrationIds = append(failedIntegrationIds, integration.Id)
+					for _, placeholder := range placeholderMap[integration.Id] {
+						m[placeholder.Name] = "N/A"
+					}
+
+					var intErr *integrations.IntegrationError
+					if errors.As(err, &intErr) && intErr.Message != "" {
+						userErrors = append(userErrors, sanitizeIntegrationErrorMessage(intErr.Message))
+					}
+
+					return nil
+				}
 
 				for key, value := range response {
 					m[key] = value
@@ -317,13 +341,20 @@ func fetchCustomIntegrationPlaceholders(
 			})
 		}
 
-		if err := group.Wait(); err != nil {
-			return nil, err
+		_ = group.Wait() // closures above never return a non-nil error; only used to block until done
+
+		if len(failedIntegrationIds) > 0 {
+			logging.WarnWithContext(
+				fmt.Errorf("failed to fetch %d/%d custom integration(s)", len(failedIntegrationIds), len(guildIntegrations)),
+				errorcontext.WorkerErrorContext{Guild: ticket.GuildId, User: ticket.UserId, Channel: utils.ValueOrZero(ticket.ChannelId)},
+				zap.Int("ticket_id", ticket.Id),
+				zap.Ints("integration_ids", failedIntegrationIds),
+			)
 		}
 
-		return m, nil
+		return integrationPlaceholderResult{Placeholders: m, UserErrors: userErrors}, nil
 	} else {
-		return make(map[string]string), nil
+		return integrationPlaceholderResult{Placeholders: make(map[string]string)}, nil
 	}
 }
 
@@ -724,6 +755,30 @@ func truncateRunes(s string, limit int) string {
 	}
 
 	return string(runes[:limit])
+}
+
+// integrationErrorMessageLimit bounds a single integration's error text so a
+// guild with several failing integrations can't blow Discord's 4096-char
+// embed description limit between them.
+const integrationErrorMessageLimit = 500
+
+// integrationErrorReplyLimit is the final cap applied to every integration's
+// error text joined together, comfortably under Discord's 4096-char embed
+// description limit.
+const integrationErrorReplyLimit = 3900
+
+// sanitizeIntegrationErrorMessage prepares a custom integration's own
+// { "error": "..." } text for display to the ticket opener. The webhook this
+// came from is configured by the guild's admin, but its response is
+// third-party content, so it's treated the same as any other untrusted text
+// destined for a Discord message. EscapeMarkdown doesn't touch "[" or "]",
+// so without escaping those too, "[click here](https://evil.example)" would
+// render as a real, clickable masked link inside the bot's own error embed.
+func sanitizeIntegrationErrorMessage(message string) string {
+	escaped := utils.EscapeMarkdown(message)
+	escaped = strings.ReplaceAll(escaped, "[", "\\[")
+	escaped = strings.ReplaceAll(escaped, "]", "\\]")
+	return truncateRunes(escaped, integrationErrorMessageLimit)
 }
 
 type FooterPolicy struct {
