@@ -441,6 +441,7 @@ var (
 	GdprErrorQueueFailed         MessageId = "gdpr.error.queue_failed"
 	GdprErrorWorkerOffline       MessageId = "gdpr.error.worker_offline"
 	GdprErrorConfirmationExpired MessageId = "gdpr.error.confirmation_expired"
+	GdprErrorBotNotInServer      MessageId = "gdpr.error.bot_not_in_server"
 
 	GdprExportSectionTitle      MessageId = "gdpr.section.export"
 	GdprButtonExportGuild       MessageId = "gdpr.button.export_guild"

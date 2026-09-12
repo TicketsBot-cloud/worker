@@ -544,23 +544,20 @@ func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 		return
 	}
 
-	var serverNames []string
-	var validGuildIds []uint64
+	check := checkOwnedGuilds(ctx, ctx.Worker(), userId, guildIds)
 
-	for _, guildId := range guildIds {
-		guild, err := ctx.Worker().GetGuild(guildId)
-		if err != nil || guild.OwnerId != userId {
-			continue
-		}
-
-		serverNames = append(serverNames, fmt.Sprintf("%s (ID: %d)", guild.Name, guildId))
-		validGuildIds = append(validGuildIds, guildId)
+	if len(check.Unreachable) > 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, check.UnreachableList()))
+		return
 	}
 
-	if len(validGuildIds) == 0 {
+	if len(check.ValidIds) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
 		return
 	}
+
+	serverNames := check.Names
+	validGuildIds := check.ValidIds
 
 	confirmId, err := storeGDPRConfirmation(ctx, "all_transcripts", locale, userId, validGuildIds, nil)
 	if err != nil {
@@ -651,8 +648,14 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 		return
 	}
 
-	guild, err := ctx.Worker().GetGuild(guildId)
-	if err != nil || guild.OwnerId != userId {
+	check := checkOwnedGuilds(ctx, ctx.Worker(), userId, []uint64{guildId})
+
+	if len(check.Unreachable) > 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, check.UnreachableList()))
+		return
+	}
+
+	if len(check.ValidIds) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
 		return
 	}
@@ -667,7 +670,7 @@ func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext)
 		RequestType:     GDPRSpecificTranscripts,
 		UserId:          userId,
 		GuildIds:        []uint64{guildId},
-		GuildNames:      []string{fmt.Sprintf("%s (ID: %d)", guild.Name, guildId)},
+		GuildNames:      check.Names,
 		TicketIds:       ticketIdList,
 		TicketIdsStr:    ticketIds,
 		Locale:          locale,
@@ -944,23 +947,20 @@ func (h *GDPRModalExportGuildHandler) Execute(ctx *context.ModalContext) {
 		return
 	}
 
-	var serverNames []string
-	var validGuildIds []uint64
+	check := checkOwnedGuilds(ctx, ctx.Worker(), userId, guildIds)
 
-	for _, guildId := range guildIds {
-		guild, err := ctx.Worker().GetGuild(guildId)
-		if err != nil || guild.OwnerId != userId {
-			continue
-		}
-
-		serverNames = append(serverNames, fmt.Sprintf("%s (ID: %d)", guild.Name, guildId))
-		validGuildIds = append(validGuildIds, guildId)
+	if len(check.Unreachable) > 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, check.UnreachableList()))
+		return
 	}
 
-	if len(validGuildIds) == 0 {
+	if len(check.ValidIds) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
 		return
 	}
+
+	serverNames := check.Names
+	validGuildIds := check.ValidIds
 
 	confirmId, err := storeGDPRConfirmation(ctx, "export_guild", locale, userId, validGuildIds, nil)
 	if err != nil {
