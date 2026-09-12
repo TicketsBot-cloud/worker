@@ -49,33 +49,39 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 			}
 		}
 
-		var ticketLimit uint8
-		var openTicketCount int
+		var panelLimit uint8
+		if panel != nil && panel.TicketLimit != nil {
+			panelLimit = *panel.TicketLimit
+		}
 
-		if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
-			ticketLimit = *panel.TicketLimit
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
-			if err != nil {
-				cmd.HandleError(err)
-				return
-			}
-		} else {
-			ticketLimit = 5
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+		settings, err := dbclient.Client.Settings.Get(ctx, cmd.GuildId())
+		if err != nil {
+			cmd.HandleError(err)
+			return
+		}
+
+		guildLimit := settings.TicketLimit
+
+		var panelOpenCount, guildOpenCount int
+
+		if panelLimit > 0 {
+			panelOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
 			if err != nil {
 				cmd.HandleError(err)
 				return
 			}
 		}
 
-		if openTicketCount >= int(ticketLimit) {
-			// TODO: Use translation of tickets
-			ticketsPluralised := "ticket"
-			if ticketLimit > 1 {
-				ticketsPluralised += "s"
+		if guildLimit > 0 {
+			guildOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+			if err != nil {
+				cmd.HandleError(err)
+				return
 			}
+		}
 
-			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageTicketLimitReached, ticketLimit, ticketsPluralised)
+		if violates, limit := ticketLimitVerdict(panelLimit, guildLimit, panelOpenCount, guildOpenCount); violates {
+			replyTicketLimitReached(cmd, limit)
 			return
 		}
 	}

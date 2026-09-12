@@ -80,14 +80,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	// Check ticket limit before ratelimit token to prevent 1 person from stopping everyone opening tickets
 	violatesTicketLimit, limit := getTicketLimit(ctx, cmd, panel)
 	if violatesTicketLimit {
-		// Notify the user
-		ticketsPluralised := "ticket"
-		if limit > 1 {
-			ticketsPluralised += "s"
-		}
-
-		// TODO: Use translation of tickets
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageTicketLimitReached, limit, ticketsPluralised)
+		replyTicketLimitReached(cmd, limit)
 		return database.Ticket{}, fmt.Errorf("ticket limit reached")
 	}
 
@@ -774,7 +767,29 @@ func refreshCachedChannels(ctx context.Context, worker *worker.Context, guildId 
 	return worker.Cache.ReplaceChannels(ctx, guildId, channels)
 }
 
-// has hit ticket limit, ticket limit
+// TODO: Use translation of tickets
+func replyTicketLimitReached(cmd registry.CommandContext, limit int) {
+	ticketsPluralised := "ticket"
+	if limit > 1 {
+		ticketsPluralised += "s"
+	}
+
+	cmd.Reply(customisation.Red, i18n.Error, i18n.MessageTicketLimitReached, limit, ticketsPluralised)
+}
+
+// Both limits apply independently; a limit of 0 disables that check.
+func ticketLimitVerdict(panelLimit, guildLimit uint8, panelOpenCount, guildOpenCount int) (bool, int) {
+	if panelLimit > 0 && panelOpenCount >= int(panelLimit) {
+		return true, int(panelLimit)
+	}
+
+	if guildLimit > 0 && guildOpenCount >= int(guildLimit) {
+		return true, int(guildLimit)
+	}
+
+	return false, int(guildLimit)
+}
+
 func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *database.Panel) (bool, int) {
 	isStaff, err := cmd.UserPermissionLevel(ctx)
 	if err != nil {
@@ -786,22 +801,35 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *dat
 		return false, 50
 	}
 
-	var openTicketCount int
-	var ticketLimit uint8
+	var panelLimit uint8
+	if panel != nil && panel.TicketLimit != nil {
+		panelLimit = *panel.TicketLimit
+	}
+
+	var guildLimit uint8
+	var guildOpenCount, panelOpenCount int
 
 	group, _ := errgroup.WithContext(ctx)
 
-	if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
-		ticketLimit = *panel.TicketLimit
+	group.Go(func() error {
+		settings, err := dbclient.Client.Settings.Get(ctx, cmd.GuildId())
+		if err != nil {
+			return err
+		}
+
+		guildLimit = settings.TicketLimit
+		return nil
+	})
+
+	group.Go(func() (err error) {
+		guildOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+		return
+	})
+
+	if panelLimit > 0 {
 		group.Go(func() (err error) {
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
+			panelOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
 				ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
-			return
-		})
-	} else {
-		ticketLimit = 5
-		group.Go(func() (err error) {
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
 			return
 		})
 	}
@@ -811,7 +839,7 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *dat
 		return true, 1
 	}
 
-	return openTicketCount >= int(ticketLimit), int(ticketLimit)
+	return ticketLimitVerdict(panelLimit, guildLimit, panelOpenCount, guildOpenCount)
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {
