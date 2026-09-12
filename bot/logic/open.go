@@ -28,12 +28,14 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -420,12 +422,22 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		externalPlaceholderCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 
-		additionalPlaceholders, err := fetchCustomIntegrationPlaceholders(externalPlaceholderCtx, ticket, formAnswersToMap(formData))
+		result, err := fetchCustomIntegrationPlaceholders(externalPlaceholderCtx, ticket, formAnswersToMap(formData))
 		if err != nil {
-			// TODO: Log for integration author and server owner on the dashboard, rather than spitting out a message.
-			// A failing integration should not block the ticket creation process.
-			cmd.HandleError(err)
+			// Prerequisite failure (couldn't even load the integration list) - not
+			// the ticket opener's problem to see, just log it.
+			logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Int("ticket_id", ticket.Id))
+		} else if len(result.UserErrors) > 0 {
+			// An integration explicitly told us why it's rejecting this ticket -
+			// that's meant for the ticket opener, unlike a generic transport failure.
+			// Each message is already sanitised and length-bounded individually
+			// (sanitizeIntegrationErrorMessage); this second cap is on the joined
+			// total, so several failing integrations together still can't exceed
+			// Discord's embed description limit.
+			joined := truncateRunes(strings.Join(result.UserErrors, "\n"), integrationErrorReplyLimit)
+			cmd.ReplyRaw(customisation.Red, cmd.GetMessage(i18n.Error), joined)
 		}
+		additionalPlaceholders := result.Placeholders
 		span.Finish()
 
 		// Placeholder lookups above run in parallel with the ping; only the send
