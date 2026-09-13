@@ -1,10 +1,9 @@
 package logic
 
 import (
-	"context"
 	"fmt"
-	"strings"
 
+	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/worker/bot/blacklist"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -159,60 +158,28 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 		return false, nil, nil, nil, err
 	}
 
-	matchedRole, action, err := dbclient.Client.PanelAccessControlRules.GetFirstMatched(
-		ctx,
-		panel.PanelId,
-		append(member.Roles, ctx.GuildId()),
-	)
-
+	rules, err := dbclient.Client.PanelAccessControlRules.GetAll(ctx, panel.PanelId)
 	if err != nil {
 		return false, nil, nil, nil, err
 	}
 
-	if action == database.AccessControlActionDeny {
-		if err := sendAccessControlDeniedMessage(ctx, ctx, panel.PanelId, matchedRole); err != nil {
-			return false, nil, nil, nil, err
-		}
+	outcome, matched := EvaluateAccessControl(rules, member.Roles, ctx.GuildId())
+
+	if matched != nil &&
+		matched.Action != database.AccessControlActionAllow &&
+		matched.Action != database.AccessControlActionDeny {
+		// Log only: HandleWarning would send an error embed on top of the denial reply.
+		sentry.LogWithContext(fmt.Errorf(
+			"panel %d has an access control rule for role %d with invalid action %q",
+			panel.PanelId, matched.RoleId, matched.Action,
+		), ctx.ToErrorContext())
+	}
+
+	if !outcome.Allowed() {
+		denial := buildAclDenial(rules, matched, ctx.GuildId())
+		ctx.Reply(customisation.Red, i18n.MessageNoPermission, denial.Content, denial.Args...)
 		return false, nil, nil, nil, nil
-	} else if action != database.AccessControlActionAllow {
-		return false, nil, nil, nil, fmt.Errorf("invalid access control action %s", action)
 	}
 
 	return true, outOfHoursWarningTitle, outOfHoursWarningMessage, outOfHoursWarningColour, nil
-}
-
-func sendAccessControlDeniedMessage(ctx context.Context, cmd registry.InteractionContext, panelId int, matchedRole uint64) error {
-	rules, err := dbclient.Client.PanelAccessControlRules.GetAll(ctx, panelId)
-	if err != nil {
-		return err
-	}
-
-	allowedRoleIds := make([]uint64, 0, len(rules))
-	for _, rule := range rules {
-		if rule.Action == database.AccessControlActionAllow {
-			allowedRoleIds = append(allowedRoleIds, rule.RoleId)
-		}
-	}
-
-	if len(allowedRoleIds) == 0 {
-		cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNoAllowRules)
-		return nil
-	}
-
-	if matchedRole == cmd.GuildId() {
-		mentions := make([]string, 0, len(allowedRoleIds))
-		for _, roleId := range allowedRoleIds {
-			mentions = append(mentions, fmt.Sprintf("<@&%d>", roleId))
-		}
-
-		if len(allowedRoleIds) == 1 {
-			cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNotAllowListedSingle, strings.Join(mentions, ", "))
-		} else {
-			cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclNotAllowListedMultiple, strings.Join(mentions, ", "))
-		}
-	} else {
-		cmd.Reply(customisation.Red, i18n.MessageNoPermission, i18n.MessageOpenAclDenyListed, matchedRole)
-	}
-
-	return nil
 }
