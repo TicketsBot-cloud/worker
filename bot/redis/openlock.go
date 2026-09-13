@@ -24,3 +24,11 @@ func TakeTicketOpenLock(ctx context.Context, guildId uint64) (Mutex, error) {
 
 	return mu, nil
 }
+
+func TakeTicketCloseLock(ctx context.Context, ticketId uint64) (Mutex, error) {
+	mu := rs.NewMutex(fmt.Sprintf("tickets:closelock:%d", ticketId), redsync.WithExpiry(TicketOpenLockExpiry))
+	if err := mu.LockContext(ctx); err != nil {
+		return nil, err
+	}
+	return mu, nil
+}
