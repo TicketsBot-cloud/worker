@@ -75,6 +75,11 @@ func buildAclDenial(
 	matched *database.PanelAccessControlRule,
 	everyoneRoleId uint64,
 ) aclDenial {
+	// Only reached on denial, so a non-@everyone match is always a deny rule.
+	if matched != nil && matched.RoleId != everyoneRoleId {
+		return aclDenial{Content: i18n.MessageOpenAclDenyListed, Args: []any{matched.RoleId}}
+	}
+
 	allowedRoleIds := make([]uint64, 0, len(rules))
 	for _, rule := range rules {
 		if rule.Action == database.AccessControlActionAllow {
@@ -87,19 +92,15 @@ func buildAclDenial(
 	}
 
 	// No match, or matched only via @everyone: both read as "you are not on the list".
-	if matched == nil || matched.RoleId == everyoneRoleId {
-		mentions := make([]string, 0, len(allowedRoleIds))
-		for _, roleId := range allowedRoleIds {
-			mentions = append(mentions, fmt.Sprintf("<@&%d>", roleId))
-		}
-
-		content := i18n.MessageOpenAclNotAllowListedMultiple
-		if len(allowedRoleIds) == 1 {
-			content = i18n.MessageOpenAclNotAllowListedSingle
-		}
-
-		return aclDenial{Content: content, Args: []any{strings.Join(mentions, ", ")}}
+	mentions := make([]string, 0, len(allowedRoleIds))
+	for _, roleId := range allowedRoleIds {
+		mentions = append(mentions, fmt.Sprintf("<@&%d>", roleId))
 	}
 
-	return aclDenial{Content: i18n.MessageOpenAclDenyListed, Args: []any{matched.RoleId}}
+	content := i18n.MessageOpenAclNotAllowListedMultiple
+	if len(allowedRoleIds) == 1 {
+		content = i18n.MessageOpenAclNotAllowListedSingle
+	}
+
+	return aclDenial{Content: content, Args: []any{strings.Join(mentions, ", ")}}
 }
