@@ -120,8 +120,6 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 }
 
 func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) ([]string, bool) {
-	// Only require the permissions for modes the guild's panels actually use, so we
-	// don't report false failures for a mode the server never opens tickets in
 	serverWidePermissions := []permission.Permission{
 		// Required in both modes
 		permission.ManageWebhooks,
@@ -130,16 +128,13 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 		permission.ManageRoles,
 	}
 
-	anyThread, anyChannel := false, false
+	// No panels to judge by: report thread mode rather than claim the guild is fine
+	anyThread := len(panels) == 0
 	for _, p := range panels {
 		if p.UseThreads {
 			anyThread = true
-		} else {
-			anyChannel = true
+			break
 		}
-	}
-	if len(panels) == 0 {
-		anyThread, anyChannel = true, true
 	}
 
 	if anyThread {
@@ -149,9 +144,9 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 			permission.ManageThreads,
 		)
 	}
-	if anyChannel {
-		serverWidePermissions = append(serverWidePermissions, permission.ManageChannels)
-	}
+
+	// Panel-less opens (message context menu) are always channel mode
+	serverWidePermissions = append(serverWidePermissions, permission.ManageChannels)
 	serverWidePermissions = append(serverWidePermissions, botpermissions.StandardPermissions...)
 
 	var results []string
@@ -279,12 +274,19 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 		if hasMissing {
 			hasMissingPermissions = true
 		}
+
+		if panel.OverflowEnabled && panel.OverflowCategoryId != nil {
+			result, hasMissing := checkChannelPermissions(worker, *panel.OverflowCategoryId, botMember, guildId, categoryPerms, "Overflow Category")
+			results = append(results, result)
+			if hasMissing {
+				hasMissingPermissions = true
+			}
+		}
 	}
 
 	// Check transcript channel if enabled for this panel
 	if panel.TranscriptChannelId != nil {
-		// Transcript channel needs minimal message permissions
-		transcriptPerms := append([]permission.Permission{}, botpermissions.MinimalPermissions...)
+		transcriptPerms := permissionwrapper.TranscriptChannelRequired
 		result, hasMissing := checkChannelPermissions(worker, *panel.TranscriptChannelId, botMember, guildId, transcriptPerms, "Transcript Channel")
 		results = append(results, result)
 		if hasMissing {

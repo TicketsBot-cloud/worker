@@ -380,9 +380,17 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 		}
 	}
 
-	// 3. Transcript channel (panel-level, both modes)
+	// 3. Overflow category (channel mode only) - a nil id means the server root
+	if !useThreads && panel != nil && panel.OverflowEnabled && panel.OverflowCategoryId != nil {
+		loc := checkChannel(*panel.OverflowCategoryId, "Overflow category", botpermissions.ChannelModeRequired)
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
+		}
+	}
+
+	// 4. Transcript channel (panel-level, both modes)
 	if panel != nil && panel.TranscriptChannelId != nil {
-		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", botpermissions.TranscriptChannelRequired)
+		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", permissionwrapper.TranscriptChannelRequired)
 		if len(loc.missing) > 0 {
 			locations = append(locations, loc)
 		}
