@@ -121,32 +121,14 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 
 func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) ([]string, bool) {
 	serverWidePermissions := []permission.Permission{
-		// Required in both modes
 		permission.ManageWebhooks,
 		permission.PinMessages,
-		// Server-wide only
 		permission.ManageRoles,
+		permission.ManageChannels,
+		permission.CreatePrivateThreads,
+		permission.SendMessagesInThreads,
+		permission.ManageThreads,
 	}
-
-	// No panels to judge by: report thread mode rather than claim the guild is fine
-	anyThread := len(panels) == 0
-	for _, p := range panels {
-		if p.UseThreads {
-			anyThread = true
-			break
-		}
-	}
-
-	if anyThread {
-		serverWidePermissions = append(serverWidePermissions,
-			permission.CreatePrivateThreads,
-			permission.SendMessagesInThreads,
-			permission.ManageThreads,
-		)
-	}
-
-	// Panel-less opens (message context menu) are always channel mode
-	serverWidePermissions = append(serverWidePermissions, permission.ManageChannels)
 	serverWidePermissions = append(serverWidePermissions, botpermissions.StandardPermissions...)
 
 	var results []string
@@ -265,7 +247,6 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 			[]permission.Permission{
 				permission.ManageChannels,
 				permission.ManageWebhooks,
-				permission.PinMessages,
 			},
 			botpermissions.StandardPermissions...,
 		)
@@ -282,11 +263,19 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 				hasMissingPermissions = true
 			}
 		}
+
+		if panel.PendingCategory != nil {
+			result, hasMissing := checkChannelPermissions(worker, *panel.PendingCategory, botMember, guildId, categoryPerms, "Pending Category")
+			results = append(results, result)
+			if hasMissing {
+				hasMissingPermissions = true
+			}
+		}
 	}
 
 	// Check transcript channel if enabled for this panel
 	if panel.TranscriptChannelId != nil {
-		transcriptPerms := permissionwrapper.TranscriptChannelRequired
+		transcriptPerms := botpermissions.TranscriptChannelRequired
 		result, hasMissing := checkChannelPermissions(worker, *panel.TranscriptChannelId, botMember, guildId, transcriptPerms, "Transcript Channel")
 		results = append(results, result)
 		if hasMissing {
@@ -294,16 +283,8 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 		}
 	}
 
-	// Check notification channel if using thread mode
-	if usesThreads && panel.TicketNotificationChannel != nil {
-		notificationPerms := append(
-			[]permission.Permission{
-				permission.EmbedLinks,
-				permission.AttachFiles,
-			},
-			botpermissions.MinimalPermissions...,
-		)
-		result, hasMissing := checkChannelPermissions(worker, *panel.TicketNotificationChannel, botMember, guildId, notificationPerms, "Notification Channel")
+	if panel.TicketNotificationChannel != nil {
+		result, hasMissing := checkChannelPermissions(worker, *panel.TicketNotificationChannel, botMember, guildId, botpermissions.NotifChannelRequired, "Notification Channel")
 		results = append(results, result)
 		if hasMissing {
 			hasMissingPermissions = true

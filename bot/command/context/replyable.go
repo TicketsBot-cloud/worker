@@ -327,9 +327,21 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 
 	var useThreads bool
 
+	var panelCustomId string
+	switch c := ctx.(type) {
+	case *ButtonContext:
+		panelCustomId = c.InteractionData.CustomId
+	case *SelectMenuContext:
+		if len(c.InteractionData.Values) > 0 {
+			panelCustomId = c.InteractionData.Values[0]
+		}
+	case *ModalContext:
+		panelCustomId = strings.TrimPrefix(c.Interaction.Data.CustomId, "form_")
+	}
+
 	var panel *database.Panel
-	if btnCtx, ok := ctx.(*ButtonContext); ok {
-		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
+	if panelCustomId != "" {
+		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), panelCustomId)
 		if err == nil && panelExists {
 			panel = &p
 			useThreads = panel.UseThreads
@@ -343,7 +355,6 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 
 	var locations []missingPermLocation
 
-	// 1. Primary location: panel channel (thread mode) or ticket category (channel mode)
 	var primaryChannelId uint64
 	var primaryLabel string
 	var primaryRequired []permission.Permission
@@ -372,15 +383,13 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 		}
 	}
 
-	// 2. Notification channel (thread mode only)
-	if useThreads && panel != nil && panel.TicketNotificationChannel != nil {
+	if panel != nil && panel.TicketNotificationChannel != nil {
 		loc := checkChannel(*panel.TicketNotificationChannel, "Notification channel", botpermissions.NotifChannelRequired)
 		if len(loc.missing) > 0 {
 			locations = append(locations, loc)
 		}
 	}
 
-	// 3. Overflow category (channel mode only) - a nil id means the server root
 	if !useThreads && panel != nil && panel.OverflowEnabled && panel.OverflowCategoryId != nil {
 		loc := checkChannel(*panel.OverflowCategoryId, "Overflow category", botpermissions.ChannelModeRequired)
 		if len(loc.missing) > 0 {
@@ -388,9 +397,15 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 		}
 	}
 
-	// 4. Transcript channel (panel-level, both modes)
+	if !useThreads && panel != nil && panel.PendingCategory != nil {
+		loc := checkChannel(*panel.PendingCategory, "Pending category", botpermissions.ChannelModeRequired)
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
+		}
+	}
+
 	if panel != nil && panel.TranscriptChannelId != nil {
-		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", permissionwrapper.TranscriptChannelRequired)
+		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", botpermissions.TranscriptChannelRequired)
 		if len(loc.missing) > 0 {
 			locations = append(locations, loc)
 		}
