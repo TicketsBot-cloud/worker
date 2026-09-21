@@ -206,7 +206,7 @@ func UnclaimTicket(ctx context.Context, cmd registry.CommandContext, ticket data
 					overwrites = append(overwrites, channel.PermissionOverwrite{
 						Id:    whoClaimed,
 						Type:  channel.PermissionTypeMember,
-						Allow: permission.BuildPermissions(StandardPermissions[:]...),
+						Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 						Deny:  0,
 					})
 				}
@@ -365,7 +365,7 @@ func BuildClaimerOverwrite(ctx context.Context, worker *worker.Context, ticket d
 	standard := channel.PermissionOverwrite{
 		Id:    claimerId,
 		Type:  channel.PermissionTypeMember,
-		Allow: permission.BuildPermissions(StandardPermissions[:]...),
+		Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 		Deny:  0,
 	}
 
