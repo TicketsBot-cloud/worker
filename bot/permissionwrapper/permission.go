@@ -13,6 +13,7 @@ import (
 func HasPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, permissions ...permission.Permission) bool {
 	m, roles, ch, err := fetchChannelData(ctx, guildId, userId, channelId)
 	if err != nil {
+		sentry.Error(err)
 		return false
 	}
 	effective := botpermissions.EffectivePermissions(guildId, userId, []uint64(m.Roles), ch.PermissionOverwrites, buildRoleMap(roles))
