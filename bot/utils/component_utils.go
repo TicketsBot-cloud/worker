@@ -29,22 +29,39 @@ func BuildContainerRaw(ctx registry.CommandContext, colour customisation.Colour,
 }
 
 func BuildContainerWithComponents[T string | i18n.MessageId](ctx registry.CommandContext, colour customisation.Colour, title T, innerComponents []component.Component) component.Component {
-	var titleStr string
+	return buildContainer(ctx, colour, containerTitle(ctx, title), innerComponents, true)
+}
+
+func BuildAdminContainerRaw(ctx registry.CommandContext, colour customisation.Colour, title, content string) component.Component {
+	return BuildAdminContainerWithComponents(ctx, colour, title, Slice(component.BuildTextDisplay(component.TextDisplay{
+		Content: content,
+	})))
+}
+
+func BuildAdminContainerWithComponents[T string | i18n.MessageId](ctx registry.CommandContext, colour customisation.Colour, title T, innerComponents []component.Component) component.Component {
+	return buildContainer(ctx, colour, containerTitle(ctx, title), innerComponents, false)
+}
+
+func containerTitle[T string | i18n.MessageId](ctx registry.CommandContext, title T) string {
 	switch t := any(title).(type) {
 	case string:
-		titleStr = t
+		return t
 	case i18n.MessageId:
-		titleStr = ctx.GetMessage(t)
+		return ctx.GetMessage(t)
 	}
 
+	return ""
+}
+
+func buildContainer(ctx registry.CommandContext, colour customisation.Colour, title string, innerComponents []component.Component, branded bool) component.Component {
 	components := append(Slice(
 		component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("### %s", titleStr),
+			Content: fmt.Sprintf("### %s", title),
 		}),
 		component.BuildSeparator(component.Separator{}),
 	), innerComponents...)
 
-	if ctx.PremiumTier() == premium.None && !ctx.Worker().IsWhitelabel {
+	if branded && ctx.PremiumTier() == premium.None && !ctx.Worker().IsWhitelabel {
 		components = addPremiumFooter(components)
 	}
 

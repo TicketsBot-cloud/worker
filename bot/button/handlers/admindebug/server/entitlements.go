@@ -103,7 +103,7 @@ func (h *AdminDebugServerEntitlementsHandler) Execute(ctx *context.ButtonContext
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Green,
 			"Admin - Debug Server - Entitlements",

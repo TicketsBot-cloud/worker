@@ -43,7 +43,7 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 
 	if onCooldown, cooldownTime := redis.GetRecacheCooldown(guildId); onCooldown {
 		ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-			utils.BuildContainerWithComponents(
+			utils.BuildAdminContainerWithComponents(
 				ctx,
 				customisation.Red,
 				"Admin - Recache",
@@ -87,7 +87,7 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(
+		utils.BuildAdminContainerWithComponents(
 			ctx,
 			customisation.Orange,
 			"Admin - Recache",

@@ -100,26 +100,45 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 		return
 	}
 
-	// Process permission checks using shared logic
-	results, hasMissingPermissions := processPermissionChecks(selectedValues, worker, guildId, botMember, panels)
+	sections := processPermissionChecks(selectedValues, worker, guildId, botMember, panels)
 
-	// Choose color based on whether permissions are missing
-	colour := customisation.Green
-	if hasMissingPermissions {
-		colour = customisation.Orange
+	containers := make([]component.Component, 0, len(sections))
+	for _, section := range sections {
+		colour := customisation.Green
+		if section.hasMissing {
+			colour = customisation.Orange
+		}
+
+		containers = append(containers, utils.BuildAdminContainerRaw(ctx, colour, section.title, section.body))
 	}
 
-	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
-			ctx,
-			colour,
-			"Admin - Debug Server - Permissions Check",
-			strings.Join(results, "\n\n"),
-		),
-	}))
+	for len(containers) > 0 {
+		chunk := containers
+		if len(chunk) > maxContainersPerMessage {
+			chunk = chunk[:maxContainersPerMessage]
+		}
+		containers = containers[len(chunk):]
+
+		if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(chunk)); err != nil {
+			ctx.HandleError(err)
+			return
+		}
+	}
 }
 
-func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) ([]string, bool) {
+const (
+	maxComponentsPerMessage = 40
+	componentsPerContainer  = 4
+	maxContainersPerMessage = maxComponentsPerMessage / componentsPerContainer
+)
+
+type permissionSection struct {
+	title      string
+	body       string
+	hasMissing bool
+}
+
+func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) []permissionSection {
 	serverWidePermissions := []permission.Permission{
 		permission.ManageWebhooks,
 		permission.PinMessages,
@@ -131,8 +150,7 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 	}
 	serverWidePermissions = append(serverWidePermissions, botpermissions.StandardPermissions...)
 
-	var results []string
-	var hasMissingPermissions bool
+	var sections []permissionSection
 
 	for _, value := range selectedValues {
 		parts := strings.Split(value, "_")
@@ -140,11 +158,12 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 
 		switch checkType {
 		case "server":
-			result, hasMissing := checkServerWidePermissions(worker, guildId, botMember, serverWidePermissions)
-			results = append(results, fmt.Sprintf("**Server Wide Permissions**\n%s", result))
-			if hasMissing {
-				hasMissingPermissions = true
-			}
+			body, hasMissing := checkServerWidePermissions(worker, guildId, botMember, serverWidePermissions)
+			sections = append(sections, permissionSection{
+				title:      "Server Wide Permissions",
+				body:       body,
+				hasMissing: hasMissing,
+			})
 
 		case "panel":
 			if len(parts) < 2 {
@@ -155,7 +174,6 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 				continue
 			}
 
-			// Find the panel
 			var panel *database.Panel
 			for i := range panels {
 				if panels[i].MessageId == panelMessageId {
@@ -165,20 +183,24 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 			}
 
 			if panel == nil {
-				results = append(results, fmt.Sprintf("**Panel (ID: %d)**\nPanel not found", panelMessageId))
+				sections = append(sections, permissionSection{
+					title:      fmt.Sprintf("Panel (ID: %d)", panelMessageId),
+					body:       "Panel not found",
+					hasMissing: true,
+				})
 				continue
 			}
 
-			// Check permissions for this panel
-			panelResults, hasMissing := checkPanelPermissions(worker, guildId, botMember, *panel)
-			results = append(results, fmt.Sprintf("**Panel: %s**\n%s", panel.Title, panelResults))
-			if hasMissing {
-				hasMissingPermissions = true
-			}
+			body, hasMissing := checkPanelPermissions(worker, guildId, botMember, *panel)
+			sections = append(sections, permissionSection{
+				title:      fmt.Sprintf("Panel: %s", panel.Title),
+				body:       body,
+				hasMissing: hasMissing,
+			})
 		}
 	}
 
-	return results, hasMissingPermissions
+	return sections
 }
 
 func checkServerWidePermissions(worker *w.Context, guildId uint64, botMember member.Member, requiredPermissions []permission.Permission) (string, bool) {

@@ -72,7 +72,7 @@ func (h *AdminDebugServerMonitoredBotsHandler) Execute(ctx *context.ButtonContex
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Orange,
 			"Admin - Debug Server - Monitored Bots",
