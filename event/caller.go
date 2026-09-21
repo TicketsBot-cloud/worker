@@ -5,21 +5,20 @@ package event
 
 import (
 	"fmt"
-	"strconv"
-
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/admin/debug"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/general"
+	"github.com/TicketsBot-cloud/worker/bot/command/impl/kb"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings"
-	"github.com/TicketsBot-cloud/worker/bot/command/impl/settings/setup"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/statistics"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tags"
 	"github.com/TicketsBot-cloud/worker/bot/command/impl/tickets"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/pkg/errors"
+	"strconv"
 )
 
 var ErrArgumentNotFound = errors.New("argument not found")
@@ -134,17 +133,17 @@ func callCommand(
 
 		v.Execute(ctx, arg0)
 	case admin.AdminRecacheCommand:
-		var arg0 *string
+		var arg0 string
 
 		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
 		if !ok0 {
-			arg0 = nil
+			return ErrArgumentNotFound
 		} else {
 			argValue, ok := opt0.Value.(string)
 			if !ok {
 				return fmt.Errorf("option %s was not a string", opt0.Name)
 			}
-			arg0 = &argValue
+			arg0 = argValue
 		}
 
 		v.Execute(ctx, arg0)
@@ -243,6 +242,54 @@ func callCommand(
 	case general.VoteCommand:
 
 		v.Execute(ctx)
+	case kb.KBBrowseCommand:
+		var arg0 *string
+
+		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
+		if !ok0 {
+			arg0 = nil
+		} else {
+			argValue, ok := opt0.Value.(string)
+			if !ok {
+				return fmt.Errorf("option %s was not a string", opt0.Name)
+			}
+			arg0 = &argValue
+		}
+
+		v.Execute(ctx, arg0)
+	case kb.KBCommand:
+
+		v.Execute(ctx)
+	case kb.KBSearchCommand:
+		var arg0 string
+
+		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
+		if !ok0 {
+			return ErrArgumentNotFound
+		} else {
+			argValue, ok := opt0.Value.(string)
+			if !ok {
+				return fmt.Errorf("option %s was not a string", opt0.Name)
+			}
+			arg0 = argValue
+		}
+
+		v.Execute(ctx, arg0)
+	case kb.KBSendCommand:
+		var arg0 string
+
+		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
+		if !ok0 {
+			return ErrArgumentNotFound
+		} else {
+			argValue, ok := opt0.Value.(string)
+			if !ok {
+				return fmt.Errorf("option %s was not a string", opt0.Name)
+			}
+			arg0 = argValue
+		}
+
+		v.Execute(ctx, arg0)
 	case settings.AddAdminCommand:
 		var arg0 uint64
 
@@ -361,83 +408,12 @@ func callCommand(
 		}
 
 		v.Execute(ctx, arg0)
+	case settings.SetupCommand:
+
+		v.Execute(ctx)
 	case settings.ViewStaffCommand:
 
 		v.Execute(ctx)
-	case setup.AutoSetupCommand:
-
-		v.Execute(ctx)
-	case setup.LimitSetupCommand:
-		var arg0 int
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(float64)
-			if !ok {
-				return fmt.Errorf("option %s was not a float64", opt0.Name)
-			}
-			arg0 = int(argValue)
-		}
-
-		v.Execute(ctx, arg0)
-	case setup.SetupCommand:
-
-		v.Execute(ctx)
-	case setup.ThreadsSetupCommand:
-		var arg0 bool
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			argValue, ok := opt0.Value.(bool)
-			if !ok {
-				return fmt.Errorf("option %s was not a bool", opt0.Name)
-			}
-			arg0 = argValue
-
-		}
-		var arg1 *uint64
-
-		opt1, ok1 := findOption(cmd.Properties().Arguments[1], options)
-		if !ok1 {
-			arg1 = nil
-		} else {
-			raw, ok := opt1.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a snowflake", opt1.Name)
-			}
-
-			argValue, err := strconv.ParseUint(raw, 10, 64)
-			if err != nil {
-				return fmt.Errorf("option %s was not a valid snowflake", opt1.Name)
-			}
-			arg1 = &argValue
-		}
-
-		v.Execute(ctx, arg0, arg1)
-	case setup.TranscriptsSetupCommand:
-		var arg0 uint64
-
-		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
-		if !ok0 {
-			return ErrArgumentNotFound
-		} else {
-			raw, ok := opt0.Value.(string)
-			if !ok {
-				return fmt.Errorf("option %s was not a snowflake", opt0.Name)
-			}
-
-			argValue, err := strconv.ParseUint(raw, 10, 64)
-			if err != nil {
-				return fmt.Errorf("option %s was not a valid snowflake", opt0.Name)
-			}
-			arg0 = argValue
-		}
-
-		v.Execute(ctx, arg0)
 	case statistics.StatsCommand:
 
 		v.Execute(ctx)
@@ -603,17 +579,17 @@ func callCommand(
 
 		v.Execute(ctx)
 	case tickets.OpenCommand:
-		var arg0 *string
+		var arg0 string
 
 		opt0, ok0 := findOption(cmd.Properties().Arguments[0], options)
 		if !ok0 {
-			arg0 = nil
+			return ErrArgumentNotFound
 		} else {
 			argValue, ok := opt0.Value.(string)
 			if !ok {
 				return fmt.Errorf("option %s was not a string", opt0.Name)
 			}
-			arg0 = &argValue
+			arg0 = argValue
 		}
 
 		v.Execute(ctx, arg0)

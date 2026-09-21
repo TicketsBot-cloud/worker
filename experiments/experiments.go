@@ -13,13 +13,9 @@ import (
 
 type Experiment string
 
-const (
-	COMPONENTS_V2_STATISTICS Experiment = "COMPONENTS_V2_STATISTICS"
-)
+const ()
 
-var List = []Experiment{
-	COMPONENTS_V2_STATISTICS,
-}
+var List = []Experiment{}
 
 func HasFeature(ctx context.Context, guildId uint64, experiment Experiment) bool {
 	if os.Getenv("ENABLE_ALL_EXPERIMENTS") == "true" {

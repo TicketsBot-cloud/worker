@@ -49,34 +49,39 @@ func ReopenTicket(ctx context.Context, cmd registry.CommandContext, ticketId int
 			}
 		}
 
-		var ticketLimit uint8
-		var openTicketCount int
+		var panelLimit uint8
+		if panel != nil && panel.TicketLimit != nil {
+			panelLimit = *panel.TicketLimit
+		}
 
-		if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
-			// Use per-panel limit and count only panel tickets
-			ticketLimit = *panel.TicketLimit
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
-			if err != nil {
-				cmd.HandleError(err)
-				return
-			}
-		} else {
-			// Use global limit and count all tickets
-			ticketLimit, err = dbclient.Client.TicketLimit.Get(ctx, cmd.GuildId())
-			if err != nil {
-				cmd.HandleError(err)
-				return
-			}
+		settings, err := dbclient.Client.Settings.Get(ctx, cmd.GuildId())
+		if err != nil {
+			cmd.HandleError(err)
+			return
+		}
 
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+		guildLimit := settings.TicketLimit
+
+		var panelOpenCount, guildOpenCount int
+
+		if panelLimit > 0 {
+			panelOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
 			if err != nil {
 				cmd.HandleError(err)
 				return
 			}
 		}
 
-		if openTicketCount >= int(ticketLimit) {
-			cmd.Reply(customisation.Green, i18n.Error, i18n.MessageTicketLimitReached)
+		if guildLimit > 0 {
+			guildOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+			if err != nil {
+				cmd.HandleError(err)
+				return
+			}
+		}
+
+		if violates, limit := ticketLimitVerdict(panelLimit, guildLimit, panelOpenCount, guildOpenCount); violates {
+			replyTicketLimitReached(cmd, limit)
 			return
 		}
 	}

@@ -82,17 +82,17 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		return
 	}
 
-	var messageId i18n.MessageId
-	var format []interface{}
-	if reason == nil {
-		messageId = i18n.MessageCloseRequestNoReason
-		format = []interface{}{ctx.UserId()}
-	} else {
-		messageId = i18n.MessageCloseRequestWithReason
-		format = []interface{}{ctx.UserId(), strings.ReplaceAll(*reason, "`", "\\`")}
+	msgEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleCloseRequest, i18n.MessageCloseRequestIntro, nil, ctx.UserId())
+
+	if reason != nil {
+		msgEmbed.Description += fmt.Sprintf("\n\n**%s**\n```\n%s\n```", ctx.GetMessage(i18n.Reason), strings.ReplaceAll(*reason, "`", "\\`"))
 	}
 
-	msgEmbed := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleCloseRequest, messageId, nil, format...)
+	if closeAt != nil {
+		msgEmbed.Description += fmt.Sprintf("\n\n**%s**\n<t:%d:f> (<t:%d:R>)", ctx.GetMessage(i18n.MessageCloseRequestCloseAt), closeAt.Unix(), closeAt.Unix())
+	}
+
+	msgEmbed.Description += "\n\n" + ctx.GetMessage(i18n.MessageCloseRequestPrompt)
 	components := component.BuildActionRow(
 		component.BuildButton(component.Button{
 			Label:    ctx.GetMessage(i18n.MessageCloseRequestAccept),

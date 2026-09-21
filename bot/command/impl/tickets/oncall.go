@@ -39,13 +39,21 @@ func (c OnCallCommand) GetExecutor() interface{} {
 }
 
 func (OnCallCommand) Execute(ctx registry.CommandContext) {
-	settings, err := ctx.Settings()
+	panels, err := dbclient.Client.Panel.GetByGuild(ctx, ctx.GuildId())
 	if err != nil {
 		ctx.HandleError(err)
 		return
 	}
 
-	if !settings.UseThreads {
+	hasThreadPanel := false
+	for _, p := range panels {
+		if p.UseThreads {
+			hasThreadPanel = true
+			break
+		}
+	}
+
+	if !hasThreadPanel {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode, "/on-call", fmt.Sprintf("%s/features/thread-mode", config.Conf.Bot.DocsUrl))
 		return
 	}

@@ -5,6 +5,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers/admindebug/server"
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers/admindebug/server/modals"
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers/tickets/edit"
+	whitelabelbtn "github.com/TicketsBot-cloud/worker/bot/button/handlers/whitelabel"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 )
@@ -71,6 +72,8 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.GDPRConfirmAllMessagesHandler),
 		new(handlers.GDPRConfirmMessagesHandler),
 		new(handlers.JoinThreadHandler),
+		new(handlers.KBNavigationHandler),
+		new(handlers.KBCreateTicketHandler),
 		new(handlers.OpenSurveyHandler),
 		new(handlers.PanelHandler),
 		new(handlers.PremiumCheckAgain),
@@ -88,9 +91,12 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(server.AdminDebugServerTicketPermissionsHandler),
 		new(server.AdminDebugServerUserTicketsHandler),
 		new(edit.EditLabelsButtonHandler),
+		new(whitelabelbtn.WhitelabelResyncHandler),
+		new(whitelabelbtn.WhitelabelRecreateCommandsHandler),
 	)
 
 	m.selectRegistry = append(m.selectRegistry,
+		new(handlers.KBCategorySelectHandler),
 		new(handlers.LanguageSelectorHandler),
 		new(handlers.MultiPanelHandler),
 		new(handlers.PremiumKeyOpenHandler),

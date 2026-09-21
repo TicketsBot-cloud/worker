@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	permcache "github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -102,10 +103,14 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 				return
 			}
 		} else {
-			additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ctx.GuildId())
-			if err != nil {
-				ctx.HandleError(err)
-				return
+			var additionalPermissions database.TicketPermissions
+			if ticket.PanelId != nil {
+				var err error
+				additionalPermissions, err = dbclient.Client.PanelTicketPermissions.Get(ctx, *ticket.PanelId)
+				if err != nil {
+					ctx.HandleError(err)
+					return
+				}
 			}
 
 			// ticket.ChannelId cannot be nil, as we get by channel id
@@ -132,10 +137,14 @@ func (AddCommand) Execute(ctx registry.CommandContext, id uint64) {
 		}
 	} else if mentionableType == context.MentionableTypeRole {
 		// Handle role addition
-		additionalPermissions, err := dbclient.Client.TicketPermissions.Get(ctx, ctx.GuildId())
-		if err != nil {
-			ctx.HandleError(err)
-			return
+		var additionalPermissions database.TicketPermissions
+		if ticket.PanelId != nil {
+			var err error
+			additionalPermissions, err = dbclient.Client.PanelTicketPermissions.Get(ctx, *ticket.PanelId)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
 		}
 
 		// ticket.ChannelId cannot be nil, as we get by channel id

@@ -195,7 +195,7 @@ func doPropertiesChecks(ctx context.Context, guildId uint64, cmd cmdregistry.Com
 		}
 	}
 
-	if properties.HelperOnly && !utils.IsBotHelper(cmd.UserId()) {
+	if properties.HelperOnly && !utils.IsBotHelper(ctx, cmd.UserId()) {
 		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageNoPermission)
 		return false, false
 	}

@@ -73,7 +73,13 @@ func (TransferCommand) Execute(ctx registry.CommandContext, userId uint64) {
 		return
 	}
 
-	if err := logic.ClaimTicket(ctx, ctx, ticket, userId); err != nil {
+	// Reassign the claim to the target user (transfer overwrites any existing claim)
+	if err := dbclient.Client.TicketClaims.Set(ctx, ticket.GuildId, ticket.Id, userId); err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if err := logic.ApplyClaim(ctx, ctx, ticket, userId); err != nil {
 		ctx.HandleError(err)
 		return
 	}

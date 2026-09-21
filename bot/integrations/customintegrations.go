@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,14 +16,12 @@ import (
 )
 
 var (
-	blacklistedHeaders        = []string{"user-agent", "x-real-ip", "cache-control", "content-type", "content-length", "expect", "max-forwards", "pragma", "range", "te", "if-match", "if-none-match", "if-modified-since", "if-unmodified-since", "if-range", "accept", "from", "referer"}
+	blacklistedHeaders        = []string{"user-agent", "x-real-ip", "cache-control", "content-type", "content-length", "expect", "max-forwards", "pragma", "range", "te", "if-match", "if-none-match", "if-modified-since", "if-unmodified-since", "if-range", "accept", "from", "referer", "host", "connection", "transfer-encoding", "upgrade"}
 	blacklistedHeaderPrefixes = []string{
 		"x-forwarded-",
 		"x-proxy-",
 		"cf-",
 	}
-
-	ErrIntegrationReturnedErrorStatus = errors.New("Integration returned an error status")
 )
 
 type formAnswers map[string]*string
@@ -58,7 +55,7 @@ func Fetch(
 	// Apply headers
 	headerMap := make(map[string]string)
 	for _, header := range headers {
-		if isHeaderBlacklisted(header.Name) {
+		if IsHeaderBlacklisted(header.Name) {
 			continue
 		}
 
@@ -139,7 +136,7 @@ outer:
 	return parsed
 }
 
-func isHeaderBlacklisted(name string) bool {
+func IsHeaderBlacklisted(name string) bool {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, " ", "")
 

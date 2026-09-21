@@ -88,13 +88,6 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 		return
 	}
 
-	// Get guild and settings
-	settings, err := dbclient.Client.Settings.Get(ctx, guildId)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	panels, err := dbclient.Client.Panel.GetByGuild(ctx, guildId)
 	if err != nil {
 		ctx.HandleError(err)
@@ -108,7 +101,7 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 	}
 
 	// Process permission checks using shared logic
-	results, hasMissingPermissions := processPermissionChecks(selectedValues, worker, guildId, botMember, settings, panels)
+	results, hasMissingPermissions := processPermissionChecks(selectedValues, worker, guildId, botMember, panels)
 
 	// Choose color based on whether permissions are missing
 	colour := customisation.Green
@@ -126,9 +119,9 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 	}))
 }
 
-func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, settings database.Settings, panels []database.Panel) ([]string, bool) {
-	// Server-wide permissions depend on the active mode so we don't report
-	// false failures for permissions that are irrelevant to the current mode
+func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) ([]string, bool) {
+	// Only require the permissions for modes the guild's panels actually use, so we
+	// don't report false failures for a mode the server never opens tickets in
 	serverWidePermissions := []permission.Permission{
 		// Required in both modes
 		permission.ManageWebhooks,
@@ -136,13 +129,27 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 		// Server-wide only
 		permission.ManageRoles,
 	}
-	if settings.UseThreads {
+
+	anyThread, anyChannel := false, false
+	for _, p := range panels {
+		if p.UseThreads {
+			anyThread = true
+		} else {
+			anyChannel = true
+		}
+	}
+	if len(panels) == 0 {
+		anyThread, anyChannel = true, true
+	}
+
+	if anyThread {
 		serverWidePermissions = append(serverWidePermissions,
 			permission.CreatePrivateThreads,
 			permission.SendMessagesInThreads,
 			permission.ManageThreads,
 		)
-	} else {
+	}
+	if anyChannel {
 		serverWidePermissions = append(serverWidePermissions, permission.ManageChannels)
 	}
 	serverWidePermissions = append(serverWidePermissions, botpermissions.StandardPermissions...)
@@ -186,7 +193,7 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 			}
 
 			// Check permissions for this panel
-			panelResults, hasMissing := checkPanelPermissions(worker, guildId, botMember, *panel, settings)
+			panelResults, hasMissing := checkPanelPermissions(worker, guildId, botMember, *panel)
 			results = append(results, fmt.Sprintf("**Panel: %s**\n%s", panel.Title, panelResults))
 			if hasMissing {
 				hasMissingPermissions = true
@@ -228,12 +235,12 @@ func checkServerWidePermissions(worker *w.Context, guildId uint64, botMember mem
 	return result.String(), len(missing) > 0
 }
 
-func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.Member, panel database.Panel, settings database.Settings) (string, bool) {
+func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.Member, panel database.Panel) (string, bool) {
 	var results []string
 	var hasMissingPermissions bool
 
 	// Determine if this panel uses threads or channels
-	usesThreads := settings.UseThreads || panel.UseThreads
+	usesThreads := panel.UseThreads
 
 	// Check panel channel permissions (if panel has a channel)
 	if panel.ChannelId != 0 {
@@ -286,8 +293,7 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 	}
 
 	// Check notification channel if using thread mode
-	if usesThreads && settings.TicketNotificationChannel != nil {
-		// Notification channel needs standard permissions + embed links
+	if usesThreads && panel.TicketNotificationChannel != nil {
 		notificationPerms := append(
 			[]permission.Permission{
 				permission.EmbedLinks,
@@ -295,7 +301,7 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 			},
 			botpermissions.MinimalPermissions...,
 		)
-		result, hasMissing := checkChannelPermissions(worker, *settings.TicketNotificationChannel, botMember, guildId, notificationPerms, "Notification Channel")
+		result, hasMissing := checkChannelPermissions(worker, *panel.TicketNotificationChannel, botMember, guildId, notificationPerms, "Notification Channel")
 		results = append(results, result)
 		if hasMissing {
 			hasMissingPermissions = true

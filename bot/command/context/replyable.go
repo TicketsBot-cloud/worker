@@ -23,6 +23,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
@@ -133,7 +134,7 @@ func (r *Replyable) HandleError(err error) {
 		fmt.Printf("ctx.HandleError: %s\n", err.Error())
 	}
 
-	eventId := sentry.ErrorWithContext(err, r.ctx.ToErrorContext())
+	eventId := logging.ErrorWithContext(err, r.ctx.ToErrorContext())
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return
@@ -151,7 +152,7 @@ func (r *Replyable) HandleError(err error) {
 }
 
 func (r *Replyable) HandleWarning(err error) {
-	eventId := sentry.LogWithContext(err, r.ctx.ToErrorContext())
+	eventId := logging.WarnWithContext(err, r.ctx.ToErrorContext())
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return
@@ -325,19 +326,13 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 	}
 
 	var useThreads bool
-	settings, settingsErr := ctx.Settings()
-	if settingsErr == nil {
-		useThreads = settings.UseThreads
-	}
 
 	var panel *database.Panel
 	if btnCtx, ok := ctx.(*ButtonContext); ok {
 		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
 		if err == nil && panelExists {
 			panel = &p
-			if !useThreads {
-				useThreads = panel.UseThreads
-			}
+			useThreads = panel.UseThreads
 		}
 	}
 
@@ -360,10 +355,8 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 	} else {
 		primaryLabel = "Ticket category"
 		primaryRequired = botpermissions.ChannelModeRequired
-		if panel != nil && panel.TargetCategory != 0 {
+		if panel != nil {
 			primaryChannelId = panel.TargetCategory
-		} else {
-			primaryChannelId, _ = dbclient.Client.ChannelCategory.Get(context.Background(), ctx.GuildId())
 		}
 	}
 
@@ -380,19 +373,10 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 	}
 
 	// 2. Notification channel (thread mode only)
-	if useThreads {
-		var notifChannelId *uint64
-		if panel != nil && panel.TicketNotificationChannel != nil {
-			notifChannelId = panel.TicketNotificationChannel
-		} else if settingsErr == nil && settings.TicketNotificationChannel != nil {
-			notifChannelId = settings.TicketNotificationChannel
-		}
-		if notifChannelId != nil {
-			notifRequired := botpermissions.NotifChannelRequired
-			loc := checkChannel(*notifChannelId, "Notification channel", notifRequired)
-			if len(loc.missing) > 0 {
-				locations = append(locations, loc)
-			}
+	if useThreads && panel != nil && panel.TicketNotificationChannel != nil {
+		loc := checkChannel(*panel.TicketNotificationChannel, "Notification channel", botpermissions.NotifChannelRequired)
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
 		}
 	}
 

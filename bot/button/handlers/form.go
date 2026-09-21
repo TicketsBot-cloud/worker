@@ -75,7 +75,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 		}
 
 		ctx.Defer()
-		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, formAnswers, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
+		_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, formAnswers, outOfHoursTitle, outOfHoursWarning, outOfHoursColour, database.TicketSourcePanel)
 
 		return
 	}

@@ -129,12 +129,6 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 	e := utils.BuildEmbed(ctx, customisation.Green, i18n.TitleAddAdmin, i18n.MessageAddAdminSuccess, nil, mention)
 	ctx.Edit(command.NewEphemeralEmbedMessageResponse(e))
 
-	settings, err := ctx.Settings()
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	// Get member and target name once for reuse in audit reasons
 	member, err := ctx.Member()
 	hasMember := err == nil
@@ -156,8 +150,8 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 		}
 	}
 
-	// Add user / role to thread notification channel
-	if settings.TicketNotificationChannel != nil {
+	// Add user / role to each panel's thread notification channel
+	{
 		auditReason := "Added admin member/role"
 		if hasMember && targetName != "" {
 			auditReason = fmt.Sprintf("Added admin %s (%s) by %s", mentionableType, targetName, member.User.Username)
@@ -165,13 +159,25 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			auditReason = fmt.Sprintf("Added admin member/role by %s", member.User.Username)
 		}
 
-		reasonCtx := request.WithAuditReason(ctx, auditReason)
-		_ = ctx.Worker().EditChannelPermissions(reasonCtx, *settings.TicketNotificationChannel, channel.PermissionOverwrite{
-			Id:    id,
-			Type:  mentionableType.OverwriteType(),
-			Allow: permission.BuildPermissions(permission.ViewChannel, permission.UseApplicationCommands, permission.ReadMessageHistory),
-			Deny:  0,
-		})
+		panels, _ := dbclient.Client.Panel.GetByGuild(ctx, ctx.GuildId())
+		seen := make(map[uint64]struct{})
+		for _, p := range panels {
+			if p.TicketNotificationChannel == nil {
+				continue
+			}
+			chId := *p.TicketNotificationChannel
+			if _, already := seen[chId]; already {
+				continue
+			}
+			seen[chId] = struct{}{}
+			reasonCtx := request.WithAuditReason(ctx, auditReason)
+			_ = ctx.Worker().EditChannelPermissions(reasonCtx, chId, channel.PermissionOverwrite{
+				Id:    id,
+				Type:  mentionableType.OverwriteType(),
+				Allow: permission.BuildPermissions(permission.ViewChannel, permission.UseApplicationCommands, permission.ReadMessageHistory),
+				Deny:  0,
+			})
+		}
 	}
 
 	openTickets, err := dbclient.Client.Tickets.GetGuildOpenTicketsExcludeThreads(ctx, ctx.GuildId())

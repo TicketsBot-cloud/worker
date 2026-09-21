@@ -187,12 +187,12 @@ func executeCommand(
 			return
 		}
 
-		if properties.AdminOnly && !utils.IsBotAdmin(interactionContext.UserId()) {
+		if properties.AdminOnly && !utils.IsBotAdmin(ctx, interactionContext.UserId()) {
 			interactionContext.Reply(customisation.Red, i18n.Error, i18n.MessageOwnerOnly)
 			return
 		}
 
-		if properties.HelperOnly && !utils.IsBotHelper(interactionContext.UserId()) {
+		if properties.HelperOnly && !utils.IsBotHelper(ctx, interactionContext.UserId()) {
 			interactionContext.Reply(customisation.Red, i18n.Error, i18n.MessageNoPermission)
 			return
 		}

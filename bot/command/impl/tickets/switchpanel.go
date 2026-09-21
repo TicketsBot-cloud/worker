@@ -217,12 +217,6 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	// If the ticket is a thread, we cannot update the permissions (possibly remove a small amount of  members in the
 	// future), or the parent channel (user may not have access to it. can you even move threads anyway?)
 	if ticket.IsThread {
-		settings, err := ctx.Settings()
-		if err != nil {
-			ctx.HandleError(err)
-			return
-		}
-
 		data := rest.ModifyChannelData{}
 		if shouldUpdateName {
 			data.Name = newChannelName
@@ -244,12 +238,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 
 		// Modify join message
 		if ticket.JoinMessageId != nil {
-			var notificationChannel *uint64
-			if newPanel.TicketNotificationChannel != nil {
-				notificationChannel = newPanel.TicketNotificationChannel
-			} else if settings.TicketNotificationChannel != nil {
-				notificationChannel = settings.TicketNotificationChannel
-			}
+			notificationChannel := newPanel.TicketNotificationChannel
 
 			if notificationChannel != nil {
 				threadStaff, err := logic.GetStaffInThread(ctx.Context, ctx.Worker(), ticket, *ticket.ChannelId)
@@ -292,15 +281,21 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 
-		// GenerateClaimedOverwrites returns nil if the permissions are the same as an unclaimed ticket
-		// so if this is the case, we still need to calculate permissions
+		// If nil, calculate the base permissions and pin the claimer at the user level
 		if overwrites == nil {
-			membersWithClaimer := append(members, claimer)
-			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, membersWithClaimer...)
+			overwrites, err = logic.CreateOverwrites(ctx.Context, ctx, ticket.UserId, &newPanel, newPanel.TargetCategory, members...)
 			if err != nil {
 				ctx.HandleError(err)
 				return
 			}
+
+			claimerOverwrite, err := logic.BuildClaimerOverwrite(ctx.Context, ctx.Worker(), ticket, claimer)
+			if err != nil {
+				ctx.HandleError(err)
+				return
+			}
+
+			overwrites = logic.UpsertMemberOverwrite(overwrites, claimerOverwrite)
 		}
 	}
 

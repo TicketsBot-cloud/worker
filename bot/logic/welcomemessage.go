@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
@@ -21,10 +23,13 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/integrations"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -39,11 +44,6 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
-	settings, err := dbclient.Client.Settings.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return 0, err
-	}
-
 	// Build embeds
 	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
@@ -69,13 +69,11 @@ func SendWelcomeMessage(
 		embeds = append(embeds, formAnswersEmbed)
 	}
 
-	hideClose := settings.HideCloseButton
-	hideCloseWithReason := settings.HideCloseWithReasonButton
-	hideClaim := settings.HideClaimButton
+	var hideClose, hideCloseWithReason, hideClaim bool
 	if panel != nil {
-		hideClose = hideClose || panel.HideCloseButton
-		hideCloseWithReason = hideCloseWithReason || panel.HideCloseWithReasonButton
-		hideClaim = hideClaim || panel.HideClaimButton
+		hideClose = panel.HideCloseButton
+		hideCloseWithReason = panel.HideCloseWithReasonButton
+		hideClaim = panel.HideClaimButton
 	}
 
 	var buttons []component.Component
@@ -138,18 +136,8 @@ func BuildWelcomeMessageEmbed(
 	additionalPlaceholders map[string]string,
 ) (*embed.Embed, error) {
 	if panel == nil || panel.WelcomeMessageEmbed == nil {
-		welcomeMessage, err := dbclient.Client.WelcomeMessages.Get(ctx, ticket.GuildId)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(welcomeMessage) == 0 {
-			welcomeMessage = "Thank you for contacting support.\nPlease describe your issue (and provide an invite to your server if applicable) and wait for a response."
-		}
-
-		// Replace variables
+		welcomeMessage := "Thank you for contacting support.\nPlease describe your issue (and provide an invite to your server if applicable) and wait for a response."
 		welcomeMessage = DoPlaceholderSubstitutions(ctx, welcomeMessage, cmd.Worker(), ticket, additionalPlaceholders)
-
 		return utils.BuildEmbedRaw(cmd.GetColour(customisation.Green), subject, welcomeMessage, nil, cmd.PremiumTier()), nil
 	} else {
 		data, err := dbclient.Client.Embeds.GetEmbed(ctx, *panel.WelcomeMessageEmbed)
@@ -162,7 +150,7 @@ func BuildWelcomeMessageEmbed(
 			return nil, err
 		}
 
-		e := BuildCustomEmbed(ctx, cmd.Worker(), ticket, data, fields, cmd.PremiumTier() == premium.None, additionalPlaceholders)
+		e := BuildCustomEmbed(ctx, cmd.Worker(), ticket, data, fields, FooterPolicyForContext(ctx, cmd), additionalPlaceholders)
 		return e, nil
 	}
 }
@@ -174,6 +162,27 @@ func DoPlaceholderSubstitutions(
 	ticket database.Ticket,
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
+) string {
+	return doPlaceholderSubstitutions(ctx, message, worker, ticket, additionalPlaceholders, false)
+}
+
+func DoPlainTextPlaceholderSubstitutions(
+	ctx context.Context,
+	message string,
+	worker *worker.Context,
+	ticket database.Ticket,
+	additionalPlaceholders map[string]string,
+) string {
+	return doPlaceholderSubstitutions(ctx, message, worker, ticket, additionalPlaceholders, true)
+}
+
+func doPlaceholderSubstitutions(
+	ctx context.Context,
+	message string,
+	worker *worker.Context,
+	ticket database.Ticket,
+	additionalPlaceholders map[string]string,
+	plainTextOnly bool,
 ) string {
 	// Handle escaped placeholders first: \%...\% -> temporary marker
 	escapedPlaceholderRegex := regexp.MustCompile(`\\%([a-z_]+(?::[^%\\]+)?)\\%`)
@@ -189,7 +198,7 @@ func DoPlaceholderSubstitutions(
 	})
 
 	// Process parameterized placeholders first (e.g., %date_days:30%)
-	message = doParameterizedSubstitutions(ctx, message, worker, ticket)
+	message = doParameterizedSubstitutions(ctx, message, worker, ticket, plainTextOnly)
 
 	var lock sync.Mutex
 
@@ -198,6 +207,12 @@ func DoPlaceholderSubstitutions(
 	for placeholder, f := range substitutions {
 		placeholder := placeholder
 		f := f
+
+		if plainTextOnly {
+			if _, isMarkup := markupPlaceholders[placeholder]; isMarkup {
+				continue
+			}
+		}
 
 		formatted := fmt.Sprintf("%%%s%%", placeholder)
 
@@ -236,15 +251,20 @@ func DoPlaceholderSubstitutions(
 	return message
 }
 
+type integrationPlaceholderResult struct {
+	Placeholders map[string]string
+	UserErrors   []string // messages an integration explicitly asked to show the ticket opener
+}
+
 func fetchCustomIntegrationPlaceholders(
 	ctx context.Context,
 	ticket database.Ticket,
 	formAnswers map[string]*string,
-) (map[string]string, error) {
+) (integrationPlaceholderResult, error) {
 	// Custom integrations
 	guildIntegrations, err := dbclient.Client.CustomIntegrationGuilds.GetGuildIntegrations(ctx, ticket.GuildId)
 	if err != nil {
-		return nil, err
+		return integrationPlaceholderResult{}, err
 	}
 
 	// Fetch integrations
@@ -256,7 +276,7 @@ func fetchCustomIntegrationPlaceholders(
 
 		placeholders, err := dbclient.Client.CustomIntegrationPlaceholders.GetAllActivatedInGuild(ctx, ticket.GuildId)
 		if err != nil {
-			return nil, err
+			return integrationPlaceholderResult{}, err
 		}
 
 		// Determine which integrations we need to fetch
@@ -271,12 +291,12 @@ func fetchCustomIntegrationPlaceholders(
 
 		secrets, err := dbclient.Client.CustomIntegrationSecretValues.GetAll(ctx, ticket.GuildId, integrationIds)
 		if err != nil {
-			return nil, err
+			return integrationPlaceholderResult{}, err
 		}
 
 		headers, err := dbclient.Client.CustomIntegrationHeaders.GetAll(ctx, integrationIds)
 		if err != nil {
-			return nil, err
+			return integrationPlaceholderResult{}, err
 		}
 
 		// Replace placeholders
@@ -284,6 +304,8 @@ func fetchCustomIntegrationPlaceholders(
 
 		var lock sync.Mutex
 		m := make(map[string]string) // Merge responses into 1 map
+		var failedIntegrationIds []int
+		var userErrors []string
 
 		for _, integration := range guildIntegrations {
 			integration := integration
@@ -291,12 +313,25 @@ func fetchCustomIntegrationPlaceholders(
 
 			group.Go(func() error {
 				response, err := integrations.Fetch(ctx, integration, ticket, integrationSecrets, headers[integration.Id], placeholderMap[integration.Id], formAnswers)
-				if err != nil {
-					return err
-				}
 
 				lock.Lock()
 				defer lock.Unlock()
+
+				if err != nil {
+					// A single failing integration shouldn't discard every other
+					// integration's already-fetched placeholders, so don't fail the group.
+					failedIntegrationIds = append(failedIntegrationIds, integration.Id)
+					for _, placeholder := range placeholderMap[integration.Id] {
+						m[placeholder.Name] = "N/A"
+					}
+
+					var intErr *integrations.IntegrationError
+					if errors.As(err, &intErr) && intErr.Message != "" {
+						userErrors = append(userErrors, sanitizeIntegrationErrorMessage(intErr.Message))
+					}
+
+					return nil
+				}
 
 				for key, value := range response {
 					m[key] = value
@@ -306,13 +341,20 @@ func fetchCustomIntegrationPlaceholders(
 			})
 		}
 
-		if err := group.Wait(); err != nil {
-			return nil, err
+		_ = group.Wait() // closures above never return a non-nil error; only used to block until done
+
+		if len(failedIntegrationIds) > 0 {
+			logging.WarnWithContext(
+				fmt.Errorf("failed to fetch %d/%d custom integration(s)", len(failedIntegrationIds), len(guildIntegrations)),
+				errorcontext.WorkerErrorContext{Guild: ticket.GuildId, User: ticket.UserId, Channel: utils.ValueOrZero(ticket.ChannelId)},
+				zap.Int("ticket_id", ticket.Id),
+				zap.Ints("integration_ids", failedIntegrationIds),
+			)
 		}
 
-		return m, nil
+		return integrationPlaceholderResult{Placeholders: m, UserErrors: userErrors}, nil
 	} else {
-		return make(map[string]string), nil
+		return integrationPlaceholderResult{Placeholders: make(map[string]string)}, nil
 	}
 }
 
@@ -417,6 +459,7 @@ func doParameterizedSubstitutions(
 	message string,
 	worker *worker.Context,
 	ticket database.Ticket,
+	plainTextOnly bool,
 ) string {
 	// Find all parameterized placeholder matches
 	matches := parameterizedPlaceholderRegex.FindAllStringSubmatchIndex(message, -1)
@@ -435,6 +478,12 @@ func doParameterizedSubstitutions(
 			continue
 		}
 
+		if plainTextOnly {
+			if _, isMarkup := markupPlaceholders[placeholderName]; isMarkup {
+				continue
+			}
+		}
+
 		// Extract parameters
 		paramString := message[match[4]:match[5]]
 		params := strings.Split(paramString, ":")
@@ -449,6 +498,24 @@ func doParameterizedSubstitutions(
 	return message
 }
 
+const AvatarUrlPlaceholder = "%avatar_url%"
+
+const defaultAvatarUrl = "https://cdn.discordapp.com/embed/avatars/0.png"
+
+var markupPlaceholders = map[string]struct{}{
+	"user":                          {},
+	"channel":                       {},
+	"time":                          {},
+	"date":                          {},
+	"datetime":                      {},
+	"discord_account_creation_date": {},
+	"discord_account_age":           {},
+	"date_days":                     {},
+	"date_weeks":                    {},
+	"date_months":                   {},
+	"date_timestamp":                {},
+}
+
 var substitutions = map[string]PlaceholderSubstitutionFunc{
 	"user_id": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		return strconv.FormatUint(ticket.UserId, 10)
@@ -460,7 +527,11 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		return strconv.Itoa(ticket.Id)
 	},
 	"channel": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
-		return fmt.Sprintf("<#%d>", ticket.ChannelId)
+		if ticket.ChannelId == nil {
+			return ""
+		}
+
+		return fmt.Sprintf("<#%d>", *ticket.ChannelId)
 	},
 	"username": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		user, _ := worker.GetUser(ticket.UserId)
@@ -479,8 +550,8 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		return strconv.Itoa(len(open))
 	},
 	"total_tickets": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
-		count, _ := dbclient.Analytics.GetTotalTicketCount(ctx, ticket.GuildId)
-		return strconv.FormatUint(count, 10)
+		count, _ := dbclient.Client.Tickets.GetTotalTicketCount(ctx, ticket.GuildId)
+		return strconv.Itoa(count)
 	},
 	"user_open_tickets": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
 		count, _ := dbclient.Client.Tickets.GetOpenCountByUser(ctx, ticket.GuildId, ticket.UserId)
@@ -490,19 +561,40 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		tickets, _ := dbclient.Client.Tickets.GetTotalCountByUser(ctx, ticket.GuildId, ticket.UserId)
 		return strconv.Itoa(tickets)
 	},
-	"ticket_limit": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
-		limit, _ := dbclient.Client.TicketLimit.Get(ctx, ticket.GuildId)
-		return strconv.Itoa(int(limit))
+	"ticket_limit": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
+		var panelLimit uint8
+		if ticket.PanelId != nil {
+			panel, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+			if err == nil && panel.TicketLimit != nil {
+				panelLimit = *panel.TicketLimit
+			}
+		}
+
+		guildLimit := database.DefaultTicketLimit
+		if settings, err := dbclient.Client.Settings.Get(ctx, ticket.GuildId); err == nil {
+			guildLimit = settings.TicketLimit
+		}
+
+		effective := guildLimit
+		if panelLimit > 0 && (effective == 0 || panelLimit < effective) {
+			effective = panelLimit
+		}
+
+		if effective == 0 {
+			return "unlimited"
+		}
+
+		return strconv.Itoa(int(effective))
 	},
 	"rating_count": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
 		ctx, cancel := context.WithTimeout(context.Background(), substitutionTimeout)
 		defer cancel()
 
-		ratingCount, _ := dbclient.Analytics.GetFeedbackCountGuild(ctx, ticket.GuildId)
-		return strconv.FormatUint(ratingCount, 10)
+		ratingCount, _ := dbclient.Client.ServiceRatings.GetCount(ctx, ticket.GuildId)
+		return strconv.Itoa(ratingCount)
 	},
 	"average_rating": func(ctx context.Context, _ *worker.Context, ticket database.Ticket) string {
-		average, _ := dbclient.Analytics.GetAverageFeedbackRatingGuild(ctx, ticket.GuildId)
+		average, _ := dbclient.Client.ServiceRatings.GetAverage(ctx, ticket.GuildId)
 		return fmt.Sprintf("%.1f", average)
 	},
 	"time": func(ctx context.Context, worker *worker.Context, ticket database.Ticket) string {
@@ -530,7 +622,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 			}
 		}
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(ctx, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -551,7 +643,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 			}
 		}
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(ctx, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(ctx, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -575,7 +667,7 @@ var substitutions = map[string]PlaceholderSubstitutionFunc{
 		context, cancel := context.WithTimeout(context.Background(), time.Millisecond*1500)
 		defer cancel()
 
-		data, err := dbclient.Analytics.GetFirstResponseTimeStats(context, ticket.GuildId)
+		data, err := dbclient.Client.FirstResponseTime.GetAverageTripleWindow(context, ticket.GuildId)
 		if err != nil {
 			sentry.Error(err)
 			return ""
@@ -649,68 +741,153 @@ func getFormDataFields(formData map[database.FormInput]string) []embed.EmbedFiel
 	return fields
 }
 
+const (
+	embedTitleLimit      = 256
+	embedAuthorNameLimit = 256
+	embedFooterTextLimit = 2048
+	embedFieldNameLimit  = 256
+)
+
+func truncateRunes(s string, limit int) string {
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+
+	return string(runes[:limit])
+}
+
+// integrationErrorMessageLimit bounds a single integration's error text so a
+// guild with several failing integrations can't blow Discord's 4096-char
+// embed description limit between them.
+const integrationErrorMessageLimit = 500
+
+// integrationErrorReplyLimit is the final cap applied to every integration's
+// error text joined together, comfortably under Discord's 4096-char embed
+// description limit.
+const integrationErrorReplyLimit = 3900
+
+// sanitizeIntegrationErrorMessage prepares a custom integration's own
+// { "error": "..." } text for display to the ticket opener. The webhook this
+// came from is configured by the guild's admin, but its response is
+// third-party content, so it's treated the same as any other untrusted text
+// destined for a Discord message. EscapeMarkdown doesn't touch "[" or "]",
+// so without escaping those too, "[click here](https://evil.example)" would
+// render as a real, clickable masked link inside the bot's own error embed.
+func sanitizeIntegrationErrorMessage(message string) string {
+	escaped := utils.EscapeMarkdown(message)
+	escaped = strings.ReplaceAll(escaped, "[", "\\[")
+	escaped = strings.ReplaceAll(escaped, "]", "\\]")
+	return truncateRunes(escaped, integrationErrorMessageLimit)
+}
+
+type FooterPolicy struct {
+	ShowBranding bool
+	AllowCustom  bool
+}
+
+func FooterPolicyForContext(ctx context.Context, cmd registry.CommandContext) FooterPolicy {
+	if cmd.PremiumTier() == premium.None {
+		return FooterPolicy{ShowBranding: true}
+	}
+
+	_, source, err := utils.PremiumClient.GetTierByGuildIdWithSource(ctx, cmd.GuildId(), cmd.Worker().Token, cmd.Worker().RateLimiter)
+	if err != nil {
+		sentry.Error(err)
+		return FooterPolicy{AllowCustom: true}
+	}
+
+	return FooterPolicy{AllowCustom: source != model.EntitlementSourceVoting}
+}
+
 func BuildCustomEmbed(
 	ctx context.Context, worker *worker.Context,
 	ticket database.Ticket,
 	customEmbed database.CustomEmbed,
 	fields []database.EmbedField,
-	branding bool,
+	footer FooterPolicy,
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) *embed.Embed {
-	description := utils.ValueOrZero(customEmbed.Description)
-	if ticket.Id != 0 {
-		description = DoPlaceholderSubstitutions(ctx, description, worker, ticket, additionalPlaceholders)
+	substitute := func(s string) string {
+		if ticket.Id == 0 {
+			return s
+		}
+
+		return DoPlaceholderSubstitutions(ctx, s, worker, ticket, additionalPlaceholders)
+	}
+
+	resolveAvatarUrl := func(url string) string {
+		return replaceAvatarPlaceholder(worker, ticket, url)
+	}
+
+	plainTextSubstitute := func(s string, limit int) string {
+		if ticket.Id == 0 {
+			return s
+		}
+
+		return truncateRunes(DoPlainTextPlaceholderSubstitutions(ctx, s, worker, ticket, additionalPlaceholders), limit)
 	}
 
 	e := &embed.Embed{
-		Title:       utils.ValueOrZero(customEmbed.Title),
-		Description: description,
-		Url:         utils.ValueOrZero(customEmbed.Url),
+		Title:       plainTextSubstitute(utils.ValueOrZero(customEmbed.Title), embedTitleLimit),
+		Description: substitute(utils.ValueOrZero(customEmbed.Description)),
+		Url:         resolveAvatarUrl(utils.ValueOrZero(customEmbed.Url)),
 		Timestamp:   customEmbed.Timestamp,
 		Color:       int(customEmbed.Colour),
 	}
 
-	if branding {
+	if footer.ShowBranding {
 		e.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
-	} else if customEmbed.FooterText != nil {
-		e.SetFooter(*customEmbed.FooterText, utils.ValueOrZero(customEmbed.FooterIconUrl))
+	} else if footer.AllowCustom && customEmbed.FooterText != nil {
+		e.SetFooter(
+			plainTextSubstitute(*customEmbed.FooterText, embedFooterTextLimit),
+			resolveAvatarUrl(utils.ValueOrZero(customEmbed.FooterIconUrl)),
+		)
 	}
 
-	if customEmbed.ImageUrl != nil {
-		imageUrl := replaceImagePlaceholder(worker, ticket, *customEmbed.ImageUrl)
+	if imageUrl := resolveAvatarUrl(utils.ValueOrZero(customEmbed.ImageUrl)); imageUrl != "" {
 		e.SetImage(imageUrl)
 	}
 
-	if customEmbed.ThumbnailUrl != nil {
-		imageUrl := replaceImagePlaceholder(worker, ticket, *customEmbed.ThumbnailUrl)
-		e.SetThumbnail(imageUrl)
+	if thumbnailUrl := resolveAvatarUrl(utils.ValueOrZero(customEmbed.ThumbnailUrl)); thumbnailUrl != "" {
+		e.SetThumbnail(thumbnailUrl)
 	}
 
 	if customEmbed.AuthorName != nil {
-		e.SetAuthor(*customEmbed.AuthorName, utils.ValueOrZero(customEmbed.AuthorUrl), utils.ValueOrZero(customEmbed.AuthorIconUrl))
+		if authorName := plainTextSubstitute(*customEmbed.AuthorName, embedAuthorNameLimit); authorName != "" {
+			e.SetAuthor(
+				authorName,
+				resolveAvatarUrl(utils.ValueOrZero(customEmbed.AuthorUrl)),
+				resolveAvatarUrl(utils.ValueOrZero(customEmbed.AuthorIconUrl)),
+			)
+		}
 	}
 
 	for _, field := range fields {
-		value := field.Value
-		if ticket.Id != 0 {
-			value = DoPlaceholderSubstitutions(ctx, value, worker, ticket, additionalPlaceholders)
+		name := plainTextSubstitute(field.Name, embedFieldNameLimit)
+		if name == "" {
+			name = truncateRunes(field.Name, embedFieldNameLimit)
 		}
 
-		e.AddField(field.Name, value, field.Inline)
+		e.AddField(name, substitute(field.Value), field.Inline)
 	}
 
 	return e
 }
 
-func replaceImagePlaceholder(worker *worker.Context, ticket database.Ticket, imageUrl string) string {
-	if imageUrl != "%avatar_url%" {
-		return imageUrl
+func replaceAvatarPlaceholder(worker *worker.Context, ticket database.Ticket, url string) string {
+	if url != AvatarUrlPlaceholder {
+		return url
+	}
+
+	if ticket.UserId == 0 {
+		return defaultAvatarUrl
 	}
 
 	user, err := worker.GetUser(ticket.UserId)
 	if err != nil {
-		return ""
+		return defaultAvatarUrl
 	}
 
 	return user.AvatarUrl(256)

@@ -49,10 +49,16 @@ func (h *CloseHandler) Execute(ctx *cmdcontext.ButtonContext) {
 		return
 	}
 
-	closeConfirmation, err := dbclient.Client.CloseConfirmation.Get(ctx, ctx.GuildId())
-	if err != nil {
-		ctx.HandleError(err)
-		return
+	closeConfirmation := true // default: show close confirmation
+	if ticket.PanelId != nil {
+		p, err := dbclient.Client.Panel.GetById(ctx, *ticket.PanelId)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+		if p.PanelId != 0 {
+			closeConfirmation = p.CloseConfirmation
+		}
 	}
 
 	if closeConfirmation {

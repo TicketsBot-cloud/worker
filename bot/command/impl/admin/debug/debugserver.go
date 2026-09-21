@@ -146,12 +146,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		return
 	}
 
-	settings, err := dbclient.Client.Settings.Get(ctx, guild.Id)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
 	owner, err := worker.GetUser(guild.OwnerId)
 	if err != nil {
 		ctx.HandleError(err)
@@ -191,19 +185,6 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 			featuresEnabled = append(featuresEnabled, string(feature))
 		}
 	}
-
-	// Helper to get ticket notification channel info
-	getTicketNotifChannel := func() (string, string) {
-		if settings.UseThreads && settings.TicketNotificationChannel != nil {
-			ch, err := worker.GetChannel(*settings.TicketNotificationChannel)
-			if err == nil {
-				return ch.Name, strconv.FormatUint(ch.Id, 10)
-			}
-		}
-		return "Disabled", "Disabled"
-	}
-
-	ticketNotifChannelName, ticketNotifChannelId := getTicketNotifChannel()
 
 	panelLimit := "3"
 	premiumTier := "None"
@@ -283,35 +264,21 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 	}
 	guildInfo = append(guildInfo, fmt.Sprintf("Server Blacklisted: `%t`", IsGuildBlacklisted))
 
-	// Count panels with per-panel thread mode override
-	perPanelThreadModeCount := 0
+	// Count panels using thread mode
+	threadPanelCount := 0
 	for _, panel := range panels {
-		if panel.UseThreads != settings.UseThreads {
-			perPanelThreadModeCount++
+		if panel.UseThreads {
+			threadPanelCount++
 		}
-	}
-
-	ticketMode := "Channel Mode"
-	if settings.UseThreads {
-		ticketMode = "Thread Mode"
 	}
 
 	// Check if bot has administrator permission
 	hasAdministrator := permissionwrapper.HasPermissions(worker, guild.Id, worker.BotId, permission.Administrator)
 
 	settingsInfo := []string{
-		fmt.Sprintf("Transcripts Enabled: `%t`", settings.StoreTranscripts),
 		fmt.Sprintf("Panel Count: `%d/%s`", panelCount, panelLimit),
-		fmt.Sprintf("Ticket Mode: `%s`", ticketMode),
+		fmt.Sprintf("Thread Mode Panels: `%d/%d`", threadPanelCount, panelCount),
 		fmt.Sprintf("Bot Has Administrator: `%t`", hasAdministrator),
-	}
-
-	if perPanelThreadModeCount > 0 && !settings.UseThreads {
-		settingsInfo = append(settingsInfo, fmt.Sprintf("Per-Panel Thread Mode: `%d/%d panels`", perPanelThreadModeCount, panelCount))
-	}
-
-	if settings.UseThreads {
-		settingsInfo = append(settingsInfo, fmt.Sprintf("Notification Channel: `#%s` (%s)", ticketNotifChannelName, ticketNotifChannelId))
 	}
 
 	if len(integrations) > 0 {

@@ -32,11 +32,12 @@ type ModalContext struct {
 	*ReplyCounter
 	*MessageComponentExtensions
 	*StateCache
-	worker          *worker.Context
-	Interaction     interaction.ModalSubmitInteraction
-	premium         premium.PremiumTier
-	hasReplied      *atomic.Bool
-	responseChannel chan button.Response
+	worker           *worker.Context
+	Interaction      interaction.ModalSubmitInteraction
+	premium          premium.PremiumTier
+	hasReplied       *atomic.Bool
+	responseChannel  chan button.Response
+	hasSourceMessage bool
 }
 
 var _ registry.CommandContext = (*ModalContext)(nil)
@@ -47,15 +48,17 @@ func NewModalContext(
 	interaction interaction.ModalSubmitInteraction,
 	premium premium.PremiumTier,
 	responseChannel chan button.Response,
+	hasSourceMessage bool,
 ) *ModalContext {
 	c := ModalContext{
-		Context:         ctx,
-		ReplyCounter:    NewReplyCounter(),
-		worker:          worker,
-		Interaction:     interaction,
-		premium:         premium,
-		hasReplied:      atomic.NewBool(false),
-		responseChannel: responseChannel,
+		Context:          ctx,
+		ReplyCounter:     NewReplyCounter(),
+		worker:           worker,
+		Interaction:      interaction,
+		premium:          premium,
+		hasReplied:       atomic.NewBool(false),
+		responseChannel:  responseChannel,
+		hasSourceMessage: hasSourceMessage,
 	}
 
 	c.Replyable = NewReplyable(&c)
@@ -65,8 +68,11 @@ func NewModalContext(
 }
 
 func (c *ModalContext) Defer() {
-	c.hasReplied.Store(true)
-	c.Ack()
+	if c.hasSourceMessage {
+		c.hasReplied.Store(true)
+		c.Ack()
+		return
+	}
 }
 
 func (c *ModalContext) GetInput(customId string) (string, bool) {
@@ -145,8 +151,14 @@ func (c *ModalContext) ReplyWith(response command.MessageResponse) (msg message.
 	}
 
 	if !hasReplied {
-		c.responseChannel <- button.ResponseMessage{
-			Data: response,
+		if c.hasSourceMessage {
+			c.responseChannel <- button.ResponseMessage{
+				Data: response,
+			}
+		} else {
+			c.responseChannel <- button.ResponseEdit{
+				Data: response,
+			}
 		}
 	} else {
 		if time.Now().Sub(utils.SnowflakeToTime(c.interaction.Id)) > time.Minute*14 {

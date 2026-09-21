@@ -33,5 +33,5 @@ func (c AutoCloseConfigureCommand) GetExecutor() interface{} {
 }
 
 func (AutoCloseConfigureCommand) Execute(ctx registry.CommandContext) {
-	ctx.Reply(customisation.Green, i18n.TitleAutoclose, i18n.MessageAutoCloseConfigure, fmt.Sprintf("%s/manage/%d/settings", config.Conf.Bot.DashboardUrl, ctx.GuildId()))
+	ctx.Reply(customisation.Green, i18n.TitleAutoclose, i18n.MessageAutoCloseConfigure, fmt.Sprintf("%s/manage/%d/panels", config.Conf.Bot.DashboardUrl, ctx.GuildId()))
 }

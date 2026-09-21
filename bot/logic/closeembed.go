@@ -214,7 +214,8 @@ func EditDMMessageIfExists(
 	ctx context.Context,
 	w *worker.Context,
 	ticket database.Ticket,
-	settings database.Settings,
+	storeTranscripts bool,
+	feedbackEnabled bool,
 	closedBy uint64,
 	reason *string,
 	rating *uint8,
@@ -226,11 +227,6 @@ func EditDMMessageIfExists(
 
 	if !ok {
 		return nil
-	}
-
-	feedbackEnabled, err := dbclient.Client.FeedbackEnabled.Get(ctx, ticket.GuildId)
-	if err != nil {
-		return err
 	}
 
 	hasSentMessage, err := dbclient.Client.Participants.HasParticipated(ctx, ticket.GuildId, ticket.Id, ticket.UserId)
@@ -258,7 +254,7 @@ func EditDMMessageIfExists(
 
 	componentBuilders := [][]CloseEmbedElement{
 		{
-			TranscriptLinkElement(settings.StoreTranscripts),
+			TranscriptLinkElement(storeTranscripts),
 			ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 		},
 		{
@@ -294,7 +290,7 @@ func EditGuildArchiveMessageIfExists(
 	ctx context.Context,
 	worker *worker.Context,
 	ticket database.Ticket,
-	settings database.Settings,
+	storeTranscripts bool,
 	viewFeedbackButton bool,
 	closedBy uint64,
 	reason *string,
@@ -311,7 +307,7 @@ func EditGuildArchiveMessageIfExists(
 
 	componentBuilders := [][]CloseEmbedElement{
 		{
-			TranscriptLinkElement(settings.StoreTranscripts),
+			TranscriptLinkElement(storeTranscripts),
 			ThreadLinkElement(ticket.IsThread && ticket.ChannelId != nil),
 			ViewFeedbackElement(viewFeedbackButton),
 			EditCloseReasonElement(),
