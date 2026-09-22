@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
@@ -20,7 +21,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
@@ -100,46 +100,88 @@ func (h *AdminDebugServerPermissionsModalSubmitHandler) Execute(ctx *context.Mod
 		return
 	}
 
-	// Process permission checks using shared logic
-	results, hasMissingPermissions := processPermissionChecks(selectedValues, worker, guildId, botMember, panels)
+	sections := processPermissionChecks(selectedValues, worker, guildId, botMember, panels)
 
-	// Choose color based on whether permissions are missing
-	colour := customisation.Green
-	if hasMissingPermissions {
-		colour = customisation.Orange
+	// Ack first so every chunk is a follow-up; the initial reply is sent by another goroutine
+	ctx.Ack()
+
+	var chunk []component.Component
+	var chunkText int
+
+	flush := func() bool {
+		if len(chunk) == 0 {
+			return true
+		}
+
+		if _, err := ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents(chunk)); err != nil {
+			ctx.HandleError(err)
+			return false
+		}
+
+		chunk, chunkText = nil, 0
+		return true
 	}
 
-	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
-			ctx,
-			colour,
-			"Admin - Debug Server - Permissions Check",
-			strings.Join(results, "\n\n"),
-		),
-	}))
+	for _, section := range sections {
+		cost := len(section.title) + len(section.body)
+		if len(chunk) >= maxContainersPerMessage || (len(chunk) > 0 && chunkText+cost > maxTextPerMessage) {
+			if !flush() {
+				return
+			}
+		}
+
+		colour := customisation.Green
+		if section.hasMissing {
+			colour = customisation.Orange
+		}
+
+		chunk = append(chunk, utils.BuildAdminContainerRaw(ctx, colour, section.title, section.body))
+		chunkText += cost
+	}
+
+	flush()
 }
 
-func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) ([]string, bool) {
-	// Server-wide permissions
-	serverWidePermissions := append(
-		[]permission.Permission{
-			// Thread mode specific
-			permission.CreatePrivateThreads,
-			permission.SendMessagesInThreads,
-			permission.ManageThreads,
-			// Channel mode specific
-			permission.ManageChannels,
-			// Both modes
-			permission.ManageWebhooks,
-			permission.PinMessages,
-			// Server-wide only
-			permission.ManageRoles,
-		},
-		logic.StandardPermissions[:]...,
-	)
+const (
+	maxComponentsPerMessage = 40
+	componentsPerContainer  = 4
+	maxContainersPerMessage = maxComponentsPerMessage / componentsPerContainer
+	maxTextPerMessage       = 3900
+)
 
-	var results []string
-	var hasMissingPermissions bool
+var pendingCategoryPerms = []permission.Permission{permission.ViewChannel, permission.ManageChannels}
+
+type permissionSection struct {
+	title      string
+	body       string
+	hasMissing bool
+}
+
+func processPermissionChecks(selectedValues []string, worker *w.Context, guildId uint64, botMember member.Member, panels []database.Panel) []permissionSection {
+	serverWidePermissions := []permission.Permission{
+		permission.ManageWebhooks,
+		permission.PinMessages,
+		permission.ManageRoles,
+		permission.ManageChannels,
+		// /notes opens a private thread inside a channel-mode ticket
+		permission.CreatePrivateThreads,
+		permission.SendMessagesInThreads,
+	}
+
+	anyThread := len(panels) == 0
+	for _, p := range panels {
+		if p.UseThreads {
+			anyThread = true
+			break
+		}
+	}
+	if anyThread {
+		serverWidePermissions = append(serverWidePermissions, permission.ManageThreads)
+	}
+
+	serverWidePermissions = append(serverWidePermissions, botpermissions.StandardPermissions...)
+
+	var sections []permissionSection
 
 	for _, value := range selectedValues {
 		parts := strings.Split(value, "_")
@@ -147,11 +189,12 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 
 		switch checkType {
 		case "server":
-			result, hasMissing := checkServerWidePermissions(worker, guildId, botMember, serverWidePermissions)
-			results = append(results, fmt.Sprintf("**Server Wide Permissions**\n%s", result))
-			if hasMissing {
-				hasMissingPermissions = true
-			}
+			body, hasMissing := checkServerWidePermissions(worker, guildId, botMember, serverWidePermissions)
+			sections = append(sections, permissionSection{
+				title:      "Server Wide Permissions",
+				body:       body,
+				hasMissing: hasMissing,
+			})
 
 		case "panel":
 			if len(parts) < 2 {
@@ -162,7 +205,6 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 				continue
 			}
 
-			// Find the panel
 			var panel *database.Panel
 			for i := range panels {
 				if panels[i].MessageId == panelMessageId {
@@ -172,20 +214,24 @@ func processPermissionChecks(selectedValues []string, worker *w.Context, guildId
 			}
 
 			if panel == nil {
-				results = append(results, fmt.Sprintf("**Panel (ID: %d)**\nPanel not found", panelMessageId))
+				sections = append(sections, permissionSection{
+					title:      fmt.Sprintf("Panel (ID: %d)", panelMessageId),
+					body:       "Panel not found",
+					hasMissing: true,
+				})
 				continue
 			}
 
-			// Check permissions for this panel
-			panelResults, hasMissing := checkPanelPermissions(worker, guildId, botMember, *panel)
-			results = append(results, fmt.Sprintf("**Panel: %s**\n%s", panel.Title, panelResults))
-			if hasMissing {
-				hasMissingPermissions = true
-			}
+			body, hasMissing := checkPanelPermissions(worker, guildId, botMember, *panel)
+			sections = append(sections, permissionSection{
+				title:      fmt.Sprintf("Panel: %s", panel.Title),
+				body:       body,
+				hasMissing: hasMissing,
+			})
 		}
 	}
 
-	return results, hasMissingPermissions
+	return sections
 }
 
 func checkServerWidePermissions(worker *w.Context, guildId uint64, botMember member.Member, requiredPermissions []permission.Permission) (string, bool) {
@@ -230,20 +276,9 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 	if panel.ChannelId != 0 {
 		var panelChannelPerms []permission.Permission
 		if usesThreads {
-			// Thread mode: specific thread permissions + standard permissions
-			panelChannelPerms = append(
-				[]permission.Permission{
-					permission.CreatePrivateThreads,
-					permission.SendMessagesInThreads,
-					permission.ManageThreads,
-					permission.ManageWebhooks,
-					permission.PinMessages,
-				},
-				logic.StandardPermissions[:]...,
-			)
+			panelChannelPerms = botpermissions.ThreadModeRequired
 		} else {
-			// Channel mode: just standard permissions (no special ones needed for panel channel in channel mode)
-			panelChannelPerms = append([]permission.Permission{}, logic.StandardPermissions[:]...)
+			panelChannelPerms = botpermissions.StandardPermissions
 		}
 		result, hasMissing := checkChannelPermissions(worker, panel.ChannelId, botMember, guildId, panelChannelPerms, "Panel Channel")
 		results = append(results, result)
@@ -254,26 +289,33 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 
 	// Check category permissions if using channel mode
 	if !usesThreads && panel.TargetCategory != 0 {
-		// Category needs channel management permissions + standard permissions
-		categoryPerms := append(
-			[]permission.Permission{
-				permission.ManageChannels,
-				permission.ManageWebhooks,
-				permission.PinMessages,
-			},
-			logic.StandardPermissions[:]...,
-		)
+		categoryPerms := botpermissions.ChannelModeRequired
 		result, hasMissing := checkChannelPermissions(worker, panel.TargetCategory, botMember, guildId, categoryPerms, "Category")
 		results = append(results, result)
 		if hasMissing {
 			hasMissingPermissions = true
 		}
+
+		if panel.OverflowEnabled && panel.OverflowCategoryId != nil {
+			result, hasMissing := checkChannelPermissions(worker, *panel.OverflowCategoryId, botMember, guildId, categoryPerms, "Overflow Category")
+			results = append(results, result)
+			if hasMissing {
+				hasMissingPermissions = true
+			}
+		}
+
+		if panel.PendingCategory != nil {
+			result, hasMissing := checkChannelPermissions(worker, *panel.PendingCategory, botMember, guildId, pendingCategoryPerms, "Pending Category")
+			results = append(results, result)
+			if hasMissing {
+				hasMissingPermissions = true
+			}
+		}
 	}
 
 	// Check transcript channel if enabled for this panel
 	if panel.TranscriptChannelId != nil {
-		// Transcript channel needs minimal message permissions
-		transcriptPerms := append([]permission.Permission{}, logic.MinimalPermissions[:]...)
+		transcriptPerms := botpermissions.TranscriptChannelRequired
 		result, hasMissing := checkChannelPermissions(worker, *panel.TranscriptChannelId, botMember, guildId, transcriptPerms, "Transcript Channel")
 		results = append(results, result)
 		if hasMissing {
@@ -281,16 +323,8 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 		}
 	}
 
-	// Check notification channel if using thread mode
-	if usesThreads && panel.TicketNotificationChannel != nil {
-		notificationPerms := append(
-			[]permission.Permission{
-				permission.EmbedLinks,
-				permission.AttachFiles,
-			},
-			logic.MinimalPermissions[:]...,
-		)
-		result, hasMissing := checkChannelPermissions(worker, *panel.TicketNotificationChannel, botMember, guildId, notificationPerms, "Notification Channel")
+	if panel.TicketNotificationChannel != nil {
+		result, hasMissing := checkChannelPermissions(worker, *panel.TicketNotificationChannel, botMember, guildId, botpermissions.NotifChannelRequired, "Notification Channel")
 		results = append(results, result)
 		if hasMissing {
 			hasMissingPermissions = true

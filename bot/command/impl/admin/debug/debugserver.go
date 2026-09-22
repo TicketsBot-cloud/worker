@@ -133,7 +133,7 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 				}
 			}
 			ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-				utils.BuildContainerRaw(
+				utils.BuildAdminContainerRaw(
 					ctx,
 					customisation.Red,
 					"Admin - This server is blacklisted",
@@ -398,7 +398,7 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 
 	// Build component list
 	components := []component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			colour,
 			"Admin - Debug Server",
