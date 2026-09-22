@@ -964,7 +964,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.CommandContext, userId u
 	// Only add PinMessages if the bot has the permission
 	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
 		selfAllow = append(selfAllow, permission.PinMessages)
-	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.ChannelId(), cmd.Worker().BotId, permission.PinMessages) {
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, categoryId, permission.PinMessages) {
 		selfAllow = append(selfAllow, permission.PinMessages)
 	}
 

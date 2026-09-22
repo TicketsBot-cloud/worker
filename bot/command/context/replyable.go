@@ -390,15 +390,23 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 		}
 	}
 
-	if !useThreads && panel != nil && panel.OverflowEnabled && panel.OverflowCategoryId != nil {
-		loc := checkChannel(*panel.OverflowCategoryId, "Overflow category", botpermissions.ChannelModeRequired)
-		if len(loc.missing) > 0 {
-			locations = append(locations, loc)
+	if !useThreads && panel != nil && panel.OverflowEnabled {
+		if panel.OverflowCategoryId != nil {
+			loc := checkChannel(*panel.OverflowCategoryId, "Overflow category", botpermissions.ChannelModeRequired)
+			if len(loc.missing) > 0 {
+				locations = append(locations, loc)
+			}
+		} else if primaryChannelId != 0 {
+			// Skipped when the primary check was already guild-level
+			missing := permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, botpermissions.ChannelModeRequired...)
+			if len(missing) > 0 {
+				locations = append(locations, missingPermLocation{label: "Overflow (no category)", missing: missing})
+			}
 		}
 	}
 
 	if !useThreads && panel != nil && panel.PendingCategory != nil {
-		loc := checkChannel(*panel.PendingCategory, "Pending category", botpermissions.ChannelModeRequired)
+		loc := checkChannel(*panel.PendingCategory, "Pending category", []permission.Permission{permission.ViewChannel, permission.ManageChannels})
 		if len(loc.missing) > 0 {
 			locations = append(locations, loc)
 		}
