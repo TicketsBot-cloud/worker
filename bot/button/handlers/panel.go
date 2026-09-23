@@ -238,6 +238,9 @@ func buildFormComponents(inputs []database.FormInput, inputOptions map[int][]dat
 				MaxValues: maxLength,
 				Required:  utils.Ptr(input.Required),
 			})
+		case int(component.ComponentTextDisplay):
+			components[i] = component.BuildTextDisplay(component.TextDisplay{Content: utils.ValueOrZero(input.Content)})
+			continue // Discord only allows Text Display at the top level, not inside a Label
 		}
 
 		label := component.Label{
