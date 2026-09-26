@@ -34,6 +34,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -165,11 +166,18 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			return database.Ticket{}, nil
 		}
 
-		// Check if the user can send messages in threads in the parent channel
-		if !permissionwrapper.HasPermissionsChannel(
-			cmd.Worker(), cmd.GuildId(), cmd.UserId(), cmd.ChannelId(),
-			permission.SendMessagesInThreads,
-		) {
+		appPermissions := cmd.InteractionMetadata().AppPermissions
+		if appPermissions != 0 && !permission.HasPermissionRaw(appPermissions, permission.Administrator) && !permission.HasPermissionRaw(appPermissions, permission.ViewChannel) {
+			docsUrl := fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl)
+			message := cmd.GetMessage(i18n.MessageErrorMissingPermissionsTitle) + ":\n"
+			message += "* `View Channel`\n"
+			message += "\n" + cmd.GetMessage(i18n.MessageErrorMissingPermissionsBody, docsUrl)
+
+			cmd.ReplyRaw(customisation.Red, cmd.GetMessage(i18n.Error), message)
+			return database.Ticket{}, nil
+		}
+
+		if !canSendMessagesInThreads(cmd) {
 			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCantMessageInThreads, cmd.ChannelId())
 			return database.Ticket{}, nil
 		}
@@ -745,11 +753,15 @@ func checkChannelLimitAndDetermineParentId(
 					if !utils.ContainsFunc(channels, func(c channel.Channel) bool {
 						return c.Id == categoryId
 					}) {
-						if err := dbclient.Client.Panel.SetOverflow(ctx, panelId, false, nil); err != nil {
-							return 0, err
-						}
+						if _, err := worker.GetChannel(categoryId); err != nil {
+							if utils.IsUnknownChannel(err) {
+								if err := dbclient.Client.Panel.SetOverflow(ctx, panelId, false, nil); err != nil {
+									return 0, err
+								}
+							}
 
-						return 0, errCategoryChannelLimitReached
+							return 0, errCategoryChannelLimitReached
+						}
 					}
 
 					// Check that the overflow category still has space
@@ -770,13 +782,39 @@ func checkChannelLimitAndDetermineParentId(
 	return categoryId, nil
 }
 
+func canSendMessagesInThreads(cmd registry.InteractionContext) bool {
+	// Zero when the member had to be looked up outside the interaction
+	if member, err := cmd.Member(); err == nil && member.Permissions != 0 {
+		return permission.HasPermissionRaw(member.Permissions, permission.Administrator) ||
+			permission.HasPermissionRaw(member.Permissions, permission.SendMessagesInThreads)
+	}
+
+	return permissionwrapper.HasPermissionsChannel(
+		cmd.Worker(), cmd.GuildId(), cmd.UserId(), cmd.ChannelId(),
+		permission.SendMessagesInThreads,
+	)
+}
+
 func refreshCachedChannels(ctx context.Context, worker *worker.Context, guildId uint64) error {
 	channels, err := rest.GetGuildChannels(ctx, worker.Token, worker.RateLimiter, guildId)
 	if err != nil {
 		return err
 	}
 
-	return worker.Cache.ReplaceChannels(ctx, guildId, channels)
+	if len(channels) > 0 {
+		if err := worker.Cache.StoreChannels(ctx, channels); err != nil {
+			return err
+		}
+	}
+
+	// Probing would outlast the 3 second ticket open lock
+	go func() {
+		if err := utils.PruneUnlistedChannels(context.Background(), worker, guildId, channels, time.Second*10, false); err != nil {
+			sentry.Error(err)
+		}
+	}()
+
+	return nil
 }
 
 // TODO: Use translation of tickets
