@@ -10,6 +10,8 @@ import (
 	"github.com/TicketsBot-cloud/worker"
 )
 
+var ErrChannelObfuscated = errors.New("channel metadata is obfuscated")
+
 func HasPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, permissions ...permission.Permission) bool {
 	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
 	if err != nil {
@@ -60,7 +62,10 @@ func getAllPermissionsChannel(ctx *worker.Context, guildId, userId, channelId ui
 
 	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
 	if err != nil {
-		sentry.Error(err)
+		if !errors.Is(err, ErrChannelObfuscated) {
+			sentry.Error(err)
+		}
+
 		return permissions
 	}
 
@@ -118,6 +123,10 @@ func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelI
 
 	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
 	if err != nil {
+		if errors.Is(err, ErrChannelObfuscated) {
+			return []permission.Permission{permission.ViewChannel}
+		}
+
 		sentry.Error(err)
 		return required
 	}
@@ -144,6 +153,10 @@ func getEffectivePermissionsChannel(ctx *worker.Context, guildId, userId, channe
 	permissions, err = getGuildTotalRolePermissions(ctx, guildId, userId, permissions)
 	if err != nil {
 		return 0, err
+	}
+
+	if permission.HasPermissionRaw(permissions, permission.Administrator) {
+		return permissions, nil
 	}
 
 	permissions, err = getChannelBasePermissions(ctx, guildId, channelId, permissions)
@@ -253,6 +266,10 @@ func getChannelBasePermissions(ctx *worker.Context, guildId, channelId uint64, i
 	ch, err := ctx.GetChannel(channelId)
 	if err != nil {
 		return 0, err
+	}
+
+	if ch.IsObfuscated() {
+		return 0, ErrChannelObfuscated
 	}
 
 	for _, overwrite := range ch.PermissionOverwrites {
