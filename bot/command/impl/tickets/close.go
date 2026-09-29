@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -38,6 +39,15 @@ func (c CloseCommand) GetExecutor() interface{} {
 }
 
 func (CloseCommand) Execute(ctx registry.CommandContext, reason *string) {
+	if reason != nil {
+		canonical, ok := logic.ResolveChannelCloseReason(ctx, ctx, *reason)
+		if !ok {
+			return
+		}
+
+		reason = &canonical
+	}
+
 	logic.CloseTicket(ctx, ctx, reason, false)
 }
 
@@ -54,6 +64,14 @@ func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoC
 
 	ctx, cancel := utils.ContextTimeout(time.Millisecond * 1500)
 	defer cancel()
+
+	if ticket.Id != 0 {
+		if closeReasons, err := logic.GetPanelCloseReasons(ctx, ticket); err != nil {
+			sentry.Error(err)
+		} else if len(closeReasons.Reasons) > 0 {
+			return closeReasonChoices(closeReasons.Reasons, value)
+		}
+	}
 
 	// If there is no text provided by the user yet, and this is a ticket channel, we can use our materialised view to
 	// get the most common close reasons for that panel. Otherwise, perform a dynamic query to get the most common
@@ -82,6 +100,25 @@ func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoC
 	choices := make([]interaction.ApplicationCommandOptionChoice, len(reasons))
 	for i, reason := range reasons {
 		choices[i] = utils.StringChoice(reason)
+	}
+
+	return choices
+}
+
+func closeReasonChoices(reasons []string, value string) []interaction.ApplicationCommandOptionChoice {
+	value = strings.ToLower(strings.TrimSpace(value))
+
+	choices := make([]interaction.ApplicationCommandOptionChoice, 0, min(len(reasons), 25))
+	for _, reason := range reasons {
+		if !strings.Contains(strings.ToLower(reason), value) {
+			continue
+		}
+
+		choices = append(choices, utils.StringChoice(reason))
+
+		if len(choices) >= 25 {
+			break
+		}
 	}
 
 	return choices

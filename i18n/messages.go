@@ -73,6 +73,11 @@ var (
 	MessageCloseCantRateStaff        MessageId = "close.rate.not_allowed.staff"
 	MessageCloseCantRateEmpty        MessageId = "close.rate.not_allowed.empty"
 
+	MessageCloseReasonNotPredefined     MessageId = "close.reason.not_predefined"
+	MessageCloseReasonMissing           MessageId = "close.reason.missing"
+	MessageCloseReasonCustom            MessageId = "close.reason.custom"
+	MessageCloseReasonCustomDescription MessageId = "close.reason.custom_description"
+
 	MessageTag                       MessageId = "commands.tag.generic"
 	MessageTagCreateInvalidArguments MessageId = "commands.tags.create.invalid_arguments"
 	MessageTagCreateTooLong          MessageId = "commands.tags.create.too_long"

@@ -64,10 +64,19 @@ func (h *EditCloseReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 		return
 	}
 
-	reason, ok := ctx.GetInput("reason")
-	if !ok {
+	reason, hasInput := ctx.GetInput("reason")
+	presets, hasSelect := ctx.GetValues("preset")
+	if !hasInput && !hasSelect {
 		ctx.HandleError(fmt.Errorf("reason input not found in modal submission"))
 		return
+	}
+
+	if hasSelect {
+		reason = pickCloseReason(reason, presets)
+		if reason == "" {
+			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseReasonMissing)
+			return
+		}
 	}
 
 	if len(reason) > 1024 {
@@ -82,6 +91,12 @@ func (h *EditCloseReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 	}
 
 	if ticket.GuildId == 0 {
+		return
+	}
+
+	reason, ok := logic.ResolveCloseReason(ctx.Context, ctx, ticket, reason)
+	if !ok {
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseReasonNotPredefined)
 		return
 	}
 
