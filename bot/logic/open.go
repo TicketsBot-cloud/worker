@@ -1377,8 +1377,7 @@ func countRealChannels(channels []channel.Channel, parentId uint64) int {
 	var count int
 
 	for _, ch := range channels {
-		// Ignore threads
-		if ch.Type == channel.ChannelTypeGuildPublicThread || ch.Type == channel.ChannelTypeGuildPrivateThread || ch.Type == channel.ChannelTypeGuildNewsThread {
+		if ch.Type.IsThread() {
 			continue
 		}
 

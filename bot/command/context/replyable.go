@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -223,7 +224,7 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 						for _, loc := range missingByLocation {
 							locationMsg += fmt.Sprintf("**%s:**\n", loc.label)
 							for _, perm := range loc.missing {
-								locationMsg += fmt.Sprintf("* `%s`\n", perm.String())
+								locationMsg += fmt.Sprintf("* `%s`\n", loc.permissionName(perm))
 							}
 						}
 
@@ -316,8 +317,17 @@ func (r *Replyable) formatDiscordError(restError request.RestError, eventId stri
 }
 
 type missingPermLocation struct {
-	label   string
-	missing []permission.Permission
+	label       string
+	missing     []permission.Permission
+	channelType *channel.ChannelType // nil when guild-level or the channel couldn't be fetched (ChannelTypeGuildText is 0)
+}
+
+func (l missingPermLocation) permissionName(p permission.Permission) string {
+	if l.channelType == nil {
+		return p.String()
+	}
+
+	return p.ChannelName(*l.channelType)
 }
 
 func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocation, error) {
@@ -349,8 +359,12 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 	}
 
 	checkChannel := func(channelId uint64, label string, required []permission.Permission) missingPermLocation {
-		missing := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, channelId, required...)
-		return missingPermLocation{label: label, missing: missing}
+		missing, ch, ok := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, channelId, required...)
+		loc := missingPermLocation{label: label, missing: missing}
+		if ok {
+			loc.channelType = &ch.Type
+		}
+		return loc
 	}
 
 	var locations []missingPermLocation

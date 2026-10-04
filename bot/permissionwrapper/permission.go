@@ -55,13 +55,14 @@ func GetMissingPermissions(ctx *worker.Context, guildId, userId uint64, required
 	return botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), nil, buildRoleMap(roles), required)
 }
 
-func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) []permission.Permission {
+func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) ([]permission.Permission, channel.Channel, bool) {
 	m, roles, ch, err := fetchChannelData(ctx, guildId, userId, channelId)
 	if err != nil {
 		sentry.Error(err)
-		return required
+		return required, channel.Channel{}, false
 	}
-	return botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), ch.PermissionOverwrites, buildRoleMap(roles), required)
+	missing := botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), ch.PermissionOverwrites, buildRoleMap(roles), required)
+	return missing, ch, true
 }
 
 func fetchGuildData(ctx *worker.Context, guildId, userId uint64) (member.Member, []guild.Role, error) {
