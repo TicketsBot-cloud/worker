@@ -256,7 +256,7 @@ func checkServerWidePermissions(worker *w.Context, guildId uint64, botMember mem
 	if len(missing) > 0 {
 		result.WriteString("**Missing Permissions:**\n")
 		for _, p := range missing {
-			result.WriteString(fmt.Sprintf("- %s\n", p))
+			result.WriteString(fmt.Sprintf("- `%s`\n", p))
 		}
 	} else {
 		result.WriteString("All required permissions are present\n")
@@ -363,7 +363,7 @@ func checkChannelPermissions(worker *w.Context, channelId uint64, botMember memb
 	if len(missing) > 0 {
 		result.WriteString("**Missing Permissions:**\n")
 		for _, p := range missing {
-			result.WriteString(fmt.Sprintf("- %s\n", p))
+			result.WriteString(fmt.Sprintf("- `%s`\n", p))
 		}
 	} else {
 		result.WriteString("All required permissions are present\n")
