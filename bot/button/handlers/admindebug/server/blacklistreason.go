@@ -127,7 +127,7 @@ func (h *AdminDebugServerBlacklistReasonHandler) Execute(ctx *context.ButtonCont
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Red,
 			"Admin - Debug Server - Blacklist Reason",

@@ -47,7 +47,7 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, guildIdRaw strin
 
 	if onCooldown, cooldownTime := redis.GetRecacheCooldown(guildId); onCooldown {
 		ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-			utils.BuildContainerWithComponents(
+			utils.BuildAdminContainerWithComponents(
 				ctx,
 				customisation.Red,
 				"Admin - Recache",
@@ -92,7 +92,7 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, guildIdRaw strin
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(
+		utils.BuildAdminContainerWithComponents(
 			ctx,
 			customisation.Orange,
 			"Admin - Recache",

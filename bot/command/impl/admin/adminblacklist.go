@@ -62,7 +62,7 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, guildIdRaw str
 
 	if isBlacklisted, blacklistReason, _ := dbclient.Client.ServerBlacklist.IsBlacklisted(ctx, guildId); isBlacklisted {
 		ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-			utils.BuildContainerRaw(
+			utils.BuildAdminContainerRaw(
 				ctx,
 				customisation.Orange,
 				"Admin - Blacklist",
@@ -112,7 +112,7 @@ func (AdminBlacklistCommand) Execute(ctx registry.CommandContext, guildIdRaw str
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Orange,
 			"Admin - Blacklist",

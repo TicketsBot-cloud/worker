@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/common/featureflags"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
@@ -956,15 +957,14 @@ func CreateOverwrites(ctx context.Context, cmd registry.CommandContext, userId u
 	}
 
 	// Add the bot to the overwrites
-	selfAllow := make([]permission.Permission, len(StandardPermissions), len(StandardPermissions)+2)
-	copy(selfAllow, StandardPermissions[:]) // Do not append to StandardPermissions
+	selfAllow := append([]permission.Permission{}, botpermissions.StandardPermissions...)
 
 	selfAllow = append(selfAllow, permission.ManageChannels)
 
 	// Only add PinMessages if the bot has the permission
 	if permissionwrapper.HasPermissions(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, permission.PinMessages) {
 		selfAllow = append(selfAllow, permission.PinMessages)
-	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.ChannelId(), cmd.Worker().BotId, permission.PinMessages) {
+	} else if permissionwrapper.HasPermissionsChannel(cmd.Worker(), cmd.GuildId(), cmd.Worker().BotId, categoryId, permission.PinMessages) {
 		selfAllow = append(selfAllow, permission.PinMessages)
 	}
 
@@ -1013,8 +1013,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.CommandContext, userId u
 				continue // Already added overwrite above
 			}
 
-			allow := make([]permission.Permission, len(StandardPermissions))
-			copy(allow, StandardPermissions[:])
+			allow := append([]permission.Permission{}, botpermissions.StandardPermissions...)
 
 			overwrites = append(overwrites, channel.PermissionOverwrite{
 				Id:    member,
@@ -1028,7 +1027,7 @@ func CreateOverwrites(ctx context.Context, cmd registry.CommandContext, userId u
 			overwrites = append(overwrites, channel.PermissionOverwrite{
 				Id:    role,
 				Type:  channel.PermissionTypeRole,
-				Allow: permission.BuildPermissions(StandardPermissions[:]...),
+				Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 				Deny:  0,
 			})
 		}
@@ -1378,8 +1377,7 @@ func countRealChannels(channels []channel.Channel, parentId uint64) int {
 	var count int
 
 	for _, ch := range channels {
-		// Ignore threads
-		if ch.Type == channel.ChannelTypeGuildPublicThread || ch.Type == channel.ChannelTypeGuildPrivateThread || ch.Type == channel.ChannelTypeGuildNewsThread {
+		if ch.Type.IsThread() {
 			continue
 		}
 

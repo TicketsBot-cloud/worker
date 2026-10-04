@@ -118,7 +118,7 @@ func (h *AdminDebugServerPanelSettingsModalHandler) Execute(ctx *context.ModalCo
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Orange,
 			"Admin - Debug Server - Panel Settings",
