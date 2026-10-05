@@ -98,18 +98,31 @@ func ApplyClaim(ctx context.Context, cmd registry.CommandContext, ticket databas
 	shouldUpdateName := true
 	// But skip if the user has manually renamed the channel (doesn't match old unclaimed name)
 	oldChannelName, _ := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
-	if currentChannel.Name != oldChannelName {
+	if currentChannel.Name != oldChannelName || newChannelName == oldChannelName {
 		shouldUpdateName = false
 	}
 
-	// Pin the claimer's access at the user level
+	claimer, err := cmd.Worker().GetGuildMember(ticket.GuildId, userId)
+	auditReason := fmt.Sprintf("Claimed ticket %d", ticket.Id)
+	if err == nil {
+		auditReason = fmt.Sprintf("Claimed ticket %d by %s", ticket.Id, claimer.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+
 	if newOverwrites == nil {
 		claimerOverwrite, err := BuildClaimerOverwrite(ctx, cmd.Worker(), ticket, userId)
 		if err != nil {
 			return err
 		}
 
-		newOverwrites = UpsertMemberOverwrite(currentChannel.PermissionOverwrites, claimerOverwrite)
+		if err := cmd.Worker().EditChannelPermissions(reasonCtx, *ticket.ChannelId, claimerOverwrite); err != nil {
+			return err
+		}
+	}
+
+	if newOverwrites == nil && !shouldUpdateName {
+		return nil
 	}
 
 	// Update channel permissions and name
@@ -120,13 +133,6 @@ func ApplyClaim(ctx context.Context, cmd registry.CommandContext, ticket databas
 		data.Name = newChannelName
 	}
 
-	claimer, err := cmd.Worker().GetGuildMember(ticket.GuildId, userId)
-	auditReason := fmt.Sprintf("Claimed ticket %d", ticket.Id)
-	if err == nil {
-		auditReason = fmt.Sprintf("Claimed ticket %d by %s", ticket.Id, claimer.User.Username)
-	}
-
-	reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 	if _, err = cmd.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 		return err
 	}
