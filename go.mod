@@ -2,7 +2,7 @@ module github.com/TicketsBot-cloud/worker
 
 go 1.26.0
 
-replace github.com/TicketsBot-cloud/database => ../database
+// replace github.com/TicketsBot-cloud/database => ../database
 
 // replace github.com/TicketsBot-cloud/common => ../common
 
@@ -16,7 +16,7 @@ require (
 	cloud.google.com/go/profiler v0.4.2
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20251015181023-f0b66a074704
 	github.com/TicketsBot-cloud/common v0.0.0-20260927072029-424264fc4be2
-	github.com/TicketsBot-cloud/database v0.0.0-20261002063446-01dca52a987e
+	github.com/TicketsBot-cloud/database v0.0.0-20261008170428-3b63509d3da8
 	github.com/TicketsBot-cloud/gdl v0.0.0-20260927072153-8dbf0b284f57
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
