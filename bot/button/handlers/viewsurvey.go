@@ -102,7 +102,7 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 
 	for _, answer := range surveyResponse.Responses {
 		var title string
-		if answer.Question == nil {
+		if answer.Question == nil || *answer.Question == "" {
 			title = "Unknown Question"
 		} else {
 			title = *answer.Question
