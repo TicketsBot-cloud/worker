@@ -28,12 +28,15 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -80,14 +83,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	// Check ticket limit before ratelimit token to prevent 1 person from stopping everyone opening tickets
 	violatesTicketLimit, limit := getTicketLimit(ctx, cmd, panel)
 	if violatesTicketLimit {
-		// Notify the user
-		ticketsPluralised := "ticket"
-		if limit > 1 {
-			ticketsPluralised += "s"
-		}
-
-		// TODO: Use translation of tickets
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageTicketLimitReached, limit, ticketsPluralised)
+		replyTicketLimitReached(cmd, limit)
 		return database.Ticket{}, fmt.Errorf("ticket limit reached")
 	}
 
@@ -170,11 +166,18 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			return database.Ticket{}, nil
 		}
 
-		// Check if the user can send messages in threads in the parent channel
-		if !permissionwrapper.HasPermissionsChannel(
-			cmd.Worker(), cmd.GuildId(), cmd.UserId(), cmd.ChannelId(),
-			permission.SendMessagesInThreads,
-		) {
+		appPermissions := cmd.InteractionMetadata().AppPermissions
+		if appPermissions != 0 && !permission.HasPermissionRaw(appPermissions, permission.Administrator) && !permission.HasPermissionRaw(appPermissions, permission.ViewChannel) {
+			docsUrl := fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl)
+			message := cmd.GetMessage(i18n.MessageErrorMissingPermissionsTitle) + ":\n"
+			message += "* `View Channel`\n"
+			message += "\n" + cmd.GetMessage(i18n.MessageErrorMissingPermissionsBody, docsUrl)
+
+			cmd.ReplyRaw(customisation.Red, cmd.GetMessage(i18n.Error), message)
+			return database.Ticket{}, nil
+		}
+
+		if !canSendMessagesInThreads(cmd) {
 			cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenCantMessageInThreads, cmd.ChannelId())
 			return database.Ticket{}, nil
 		}
@@ -427,12 +430,22 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		externalPlaceholderCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 
-		additionalPlaceholders, err := fetchCustomIntegrationPlaceholders(externalPlaceholderCtx, ticket, formAnswersToMap(formData))
+		result, err := fetchCustomIntegrationPlaceholders(externalPlaceholderCtx, ticket, formAnswersToMap(formData))
 		if err != nil {
-			// TODO: Log for integration author and server owner on the dashboard, rather than spitting out a message.
-			// A failing integration should not block the ticket creation process.
-			cmd.HandleError(err)
+			// Prerequisite failure (couldn't even load the integration list) - not
+			// the ticket opener's problem to see, just log it.
+			logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Int("ticket_id", ticket.Id))
+		} else if len(result.UserErrors) > 0 {
+			// An integration explicitly told us why it's rejecting this ticket -
+			// that's meant for the ticket opener, unlike a generic transport failure.
+			// Each message is already sanitised and length-bounded individually
+			// (sanitizeIntegrationErrorMessage); this second cap is on the joined
+			// total, so several failing integrations together still can't exceed
+			// Discord's embed description limit.
+			joined := truncateRunes(strings.Join(result.UserErrors, "\n"), integrationErrorReplyLimit)
+			cmd.ReplyRaw(customisation.Red, cmd.GetMessage(i18n.Error), joined)
 		}
+		additionalPlaceholders := result.Placeholders
 		span.Finish()
 
 		// Placeholder lookups above run in parallel with the ping; only the send
@@ -740,11 +753,15 @@ func checkChannelLimitAndDetermineParentId(
 					if !utils.ContainsFunc(channels, func(c channel.Channel) bool {
 						return c.Id == categoryId
 					}) {
-						if err := dbclient.Client.Panel.SetOverflow(ctx, panelId, false, nil); err != nil {
-							return 0, err
-						}
+						if _, err := worker.GetChannel(categoryId); err != nil {
+							if utils.IsUnknownChannel(err) {
+								if err := dbclient.Client.Panel.SetOverflow(ctx, panelId, false, nil); err != nil {
+									return 0, err
+								}
+							}
 
-						return 0, errCategoryChannelLimitReached
+							return 0, errCategoryChannelLimitReached
+						}
 					}
 
 					// Check that the overflow category still has space
@@ -765,16 +782,64 @@ func checkChannelLimitAndDetermineParentId(
 	return categoryId, nil
 }
 
+func canSendMessagesInThreads(cmd registry.InteractionContext) bool {
+	// Zero when the member had to be looked up outside the interaction
+	if member, err := cmd.Member(); err == nil && member.Permissions != 0 {
+		return permission.HasPermissionRaw(member.Permissions, permission.Administrator) ||
+			permission.HasPermissionRaw(member.Permissions, permission.SendMessagesInThreads)
+	}
+
+	return permissionwrapper.HasPermissionsChannel(
+		cmd.Worker(), cmd.GuildId(), cmd.UserId(), cmd.ChannelId(),
+		permission.SendMessagesInThreads,
+	)
+}
+
 func refreshCachedChannels(ctx context.Context, worker *worker.Context, guildId uint64) error {
 	channels, err := rest.GetGuildChannels(ctx, worker.Token, worker.RateLimiter, guildId)
 	if err != nil {
 		return err
 	}
 
-	return worker.Cache.ReplaceChannels(ctx, guildId, channels)
+	if len(channels) > 0 {
+		if err := worker.Cache.StoreChannels(ctx, channels); err != nil {
+			return err
+		}
+	}
+
+	// Probing would outlast the 3 second ticket open lock
+	go func() {
+		if err := utils.PruneUnlistedChannels(context.Background(), worker, guildId, channels, time.Second*10, false); err != nil {
+			sentry.Error(err)
+		}
+	}()
+
+	return nil
 }
 
-// has hit ticket limit, ticket limit
+// TODO: Use translation of tickets
+func replyTicketLimitReached(cmd registry.CommandContext, limit int) {
+	ticketsPluralised := "ticket"
+	if limit > 1 {
+		ticketsPluralised += "s"
+	}
+
+	cmd.Reply(customisation.Red, i18n.Error, i18n.MessageTicketLimitReached, limit, ticketsPluralised)
+}
+
+// Both limits apply independently; a limit of 0 disables that check.
+func ticketLimitVerdict(panelLimit, guildLimit uint8, panelOpenCount, guildOpenCount int) (bool, int) {
+	if panelLimit > 0 && panelOpenCount >= int(panelLimit) {
+		return true, int(panelLimit)
+	}
+
+	if guildLimit > 0 && guildOpenCount >= int(guildLimit) {
+		return true, int(guildLimit)
+	}
+
+	return false, int(guildLimit)
+}
+
 func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *database.Panel) (bool, int) {
 	isStaff, err := cmd.UserPermissionLevel(ctx)
 	if err != nil {
@@ -786,22 +851,35 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *dat
 		return false, 50
 	}
 
-	var openTicketCount int
-	var ticketLimit uint8
+	var panelLimit uint8
+	if panel != nil && panel.TicketLimit != nil {
+		panelLimit = *panel.TicketLimit
+	}
+
+	var guildLimit uint8
+	var guildOpenCount, panelOpenCount int
 
 	group, _ := errgroup.WithContext(ctx)
 
-	if panel != nil && panel.TicketLimit != nil && *panel.TicketLimit > 0 {
-		ticketLimit = *panel.TicketLimit
+	group.Go(func() error {
+		settings, err := dbclient.Client.Settings.Get(ctx, cmd.GuildId())
+		if err != nil {
+			return err
+		}
+
+		guildLimit = settings.TicketLimit
+		return nil
+	})
+
+	group.Go(func() (err error) {
+		guildOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
+		return
+	})
+
+	if panelLimit > 0 {
 		group.Go(func() (err error) {
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
+			panelOpenCount, err = dbclient.Client.Tickets.GetOpenCountByUserAndPanel(
 				ctx, cmd.GuildId(), cmd.UserId(), panel.PanelId)
-			return
-		})
-	} else {
-		ticketLimit = 5
-		group.Go(func() (err error) {
-			openTicketCount, err = dbclient.Client.Tickets.GetOpenCountByUser(ctx, cmd.GuildId(), cmd.UserId())
 			return
 		})
 	}
@@ -811,7 +889,7 @@ func getTicketLimit(ctx context.Context, cmd registry.CommandContext, panel *dat
 		return true, 1
 	}
 
-	return openTicketCount >= int(ticketLimit), int(ticketLimit)
+	return ticketLimitVerdict(panelLimit, guildLimit, panelOpenCount, guildOpenCount)
 }
 
 func createWebhook(ctx context.Context, c registry.CommandContext, ticketId int, guildId, channelId uint64) error {

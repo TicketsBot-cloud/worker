@@ -57,6 +57,15 @@ const (
 
 	// snippetLength is the length of the one-line preview shown in article lists.
 	snippetLength = 100
+
+	// articleTextBudget matches the kb_articles.content CHECK, so rendering the unbounded embed
+	// JSONB can never make a card larger than a maximum-length article already produces.
+	articleTextBudget = 4096
+
+	// minEmbedBudget stops a nearly-full article appending a stub of its embed.
+	minEmbedBudget = 128
+
+	maxEmbedFields = 25
 )
 
 // customEmojiPattern matches a Discord custom emoji mention, e.g. <:name:123> or <a:name:123>.
@@ -220,29 +229,70 @@ func BuildDeflectionCard(ctx registry.CommandContext, panel database.Panel, arti
 	return utils.Slice(utils.BuildContainerWithComponents(ctx, customisation.Green, i18n.MessageKbSuggestTitle, inner))
 }
 
-// BuildArticleView renders a single article: its content, an optional image, and an
+// articleBody keeps the "is there anything to show" decision out of the component builders,
+// which need a registry.CommandContext that tests cannot construct.
+type articleBody struct {
+	Text     []string
+	ImageUrl string
+}
+
+func (b articleBody) isEmpty() bool {
+	return len(b.Text) == 0 && b.ImageUrl == ""
+}
+
+func buildArticleBody(article database.KBArticle) articleBody {
+	body := articleBody{ImageUrl: articleImageUrl(article)}
+
+	var text string
+	if content := utils.ValueOrZero(article.Content); strings.TrimSpace(content) != "" {
+		text = content
+	}
+
+	// The embed gets only the budget content has not spent, so content is never trimmed and an
+	// article that renders today renders identically.
+	if remaining := articleTextBudget - len([]rune(text)); remaining >= minEmbedBudget {
+		e, fields := articleEmbedParts(article)
+		if embedText := truncateSnippet(embedBodyText(e, fields), remaining); embedText != "" {
+			if text == "" {
+				text = embedText
+			} else {
+				text += "\n\n" + embedText
+			}
+		}
+	}
+
+	if text != "" {
+		body.Text = splitContent(text, textDisplayLimit)
+	}
+
+	return body
+}
+
+// BuildArticleView renders a single article: its body, an optional image, and an
 // action row. Interactive (ephemeral) sources get a Back button; public cards from
 // /kb send carry none. Every view offers a "this helped" feedback button so article
 // usefulness can be measured. When feedbackGiven is true the feedback button is
 // replaced by a disabled acknowledgement, confirming the vote in place.
 func BuildArticleView(ctx registry.CommandContext, article database.KBArticle, src string, feedbackGiven bool) []component.Component {
-	inner := make([]component.Component, 0, 4)
+	inner := make([]component.Component, 0, 5)
 
-	content := utils.ValueOrZero(article.Content)
-	if strings.TrimSpace(content) == "" {
+	// Empty means the renderer produced nothing, not that content is blank, so any embed part
+	// rendered later stops triggering this. MessageKbNoArticlesFound would be false: it was found.
+	body := buildArticleBody(article)
+	if body.isEmpty() {
 		inner = append(inner, component.BuildTextDisplay(component.TextDisplay{
-			Content: ctx.GetMessage(i18n.MessageKbNoArticlesFound),
+			Content: fmt.Sprintf("-# %s", ctx.GetMessage(i18n.MessageKbNoDescription)),
 		}))
-	} else {
-		for _, chunk := range splitContent(content, textDisplayLimit) {
-			inner = append(inner, component.BuildTextDisplay(component.TextDisplay{Content: chunk}))
-		}
 	}
 
-	if imageUrl := articleImageUrl(article); imageUrl != "" {
+	for _, chunk := range body.Text {
+		inner = append(inner, component.BuildTextDisplay(component.TextDisplay{Content: chunk}))
+	}
+
+	if body.ImageUrl != "" {
 		inner = append(inner, component.BuildMediaGallery(component.MediaGallery{
 			Items: []component.MediaGalleryItem{
-				{Media: component.UnfurledMediaItem{Url: imageUrl}},
+				{Media: component.UnfurledMediaItem{Url: body.ImageUrl}},
 			},
 		}))
 	}
@@ -320,13 +370,71 @@ func truncateSnippet(s string, limit int) string {
 // renders as a single tidy preview line.
 var mdWhitespace = regexp.MustCompile(`\s+`)
 
+// articleEmbedParts is the only read of the stored embed: {"fields": [...]} unmarshals to a
+// non-nil wrapper around a nil *CustomEmbed, and a promoted-field read there would panic in a
+// button handler goroutine that has no recover().
+func articleEmbedParts(article database.KBArticle) (*database.CustomEmbed, []database.EmbedField) {
+	if article.Embed == nil {
+		return nil, nil
+	}
+
+	return article.Embed.CustomEmbed, article.Embed.Fields
+}
+
 // articleImageUrl returns the image URL from an article's stored custom embed, if any.
 func articleImageUrl(article database.KBArticle) string {
-	if article.Embed == nil || article.Embed.CustomEmbed == nil || article.Embed.ImageUrl == nil {
+	e, _ := articleEmbedParts(article)
+	if e == nil {
 		return ""
 	}
 
-	return *article.Embed.ImageUrl
+	return utils.ValueOrZero(e.ImageUrl)
+}
+
+// embedBodyText flattens an embed's prose to markdown. Title, url, thumbnail, author, footer,
+// timestamp, colour and Inline are deliberately left out - card-design decisions, not body.
+func embedBodyText(e *database.CustomEmbed, fields []database.EmbedField) string {
+	parts := make([]string, 0, 2)
+
+	if description := embedDescriptionText(e); description != "" {
+		parts = append(parts, description)
+	}
+
+	if fieldsText := embedFieldsText(fields); fieldsText != "" {
+		parts = append(parts, fieldsText)
+	}
+
+	return strings.Join(parts, "\n\n")
+}
+
+func embedDescriptionText(e *database.CustomEmbed) string {
+	if e == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(utils.ValueOrZero(e.Description))
+}
+
+func embedFieldsText(fields []database.EmbedField) string {
+	if len(fields) > maxEmbedFields {
+		fields = fields[:maxEmbedFields]
+	}
+
+	rendered := make([]string, 0, len(fields))
+	for _, field := range fields {
+		name, value := strings.TrimSpace(field.Name), strings.TrimSpace(field.Value)
+
+		switch {
+		case name != "" && value != "":
+			rendered = append(rendered, fmt.Sprintf("**%s**\n%s", name, value))
+		case name != "":
+			rendered = append(rendered, fmt.Sprintf("**%s**", name))
+		case value != "":
+			rendered = append(rendered, value)
+		}
+	}
+
+	return strings.Join(rendered, "\n\n")
 }
 
 // splitContent breaks content into chunks no longer than limit runes, preferring to

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -22,11 +23,13 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"go.uber.org/zap"
 )
 
 type Replyable struct {
@@ -133,7 +136,21 @@ func (r *Replyable) HandleError(err error) {
 		fmt.Printf("ctx.HandleError: %s\n", err.Error())
 	}
 
-	eventId := sentry.ErrorWithContext(err, r.ctx.ToErrorContext())
+	var eventId string
+	if isExpectedDiscordError(err) {
+		// No Sentry stack trace on this path, so record which handler raised it.
+		var restError request.RestError
+		errors.As(err, &restError)
+		_, file, line, _ := runtime.Caller(1)
+
+		eventId = logging.LocalOnly(err, r.ctx.ToErrorContext(),
+			zap.Int("discord_code", restError.ApiError.Code),
+			zap.Int("status_code", restError.StatusCode),
+			zap.String("call_site", fmt.Sprintf("%s:%d", file, line)),
+		)
+	} else {
+		eventId = logging.ErrorWithContext(err, r.ctx.ToErrorContext())
+	}
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return
@@ -150,8 +167,29 @@ func (r *Replyable) HandleError(err error) {
 	_, _ = r.ctx.ReplyWith(res)
 }
 
+// isExpectedDiscordError reports guild state/config errors that buildErrorResponse
+// already answers with a friendly message and no event ID, so Sentry gains nothing.
+// Kept out on purpose: 10062 and 40060 (slow or double ack, our fault), 429s, and
+// 50035, whose fallback branch shows the event ID.
+func isExpectedDiscordError(err error) bool {
+	var restError request.RestError
+	if !errors.As(err, &restError) {
+		return false
+	}
+
+	switch restError.ApiError.Code {
+	case 10003, 10004, 10007, 10008, 10011, 10013, 10059,
+		30007, 30013,
+		50001, 50013,
+		160005, 160006, 160007:
+		return true
+	default:
+		return false
+	}
+}
+
 func (r *Replyable) HandleWarning(err error) {
-	eventId := sentry.LogWithContext(err, r.ctx.ToErrorContext())
+	eventId := logging.WarnWithContext(err, r.ctx.ToErrorContext())
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return

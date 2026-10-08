@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -23,8 +22,6 @@ var (
 		"x-proxy-",
 		"cf-",
 	}
-
-	ErrIntegrationReturnedErrorStatus = errors.New("Integration returned an error status")
 )
 
 type formAnswers map[string]*string
