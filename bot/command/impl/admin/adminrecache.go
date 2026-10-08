@@ -64,7 +64,6 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, guildIdRaw strin
 
 	// purge cache
 	ctx.Worker().Cache.DeleteGuild(ctx, guildId)
-	ctx.Worker().Cache.DeleteGuildChannels(ctx, guildId)
 	ctx.Worker().Cache.DeleteGuildRoles(ctx, guildId)
 
 	// re-cache
@@ -80,7 +79,7 @@ func (AdminRecacheCommand) Execute(ctx registry.CommandContext, guildIdRaw strin
 		return
 	}
 
-	guildChannels, err := worker.GetGuildChannels(guildId)
+	guildChannels, err := utils.RecacheGuildChannels(ctx, worker, guildId, time.Second*3, true)
 	if err != nil {
 		ctx.HandleError(err)
 		return
