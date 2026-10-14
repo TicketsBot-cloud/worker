@@ -396,9 +396,9 @@ func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocat
 	}
 
 	checkChannel := func(channelId uint64, label string, required []permission.Permission) missingPermLocation {
-		missing, ch, ok := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, channelId, required...)
+		missing, ch, _ := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, channelId, required...)
 		loc := missingPermLocation{label: label, missing: missing}
-		if ok {
+		if ch.Id != 0 {
 			loc.channelType = &ch.Type
 		}
 		return loc
