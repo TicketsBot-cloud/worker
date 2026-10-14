@@ -212,6 +212,14 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			continue
 		}
 
+		// Placeholder overwrites must not be written back
+		if ch.IsObfuscated() {
+			ch, err = rest.GetChannel(ctx, ctx.Worker().Token, ctx.Worker().RateLimiter, *ticket.ChannelId)
+			if err != nil || ch.IsObfuscated() {
+				continue
+			}
+		}
+
 		// Apply overwrites to existing channels
 		overwrites := append(ch.PermissionOverwrites, channel.PermissionOverwrite{
 			Id:    id,

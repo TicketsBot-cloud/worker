@@ -18,6 +18,11 @@ func WarnWithContext(err error, ctx sentry.ErrorContext, fields ...zap.Field) st
 	return logLocally(err, ctx, sentry.LogWithContext(err, ctx), fields)
 }
 
+// LocalOnly skips Sentry entirely; the returned ID is a local-<uuid> one.
+func LocalOnly(err error, ctx sentry.ErrorContext, fields ...zap.Field) string {
+	return logLocally(err, ctx, "", fields)
+}
+
 // logLocally always logs at zap Warn, deliberately never Error: common/observability's
 // ZapSentryAdapter hook (wired in cmd/worker/main.go) forwards every Error-level zap
 // line into its own independent, separately-sampled sentry.CaptureEvent call whose

@@ -81,10 +81,10 @@ func sendIntroMessage(ctx context.Context, worker *worker.Context, guild guild.G
 		SetDescription(fmt.Sprintf("Thank you for inviting Tickets to your server! Below is a quick guide on setting up the bot, please don't hesitate to contact us in our [support server](%s) if you need any assistance!", config.Conf.Bot.SupportServerInvite)).
 		SetColor(customisation.GetColourOrDefault(ctx, guild.Id, customisation.Green)).
 		AddField("Setup", fmt.Sprintf("You can setup the bot using `/setup`, or you can use the [web dashboard](%s) which has additional options", config.Conf.Bot.DashboardUrl), false).
-		AddField("Ticket Panels", fmt.Sprintf("Ticket panels are a commonly used feature of the bot. You can read about them [here](%s/panels), or create one on the [web dashboard](%s/manage/%d/panels)", config.Conf.Bot.FrontpageUrl, config.Conf.Bot.DashboardUrl, guild.Id), false).
+		AddField("Ticket Panels", fmt.Sprintf("Ticket panels are a commonly used feature of the bot. You can read about them [here](%s/setup/ticket-panels), or create one on the [web dashboard](%s/manage/%d/panels)", config.Conf.Bot.DocsUrl, config.Conf.Bot.DashboardUrl, guild.Id), false).
 		AddField("Adding Staff", "To allow staff to answer tickets, you must let the bot know about them first. You can do this through\n`/addsupport [@User / @Role]` and `/addadmin [@User / @Role]`. While both Support and Admin can access the dashboard, Bot Admins can change the settings of the bot.", false).
-		AddField("Tags", fmt.Sprintf("Tags are predefined tickets of text which you can access through a simple command. You can learn more about them [here](%s/tags).", config.Conf.Bot.FrontpageUrl), false).
-		AddField("Claiming", fmt.Sprintf("Tickets can be claimed by your staff such that other staff members cannot also reply to the ticket. You can learn more about claiming [here](%s/claiming).", config.Conf.Bot.FrontpageUrl), false).
+		AddField("Tags", fmt.Sprintf("Tags are predefined tickets of text which you can access through a simple command. You can learn more about them [here](%s/dashboard/tags).", config.Conf.Bot.DocsUrl), false).
+		AddField("Claiming", fmt.Sprintf("Tickets can be claimed by your staff such that other staff members cannot also reply to the ticket. You can learn more about claiming [here](%s/dashboard/settings/claiming-tickets).", config.Conf.Bot.DocsUrl), false).
 		AddField("Additional Support", fmt.Sprintf("If you are still confused, we welcome you to our [support server](%s). Cheers.", config.Conf.Bot.SupportServerInvite), false)
 
 	_, _ = worker.CreateMessageEmbed(channel.Id, msg)

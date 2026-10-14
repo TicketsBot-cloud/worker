@@ -148,6 +148,10 @@ func (h *ExitSurveySubmitHandler) Execute(cmd *cmdcontext.ModalContext) {
 
 	cmd.EditWithRaw(customisation.Green, "Success", "Thank you for your feedback!") // TODO: i18n
 
+	if len(responses) == 0 {
+		return
+	}
+
 	if err := addViewFeedbackButton(ctx, cmd, ticket); err != nil {
 		cmd.HandleError(err)
 		return

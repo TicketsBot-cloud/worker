@@ -18,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"golang.org/x/sync/errgroup"
@@ -93,6 +94,18 @@ func ApplyClaim(ctx context.Context, cmd registry.CommandContext, ticket databas
 	currentChannel, err := cmd.Worker().GetChannel(*ticket.ChannelId)
 	if err != nil {
 		return err
+	}
+
+	// Placeholder overwrites must not be written back
+	if currentChannel.IsObfuscated() {
+		currentChannel, err = rest.GetChannel(ctx, cmd.Worker().Token, cmd.Worker().RateLimiter, *ticket.ChannelId)
+		if err != nil {
+			return err
+		}
+
+		if currentChannel.IsObfuscated() {
+			return permissionwrapper.ErrChannelObfuscated
+		}
 	}
 
 	// Always update the name to match the new claimed naming scheme

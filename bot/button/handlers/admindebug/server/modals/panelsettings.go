@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
@@ -77,6 +78,12 @@ func (h *AdminDebugServerPanelSettingsModalHandler) Execute(ctx *context.ModalCo
 
 	selectedValues := selectData.Values
 
+	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	// Get all panels for this guild
 	panels, err := dbclient.Client.Panel.GetByGuild(ctx, guildId)
 	if err != nil {
@@ -113,7 +120,7 @@ func (h *AdminDebugServerPanelSettingsModalHandler) Execute(ctx *context.ModalCo
 		}
 
 		// Build settings for this panel
-		panelSettings := buildPanelSettings(ctx, selectedPanel)
+		panelSettings := buildPanelSettings(ctx, worker, selectedPanel)
 		results = append(results, panelSettings)
 	}
 
@@ -127,7 +134,21 @@ func (h *AdminDebugServerPanelSettingsModalHandler) Execute(ctx *context.ModalCo
 	}))
 }
 
-func buildPanelSettings(ctx *context.ModalContext, selectedPanel *database.Panel) string {
+func channelLabel(worker *w.Context, channelId uint64, prefix, missing string) string {
+	ch, err := worker.GetChannel(channelId)
+	switch {
+	case utils.IsMissingAccess(err), err == nil && ch.IsObfuscated():
+		return fmt.Sprintf("`%d` (no access - bot is missing View Channel)", channelId)
+	case utils.IsUnknownChannel(err):
+		return fmt.Sprintf("`%d` (%s)", channelId, missing)
+	case err != nil:
+		return fmt.Sprintf("`%d` (could not fetch)", channelId)
+	default:
+		return fmt.Sprintf("`%s%s` (%d)", prefix, ch.Name, channelId)
+	}
+}
+
+func buildPanelSettings(ctx *context.ModalContext, worker *w.Context, selectedPanel *database.Panel) string {
 	var settings []string
 
 	// Panel header
@@ -145,32 +166,17 @@ func buildPanelSettings(ctx *context.ModalContext, selectedPanel *database.Panel
 
 	// Panel channel
 	if selectedPanel.ChannelId != 0 {
-		channel, err := ctx.Worker().GetChannel(selectedPanel.ChannelId)
-		if err == nil {
-			settings = append(settings, fmt.Sprintf("**Panel Channel:** `#%s` (%d)", channel.Name, selectedPanel.ChannelId))
-		} else {
-			settings = append(settings, fmt.Sprintf("**Panel Channel:** `%d` (channel not found)", selectedPanel.ChannelId))
-		}
+		settings = append(settings, "**Panel Channel:** "+channelLabel(worker, selectedPanel.ChannelId, "#", "channel not found"))
 	}
 
 	// Target category (for channel mode)
 	if !selectedPanel.UseThreads && selectedPanel.TargetCategory != 0 {
-		category, err := ctx.Worker().GetChannel(selectedPanel.TargetCategory)
-		if err == nil {
-			settings = append(settings, fmt.Sprintf("**Target Category:** `%s` (%d)", category.Name, selectedPanel.TargetCategory))
-		} else {
-			settings = append(settings, fmt.Sprintf("**Target Category:** `%d` (category not found)", selectedPanel.TargetCategory))
-		}
+		settings = append(settings, "**Target Category:** "+channelLabel(worker, selectedPanel.TargetCategory, "", "category not found"))
 	}
 
 	// Transcript channel
 	if selectedPanel.TranscriptChannelId != nil {
-		channel, err := ctx.Worker().GetChannel(*selectedPanel.TranscriptChannelId)
-		if err == nil {
-			settings = append(settings, fmt.Sprintf("**Transcript Channel:** `#%s` (%d)", channel.Name, *selectedPanel.TranscriptChannelId))
-		} else {
-			settings = append(settings, fmt.Sprintf("**Transcript Channel:** `%d` (channel not found)", *selectedPanel.TranscriptChannelId))
-		}
+		settings = append(settings, "**Transcript Channel:** "+channelLabel(worker, *selectedPanel.TranscriptChannelId, "#", "channel not found"))
 	}
 
 	// Other settings

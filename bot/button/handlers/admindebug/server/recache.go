@@ -59,7 +59,6 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 
 	// purge cache
 	ctx.Worker().Cache.DeleteGuild(ctx, guildId)
-	ctx.Worker().Cache.DeleteGuildChannels(ctx, guildId)
 	ctx.Worker().Cache.DeleteGuildRoles(ctx, guildId)
 
 	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
@@ -74,7 +73,7 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	guildChannels, err := worker.GetGuildChannels(guildId)
+	guildChannels, err := utils.RecacheGuildChannels(ctx, worker, guildId, time.Second*3, true)
 	if err != nil {
 		ctx.HandleError(err)
 		return

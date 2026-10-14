@@ -59,7 +59,7 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 	}
 
 	if !ok {
-		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagInvalidTag, utils.ToSlice(usageEmbed), fmt.Sprintf("%s/tags", config.Conf.Bot.FrontpageUrl))
+		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagInvalidTag, utils.ToSlice(usageEmbed), fmt.Sprintf("%s/dashboard/tags#using-a-tag-in-discord", config.Conf.Bot.DocsUrl))
 		return
 	}
 

@@ -1,6 +1,8 @@
 package permissionwrapper
 
 import (
+	"errors"
+
 	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
@@ -8,11 +10,19 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
+
+var ErrChannelObfuscated = errors.New("channel metadata is obfuscated")
 
 func HasPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, permissions ...permission.Permission) bool {
 	m, roles, ch, err := fetchChannelData(ctx, guildId, userId, channelId)
 	if err != nil {
+		// Administrator outranks anything the channel could say, including being unreadable
+		if errors.Is(err, ErrChannelObfuscated) {
+			return HasPermissions(ctx, guildId, userId, permission.Administrator)
+		}
+
 		sentry.Error(err)
 		return false
 	}
@@ -55,14 +65,18 @@ func GetMissingPermissions(ctx *worker.Context, guildId, userId uint64, required
 	return botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), nil, buildRoleMap(roles), required)
 }
 
-func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) ([]permission.Permission, channel.Channel, bool) {
+func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) ([]permission.Permission, channel.Channel, error) {
 	m, roles, ch, err := fetchChannelData(ctx, guildId, userId, channelId)
 	if err != nil {
+		if errors.Is(err, ErrChannelObfuscated) {
+			return []permission.Permission{permission.ViewChannel}, ch, err
+		}
+
 		sentry.Error(err)
-		return required, channel.Channel{}, false
+		return required, channel.Channel{}, err
 	}
 	missing := botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), ch.PermissionOverwrites, buildRoleMap(roles), required)
-	return missing, ch, true
+	return missing, ch, nil
 }
 
 func fetchGuildData(ctx *worker.Context, guildId, userId uint64) (member.Member, []guild.Role, error) {
@@ -78,11 +92,19 @@ func fetchGuildData(ctx *worker.Context, guildId, userId uint64) (member.Member,
 }
 
 func fetchChannelData(ctx *worker.Context, guildId, userId, channelId uint64) (member.Member, []guild.Role, channel.Channel, error) {
-	m, roles, err := fetchGuildData(ctx, guildId, userId)
+	// Before the guild data, so an unreadable channel isn't masked by a member/role lookup failure
+	ch, err := ctx.GetChannel(channelId)
 	if err != nil {
+		if utils.IsMissingAccess(err) {
+			return member.Member{}, nil, channel.Channel{}, ErrChannelObfuscated
+		}
 		return member.Member{}, nil, channel.Channel{}, err
 	}
-	ch, err := ctx.GetChannel(channelId)
+	if ch.IsObfuscated() {
+		return member.Member{}, nil, ch, ErrChannelObfuscated
+	}
+
+	m, roles, err := fetchGuildData(ctx, guildId, userId)
 	if err != nil {
 		return member.Member{}, nil, channel.Channel{}, err
 	}
