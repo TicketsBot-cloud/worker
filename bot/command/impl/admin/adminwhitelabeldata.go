@@ -140,7 +140,7 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 	}
 
 	components := []component.Component{
-		utils.BuildContainerWithComponents(ctx, customisation.Green, "Admin - Whitelabel Data", innerComponents),
+		utils.BuildAdminContainerWithComponents(ctx, customisation.Green, "Admin - Whitelabel Data", innerComponents),
 	}
 
 	if data.BotId != 0 {

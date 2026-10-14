@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
@@ -218,7 +219,7 @@ func UnclaimTicket(ctx context.Context, cmd registry.CommandContext, ticket data
 					overwrites = append(overwrites, channel.PermissionOverwrite{
 						Id:    whoClaimed,
 						Type:  channel.PermissionTypeMember,
-						Allow: permission.BuildPermissions(StandardPermissions[:]...),
+						Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 						Deny:  0,
 					})
 				}
@@ -377,7 +378,7 @@ func BuildClaimerOverwrite(ctx context.Context, worker *worker.Context, ticket d
 	standard := channel.PermissionOverwrite{
 		Id:    claimerId,
 		Type:  channel.PermissionTypeMember,
-		Allow: permission.BuildPermissions(StandardPermissions[:]...),
+		Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 		Deny:  0,
 	}
 
@@ -554,7 +555,7 @@ func overwritesCantView(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
 			Type:  channel.PermissionTypeMember,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}
@@ -563,7 +564,7 @@ func overwritesCantView(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
 			Type:  channel.PermissionTypeRole,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}
@@ -609,7 +610,7 @@ func overwritesCantType(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
 			Type:  channel.PermissionTypeMember,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}
@@ -618,7 +619,7 @@ func overwritesCantType(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
 			Type:  channel.PermissionTypeRole,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}

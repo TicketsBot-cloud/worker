@@ -77,7 +77,7 @@ func (AdminListUserEntitlementsCommand) Execute(ctx registry.CommandContext, use
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(
+		utils.BuildAdminContainerWithComponents(
 			ctx,
 			customisation.Orange,
 			"Admin - User Entitlements",
