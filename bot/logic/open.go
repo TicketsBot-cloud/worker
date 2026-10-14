@@ -171,7 +171,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		if appPermissions != 0 && !permission.HasPermissionRaw(appPermissions, permission.Administrator) && !permission.HasPermissionRaw(appPermissions, permission.ViewChannel) {
 			docsUrl := fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl)
 			message := cmd.GetMessage(i18n.MessageErrorMissingPermissionsTitle) + ":\n"
-			message += "* `View Channel`\n"
+			message += fmt.Sprintf("* `%s`\n", permission.ViewChannel.ChannelName(panelChannel.Type))
 			message += "\n" + cmd.GetMessage(i18n.MessageErrorMissingPermissionsBody, docsUrl)
 
 			cmd.ReplyRaw(customisation.Red, cmd.GetMessage(i18n.Error), message)

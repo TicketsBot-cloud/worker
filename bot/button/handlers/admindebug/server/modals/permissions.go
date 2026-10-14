@@ -341,7 +341,7 @@ func checkPanelPermissions(worker *w.Context, guildId uint64, botMember member.M
 func checkChannelPermissions(worker *w.Context, channelId uint64, botMember member.Member, guildId uint64, requiredPermissions []permission.Permission, label string) (string, bool) {
 	missingPerms, channel, err := permissionwrapper.GetMissingPermissionsChannel(worker, guildId, botMember.User.Id, channelId, requiredPermissions...)
 	if errors.Is(err, permissionwrapper.ErrChannelObfuscated) {
-		return fmt.Sprintf("**%s** (`%d`)\n**Missing Permissions:**\n- View Channel\n", label, channelId), true
+		return fmt.Sprintf("**%s** (`%d`)\n**Missing Permissions:**\n- `%s`\n", label, channelId, permission.ViewChannel.ChannelName(channel.Type)), true
 	}
 
 	if err != nil {
