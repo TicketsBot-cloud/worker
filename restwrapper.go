@@ -42,7 +42,7 @@ func (ctx *Context) GetChannel(channelId uint64) (channel.Channel, error) {
 func (ctx *Context) ModifyChannel(reqCtx context.Context, channelId uint64, data rest.ModifyChannelData) (channel.Channel, error) {
 	channel, err := rest.ModifyChannel(reqCtx, ctx.Token, ctx.RateLimiter, channelId, data)
 
-	if ctx.Cache.Options().Channels && err != nil {
+	if ctx.Cache.Options().Channels && err == nil {
 		go ctx.Cache.StoreChannel(context.Background(), channel)
 	}
 

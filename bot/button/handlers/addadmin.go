@@ -159,7 +159,7 @@ func (h *AddAdminHandler) Execute(ctx *context.ButtonContext) {
 			auditReason = fmt.Sprintf("Added admin member/role by %s", member.User.Username)
 		}
 
-		panels, _ := dbclient.Client.Panel.GetByGuild(ctx, ctx.GuildId())
+		panels, _ := dbclient.Client.Panel.GetByGuildWithoutComponents(ctx, ctx.GuildId())
 		seen := make(map[uint64]struct{})
 		for _, p := range panels {
 			if p.TicketNotificationChannel == nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/permission"
@@ -686,68 +687,86 @@ func UpdateWelcomeMessageClaimButton(ctx context.Context, worker *worker.Context
 		return nil
 	}
 
-	// Find and update the button
-	updated := false
-	for i, comp := range msg.Components {
-		if comp.Type == component.ComponentActionRow {
-			row := comp.ComponentData.(component.ActionRow)
+	replacement := component.BuildButton(component.Button{
+		Label:    cmd.GetMessage(i18n.TitleClaim),
+		CustomId: "claim",
+		Style:    component.ButtonStyleSuccess,
+		Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+	})
+	fromId := "unclaim"
+	if claimed {
+		replacement = component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleUnclaim),
+			CustomId: "unclaim",
+			Style:    component.ButtonStyleSecondary,
+			Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+		})
+		fromId = "claim"
+	}
 
-			for j, btnComp := range row.Components {
-				if btnComp.Type == component.ComponentButton {
-					btn := btnComp.ComponentData.(component.Button)
+	if !replaceButton(msg.Components, fromId, replacement) {
+		return nil
+	}
 
-					if claimed && btn.CustomId == "claim" {
-						// Replace claim button with unclaim button
-						row.Components[j] = component.BuildButton(component.Button{
-							Label:    cmd.GetMessage(i18n.TitleUnclaim),
-							CustomId: "unclaim",
-							Style:    component.ButtonStyleSecondary,
-							Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
-						})
-						updated = true
-						break
-					} else if !claimed && btn.CustomId == "unclaim" {
-						// Replace unclaim button with claim button
-						row.Components[j] = component.BuildButton(component.Button{
-							Label:    cmd.GetMessage(i18n.TitleClaim),
-							CustomId: "claim",
-							Style:    component.ButtonStyleSuccess,
-							Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
-						})
-						updated = true
-						break
-					}
-				}
-			}
+	editData := welcomeMessageEditData(msg)
 
-			if updated {
-				msg.Components[i] = component.Component{
-					Type:          component.ComponentActionRow,
-					ComponentData: row,
-				}
-				break
+	_, err = worker.EditMessage(*ticket.ChannelId, *ticket.WelcomeMessageId, editData)
+	return err
+}
+
+// replaceButton swaps the first top-level action row button with the given custom id.
+// The bot's own row is always appended at the top level, including on V2 messages.
+func replaceButton(components []component.Component, customId string, replacement component.Component) bool {
+	for _, comp := range components {
+		row, ok := comp.ComponentData.(component.ActionRow)
+		if !ok {
+			continue
+		}
+
+		for j, btnComp := range row.Components {
+			btn, ok := btnComp.ComponentData.(component.Button)
+			if ok && btn.CustomId == customId {
+				row.Components[j] = replacement
+				return true
 			}
 		}
 	}
 
-	// If no button was found to update, nothing to do
-	if !updated {
-		return nil
-	}
+	return false
+}
 
-	// Convert embeds to pointers
-	embeds := make([]*embed.Embed, len(msg.Embeds))
-	for i := range msg.Embeds {
-		embeds[i] = &msg.Embeds[i]
-	}
+// ShouldRewriteClassicWelcome reports whether /switchpanel may replace the welcome
+// embed. Only an embed can be rewritten in place, so a V2 message on either side is
+// left as it is.
+func ShouldRewriteClassicWelcome(msg message.Message, newPanel *database.Panel) bool {
+	return !IsComponentsV2Message(msg) && !newPanel.WelcomeMessageUsesComponentsV2
+}
 
-	// Edit the message with updated components
-	editData := rest.EditMessageData{
+func IsComponentsV2Message(msg message.Message) bool {
+	return msg.Flags&int(message.FlagComponentsV2) != 0
+}
+
+// welcomeMessageEditData rebuilds an edit from an existing welcome message. Discord
+// rejects an edit that drops IS_COMPONENTS_V2 and requires embeds to be empty on V2
+// messages. V2 text is mention-parsed, and an edit without allowed_mentions re-parses
+// it with default allowances, which would ping from form answers.
+func welcomeMessageEditData(msg message.Message) rest.EditMessageData {
+	data := rest.EditMessageData{
 		Content:    msg.Content,
-		Embeds:     embeds,
+		Flags:      uint(msg.Flags),
 		Components: msg.Components,
 	}
 
-	_, err = worker.EditMessage(*ticket.ChannelId, *ticket.WelcomeMessageId, editData)
-	return err
+	if IsComponentsV2Message(msg) {
+		data.Embeds = []*embed.Embed{}
+		data.AllowedMentions = &message.AllowedMention{}
+		return data
+	}
+
+	data.Embeds = make([]*embed.Embed, len(msg.Embeds))
+	for i := range msg.Embeds {
+		data.Embeds[i] = &msg.Embeds[i]
+	}
+
+	return data
 }

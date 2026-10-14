@@ -67,7 +67,7 @@ func (OpenCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCo
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	allPanels, err := dbclient.Client.Panel.GetByGuild(ctx, data.GuildId.Value)
+	allPanels, err := dbclient.Client.Panel.GetByGuildWithoutComponents(ctx, data.GuildId.Value)
 	if err != nil {
 		sentry.Error(err)
 		return nil
