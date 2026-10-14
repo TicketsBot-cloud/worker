@@ -95,12 +95,20 @@ func (r *MessageResponse) IntoCreateMessageData() rest.CreateMessageData {
 }
 
 func (r *MessageResponse) IntoEditMessageData() rest.EditMessageData {
-	return rest.EditMessageData{
-		Content:    r.Content,
-		Embeds:     r.Embeds,
+	data := rest.EditMessageData{
 		Flags:      r.Flags,
 		Components: r.Components,
 	}
+
+	// V2 messages cannot carry content, and Discord requires embeds to be an empty array.
+	if r.isComponentsV2() {
+		data.Embeds = []*embed.Embed{}
+	} else {
+		data.Content = r.Content
+		data.Embeds = r.Embeds
+	}
+
+	return data
 }
 
 func (r *MessageResponse) IntoWebhookBody() rest.WebhookBody {

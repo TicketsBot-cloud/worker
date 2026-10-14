@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TicketsBot-cloud/common/featureflags"
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -47,8 +46,13 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
-	if panel != nil && panel.WelcomeMessageUsesComponentsV2 && utils.FeatureFlags.IsEnabled(ctx, "202608_COMPONENTS_V2_BUILDER", featureflags.ForGuild(ticket.GuildId)) {
-		return sendWelcomeMessageV2(ctx, cmd, ticket, panel, formData, additionalPlaceholders)
+	if tree := loadWelcomeV2Tree(ctx, cmd, ticket, panel); tree != nil {
+		msgId, err := sendWelcomeMessageV2(ctx, cmd, ticket, panel, tree, formData, additionalPlaceholders)
+		if err == nil {
+			return msgId, nil
+		}
+
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
 	}
 
 	// Build embeds
@@ -133,10 +137,57 @@ func SendWelcomeMessage(
 	return msg.Id, nil
 }
 
-const (
-	componentsV2MaxTopLevel = 10
-	componentsV2MaxTotal    = 30
-)
+// welcomeV2Tree returns the stored Components V2 tree when the V2 welcome should be
+// sent, or nil when the classic welcome applies. Nothing is cleared on the panel, so
+// V2 resumes as soon as paid premium returns.
+func welcomeV2Tree(panel *database.Panel, paidPremium bool) ([]component.Component, error) {
+	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || !paidPremium {
+		return nil, nil
+	}
+
+	// Older rows store NULL where newer ones store an empty array.
+	if panel.WelcomeMessageComponents == nil {
+		return nil, nil
+	}
+
+	var tree []component.Component
+	if err := json.Unmarshal([]byte(*panel.WelcomeMessageComponents), &tree); err != nil {
+		return nil, fmt.Errorf("unmarshal welcome message components: %w", err)
+	}
+
+	if len(tree) == 0 {
+		return nil, nil
+	}
+
+	return tree, nil
+}
+
+// hasPaidPremium mirrors FooterPolicyForContext: voting premium does not count.
+func hasPaidPremium(tier premium.PremiumTier, source model.EntitlementSource) bool {
+	return tier != premium.None && source != model.EntitlementSourceVoting
+}
+
+// loadWelcomeV2Tree resolves the premium source only for panels that opted into V2, so
+// classic panels never pay for the extra lookup.
+func loadWelcomeV2Tree(ctx context.Context, cmd registry.CommandContext, ticket database.Ticket, panel *database.Panel) []component.Component {
+	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || cmd.PremiumTier() == premium.None {
+		return nil
+	}
+
+	tier, source, err := utils.PremiumClient.GetTierByGuildIdWithSource(ctx, cmd.GuildId(), cmd.Worker().Token, cmd.Worker().RateLimiter)
+	if err != nil {
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+		return nil
+	}
+
+	tree, err := welcomeV2Tree(panel, hasPaidPremium(tier, source))
+	if err != nil {
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+		return nil
+	}
+
+	return tree
+}
 
 // sendWelcomeMessageV2 sends a welcome message built from a panel's Components V2 tree,
 // rather than the classic embed-based welcome message.
@@ -145,6 +196,7 @@ func sendWelcomeMessageV2(
 	cmd registry.CommandContext,
 	ticket database.Ticket,
 	panel *database.Panel,
+	tree []component.Component,
 	formData map[database.FormInput]string,
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
@@ -153,14 +205,19 @@ func sendWelcomeMessageV2(
 		return 0, fmt.Errorf("channel is nil")
 	}
 
-	if panel.WelcomeMessageComponents == nil {
-		return 0, fmt.Errorf("panel %d has components v2 welcome message enabled but no components stored", panel.PanelId)
-	}
-
-	var tree []component.Component
-	if err := json.Unmarshal([]byte(*panel.WelcomeMessageComponents), &tree); err != nil {
-		return 0, fmt.Errorf("unmarshal welcome message components: %w", err)
-	}
+	// Substitution happens before the form answers are appended, so ticket-opener
+	// input is never treated as a placeholder.
+	tree = transformComponentText(tree, componentTextTransform{
+		Text: func(s string) string {
+			return DoPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
+		},
+		Label: func(s string) string {
+			return DoPlainTextPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
+		},
+		Url: func(s string) string {
+			return replaceAvatarPlaceholder(cmd.Worker(), ticket, s)
+		},
+	})
 
 	var buttons []component.Component
 	if !panel.HideCloseButton {
@@ -190,60 +247,11 @@ func sendWelcomeMessageV2(
 		}))
 	}
 
-	// Work out how much of Discord's 10 top-level / 30 total component budget is
-	// left over for form-answer content, after the panel's own tree and the button
-	// row. This can only be known at send time, since the panel's tree is opaque
-	// JSON authored in the dashboard.
-	usedTopLevel := len(tree)
-	usedTotal := countComponents(tree)
-	if len(buttons) > 0 {
-		usedTopLevel++                // the action row itself
-		usedTotal += 1 + len(buttons) // the action row plus its buttons
-	}
+	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), buttons)
 
-	budget := componentsV2MaxTopLevel - usedTopLevel
-	if remaining := componentsV2MaxTotal - usedTotal; remaining < budget {
-		budget = remaining
-	}
-
-	fields := getFormDataFields(formData)
-
-	var formComponents []component.Component
-	truncated := false
-	for _, field := range fields {
-		if budget <= 0 {
-			truncated = true
-			break
-		}
-
-		formComponents = append(formComponents, component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("**%s**\n%s", field.Name, utils.EscapeMarkdown(field.Value)),
-		}))
-		budget--
-	}
-
-	if truncated {
-		sentry.Log("welcome message v2: form answers truncated, component budget exceeded", map[string]interface{}{
-			"guild_id":  ticket.GuildId,
-			"ticket_id": ticket.Id,
-			"panel_id":  panel.PanelId,
-		})
-	}
-
-	finalTree := make([]component.Component, 0, len(tree)+len(formComponents)+1)
-	finalTree = append(finalTree, tree...)
-	finalTree = append(finalTree, formComponents...)
-	if len(buttons) > 0 {
-		finalTree = append(finalTree, component.BuildActionRow(buttons...))
-	}
-
-	// formComponents' TextDisplay content is attacker-controlled (the ticket-opener's own
-	// form answers), and unlike embed fields, Components V2 text content is parsed for
-	// mentions. AllowedMentions is left as its zero value deliberately: CreateMessageData
-	// has no `omitempty` on that field, so it is always sent as an explicit empty object
-	// (`{"replied_user":false}`, no "parse"/"roles"/"users"), which Discord treats as
-	// suppressing every mention type - the same protection tag.go/closerequest.go apply
-	// explicitly elsewhere in this codebase for other user-controlled message content.
+	// Form answers are ticket-opener input and V2 text is mention-parsed, unlike embed
+	// fields. CreateMessageData sends allowed_mentions without omitempty, so the zero
+	// value goes out as an explicit empty object and suppresses every mention.
 	data := rest.CreateMessageData{
 		Flags:      message.SumFlags(message.FlagComponentsV2),
 		Components: finalTree,
@@ -257,26 +265,84 @@ func sendWelcomeMessageV2(
 	return msg.Id, nil
 }
 
-// countComponents recursively counts a component tree, including components nested
-// within action rows, containers and sections, to approximate Discord's 30-component
-// total limit.
-func countComponents(components []component.Component) int {
-	count := len(components)
-	for _, c := range components {
-		switch data := c.ComponentData.(type) {
-		case component.ActionRow:
-			count += countComponents(data.Components)
-		case component.Container:
-			count += countComponents(data.Components)
-		case component.Section:
-			count += countComponents(data.Components)
-			if data.Accessory.ComponentData != nil {
-				count++
-			}
-		}
+func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
+	out := make([]component.Component, 0, len(tree)+len(fields)+1)
+	out = append(out, tree...)
+
+	for _, field := range fields {
+		out = append(out, component.BuildTextDisplay(component.TextDisplay{
+			Content: fmt.Sprintf("**%s**\n%s", field.Name, utils.EscapeMarkdown(field.Value)),
+		}))
 	}
 
-	return count
+	if len(buttons) > 0 {
+		out = append(out, component.BuildActionRow(buttons...))
+	}
+
+	return out
+}
+
+// componentTextTransform rewrites the authored strings of a component tree. Url is
+// applied to media and link button URLs, matching the classic path, which only
+// resolves the avatar placeholder there.
+type componentTextTransform struct {
+	Text  func(string) string
+	Label func(string) string
+	Url   func(string) string
+}
+
+// transformComponentText returns a rewritten copy of the tree and leaves the input untouched.
+func transformComponentText(components []component.Component, t componentTextTransform) []component.Component {
+	if components == nil {
+		return nil
+	}
+
+	out := make([]component.Component, len(components))
+	for i, c := range components {
+		out[i] = transformComponentTextOne(c, t)
+	}
+
+	return out
+}
+
+func transformComponentTextOne(c component.Component, t componentTextTransform) component.Component {
+	switch data := c.ComponentData.(type) {
+	case component.TextDisplay:
+		data.Content = t.Text(data.Content)
+		return component.BuildTextDisplay(data)
+	case component.Section:
+		data.Components = transformComponentText(data.Components, t)
+		if data.Accessory.ComponentData != nil {
+			data.Accessory = transformComponentTextOne(data.Accessory, t)
+		}
+		return component.BuildSection(data)
+	case component.Container:
+		data.Components = transformComponentText(data.Components, t)
+		return component.BuildContainer(data)
+	case component.ActionRow:
+		data.Components = transformComponentText(data.Components, t)
+		return component.BuildActionRow(data.Components...)
+	case component.Button:
+		data.Label = t.Label(data.Label)
+		if data.Url != nil {
+			resolved := t.Url(*data.Url)
+			data.Url = &resolved
+		}
+		return component.BuildButton(data)
+	case component.Thumbnail:
+		data.Media.Url = t.Url(data.Media.Url)
+		return component.BuildThumbnail(data)
+	case component.MediaGallery:
+		items := make([]component.MediaGalleryItem, len(data.Items))
+		copy(items, data.Items)
+		for i := range items {
+			items[i].Media.Url = t.Url(items[i].Media.Url)
+		}
+		data.Items = items
+		return component.BuildMediaGallery(data)
+	}
+
+	return c
 }
 
 func BuildWelcomeMessageEmbed(
