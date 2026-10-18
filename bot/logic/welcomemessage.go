@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
@@ -69,15 +70,19 @@ func SendWelcomeMessage(
 		formAnswersEmbed := embed.NewEmbed().
 			SetColor(welcomeMessageEmbed.Color)
 
-		for _, field := range fields {
-			formAnswersEmbed.AddField(field.Name, utils.EscapeMarkdown(field.Value), field.Inline)
-		}
-
 		if cmd.PremiumTier() == premium.None {
 			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 		}
 
-		embeds = append(embeds, formAnswersEmbed)
+		used := embedTextLength(welcomeMessageEmbed) + embedTextLength(formAnswersEmbed)
+		fitted := fitClassicFormAnswers(fields, used)
+		for _, field := range fitted {
+			formAnswersEmbed.AddField(field.Name, field.Value, field.Inline)
+		}
+
+		if len(fitted) > 0 {
+			embeds = append(embeds, formAnswersEmbed)
+		}
 	}
 
 	var hideClose, hideCloseWithReason, hideClaim bool
@@ -189,8 +194,6 @@ func loadWelcomeV2Tree(ctx context.Context, cmd registry.CommandContext, ticket 
 	return tree
 }
 
-// sendWelcomeMessageV2 sends a welcome message built from a panel's Components V2 tree,
-// rather than the classic embed-based welcome message.
 func sendWelcomeMessageV2(
 	ctx context.Context,
 	cmd registry.CommandContext,
@@ -212,7 +215,7 @@ func sendWelcomeMessageV2(
 			return DoPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
 		},
 		Label: func(s string) string {
-			return DoPlainTextPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
+			return truncateRunes(DoPlainTextPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders), buttonLabelLimit)
 		},
 		Url: func(s string) string {
 			return replaceAvatarPlaceholder(cmd.Worker(), ticket, s)
@@ -265,13 +268,27 @@ func sendWelcomeMessageV2(
 	return msg.Id, nil
 }
 
+// Authored text takes priority for the text display budget; answers share what is left.
 func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
-	out := make([]component.Component, 0, len(tree)+len(fields)+1)
+	tree, used := fitTemplateText(tree, v2TextDisplayBudget)
+
+	headers := make([]string, len(fields))
+	values := make([]string, len(fields))
+	overheads := make([]int, len(fields))
+	for i, field := range fields {
+		headers[i] = v2AnswerHeader(field)
+		values[i] = field.Value
+		overheads[i] = utf8.RuneCountInString(headers[i])
+	}
+
+	answers := fitAnswerValues(values, overheads, v2TextDisplayBudget-used, 0)
+
+	out := make([]component.Component, 0, len(tree)+len(answers)+1)
 	out = append(out, tree...)
 
-	for _, field := range fields {
+	for i, answer := range answers {
 		out = append(out, component.BuildTextDisplay(component.TextDisplay{
-			Content: fmt.Sprintf("**%s**\n%s", field.Name, utils.EscapeMarkdown(field.Value)),
+			Content: headers[i] + answer,
 		}))
 	}
 
@@ -308,7 +325,7 @@ func transformComponentText(components []component.Component, t componentTextTra
 func transformComponentTextOne(c component.Component, t componentTextTransform) component.Component {
 	switch data := c.ComponentData.(type) {
 	case component.TextDisplay:
-		data.Content = t.Text(data.Content)
+		data.Content = expandOrKeepRaw(data.Content, t.Text(data.Content))
 		return component.BuildTextDisplay(data)
 	case component.Section:
 		data.Components = transformComponentText(data.Components, t)
@@ -323,7 +340,7 @@ func transformComponentTextOne(c component.Component, t componentTextTransform) 
 		data.Components = transformComponentText(data.Components, t)
 		return component.BuildActionRow(data.Components...)
 	case component.Button:
-		data.Label = t.Label(data.Label)
+		data.Label = expandOrKeepRaw(data.Label, t.Label(data.Label))
 		if data.Url != nil {
 			resolved := t.Url(*data.Url)
 			data.Url = &resolved
@@ -944,7 +961,7 @@ func getFormDataFields(formData map[database.FormInput]string) []embed.EmbedFiel
 	var fields []embed.EmbedField // Can't use len(formData), as form may have changed since modal was opened
 	for _, input := range inputs {
 		answer, ok := formData[input]
-		if answer == "" {
+		if strings.TrimSpace(answer) == "" {
 			answer = "N/A" // TODO: What should we use here?
 		}
 
