@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -10,12 +11,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -44,6 +47,15 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
+	if tree := loadWelcomeV2Tree(ctx, cmd, ticket, panel); tree != nil {
+		msgId, err := sendWelcomeMessageV2(ctx, cmd, ticket, panel, tree, formData, additionalPlaceholders)
+		if err == nil {
+			return msgId, nil
+		}
+
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+	}
+
 	// Build embeds
 	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
@@ -58,15 +70,19 @@ func SendWelcomeMessage(
 		formAnswersEmbed := embed.NewEmbed().
 			SetColor(welcomeMessageEmbed.Color)
 
-		for _, field := range fields {
-			formAnswersEmbed.AddField(field.Name, utils.EscapeMarkdown(field.Value), field.Inline)
-		}
-
 		if cmd.PremiumTier() == premium.None {
 			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 		}
 
-		embeds = append(embeds, formAnswersEmbed)
+		used := embedTextLength(welcomeMessageEmbed) + embedTextLength(formAnswersEmbed)
+		fitted := fitClassicFormAnswers(fields, used)
+		for _, field := range fitted {
+			formAnswersEmbed.AddField(field.Name, field.Value, field.Inline)
+		}
+
+		if len(fitted) > 0 {
+			embeds = append(embeds, formAnswersEmbed)
+		}
 	}
 
 	var hideClose, hideCloseWithReason, hideClaim bool
@@ -124,6 +140,226 @@ func SendWelcomeMessage(
 	}
 
 	return msg.Id, nil
+}
+
+// welcomeV2Tree returns the stored Components V2 tree when the V2 welcome should be
+// sent, or nil when the classic welcome applies. Nothing is cleared on the panel, so
+// V2 resumes as soon as paid premium returns.
+func welcomeV2Tree(panel *database.Panel, paidPremium bool) ([]component.Component, error) {
+	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || !paidPremium {
+		return nil, nil
+	}
+
+	// Older rows store NULL where newer ones store an empty array.
+	if panel.WelcomeMessageComponents == nil {
+		return nil, nil
+	}
+
+	var tree []component.Component
+	if err := json.Unmarshal([]byte(*panel.WelcomeMessageComponents), &tree); err != nil {
+		return nil, fmt.Errorf("unmarshal welcome message components: %w", err)
+	}
+
+	if len(tree) == 0 {
+		return nil, nil
+	}
+
+	return tree, nil
+}
+
+// hasPaidPremium mirrors FooterPolicyForContext: voting premium does not count.
+func hasPaidPremium(tier premium.PremiumTier, source model.EntitlementSource) bool {
+	return tier != premium.None && source != model.EntitlementSourceVoting
+}
+
+// loadWelcomeV2Tree resolves the premium source only for panels that opted into V2, so
+// classic panels never pay for the extra lookup.
+func loadWelcomeV2Tree(ctx context.Context, cmd registry.CommandContext, ticket database.Ticket, panel *database.Panel) []component.Component {
+	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || cmd.PremiumTier() == premium.None {
+		return nil
+	}
+
+	tier, source, err := utils.PremiumClient.GetTierByGuildIdWithSource(ctx, cmd.GuildId(), cmd.Worker().Token, cmd.Worker().RateLimiter)
+	if err != nil {
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+		return nil
+	}
+
+	tree, err := welcomeV2Tree(panel, hasPaidPremium(tier, source))
+	if err != nil {
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+		return nil
+	}
+
+	return tree
+}
+
+func sendWelcomeMessageV2(
+	ctx context.Context,
+	cmd registry.CommandContext,
+	ticket database.Ticket,
+	panel *database.Panel,
+	tree []component.Component,
+	formData map[database.FormInput]string,
+	// Only custom integration placeholders for now - prevent making duplicate requests
+	additionalPlaceholders map[string]string,
+) (uint64, error) {
+	if ticket.ChannelId == nil {
+		return 0, fmt.Errorf("channel is nil")
+	}
+
+	// Substitution happens before the form answers are appended, so ticket-opener
+	// input is never treated as a placeholder.
+	tree = transformComponentText(tree, componentTextTransform{
+		Text: func(s string) string {
+			return DoPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
+		},
+		Label: func(s string) string {
+			return truncateRunes(DoPlainTextPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders), buttonLabelLimit)
+		},
+		Url: func(s string) string {
+			return replaceAvatarPlaceholder(cmd.Worker(), ticket, s)
+		},
+	})
+
+	var buttons []component.Component
+	if !panel.HideCloseButton {
+		buttons = append(buttons, component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleClose),
+			CustomId: "close",
+			Style:    component.ButtonStyleDanger,
+			Emoji:    &emoji.Emoji{Name: "🔒"},
+		}))
+	}
+
+	if !panel.HideCloseWithReasonButton {
+		buttons = append(buttons, component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleCloseWithReason),
+			CustomId: "close_with_reason",
+			Style:    component.ButtonStyleDanger,
+			Emoji:    &emoji.Emoji{Name: "🔒"},
+		}))
+	}
+
+	if !panel.HideClaimButton && !ticket.IsThread {
+		buttons = append(buttons, component.BuildButton(component.Button{
+			Label:    cmd.GetMessage(i18n.TitleClaim),
+			CustomId: "claim",
+			Style:    component.ButtonStyleSuccess,
+			Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
+		}))
+	}
+
+	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), buttons)
+
+	// Form answers are ticket-opener input and V2 text is mention-parsed, unlike embed
+	// fields. CreateMessageData sends allowed_mentions without omitempty, so the zero
+	// value goes out as an explicit empty object and suppresses every mention.
+	data := rest.CreateMessageData{
+		Flags:      message.SumFlags(message.FlagComponentsV2),
+		Components: finalTree,
+	}
+
+	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
+	if err != nil {
+		return 0, err
+	}
+
+	return msg.Id, nil
+}
+
+// Authored text takes priority for the text display budget; answers share what is left.
+func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
+	tree, used := fitTemplateText(tree, v2TextDisplayBudget)
+
+	headers := make([]string, len(fields))
+	values := make([]string, len(fields))
+	overheads := make([]int, len(fields))
+	for i, field := range fields {
+		headers[i] = v2AnswerHeader(field)
+		values[i] = field.Value
+		overheads[i] = utf8.RuneCountInString(headers[i])
+	}
+
+	answers := fitAnswerValues(values, overheads, v2TextDisplayBudget-used, 0)
+
+	out := make([]component.Component, 0, len(tree)+len(answers)+1)
+	out = append(out, tree...)
+
+	for i, answer := range answers {
+		out = append(out, component.BuildTextDisplay(component.TextDisplay{
+			Content: headers[i] + answer,
+		}))
+	}
+
+	if len(buttons) > 0 {
+		out = append(out, component.BuildActionRow(buttons...))
+	}
+
+	return out
+}
+
+// componentTextTransform rewrites the authored strings of a component tree. Url is
+// applied to media and link button URLs, matching the classic path, which only
+// resolves the avatar placeholder there.
+type componentTextTransform struct {
+	Text  func(string) string
+	Label func(string) string
+	Url   func(string) string
+}
+
+// transformComponentText returns a rewritten copy of the tree and leaves the input untouched.
+func transformComponentText(components []component.Component, t componentTextTransform) []component.Component {
+	if components == nil {
+		return nil
+	}
+
+	out := make([]component.Component, len(components))
+	for i, c := range components {
+		out[i] = transformComponentTextOne(c, t)
+	}
+
+	return out
+}
+
+func transformComponentTextOne(c component.Component, t componentTextTransform) component.Component {
+	switch data := c.ComponentData.(type) {
+	case component.TextDisplay:
+		data.Content = expandOrKeepRaw(data.Content, t.Text(data.Content))
+		return component.BuildTextDisplay(data)
+	case component.Section:
+		data.Components = transformComponentText(data.Components, t)
+		if data.Accessory.ComponentData != nil {
+			data.Accessory = transformComponentTextOne(data.Accessory, t)
+		}
+		return component.BuildSection(data)
+	case component.Container:
+		data.Components = transformComponentText(data.Components, t)
+		return component.BuildContainer(data)
+	case component.ActionRow:
+		data.Components = transformComponentText(data.Components, t)
+		return component.BuildActionRow(data.Components...)
+	case component.Button:
+		data.Label = expandOrKeepRaw(data.Label, t.Label(data.Label))
+		if data.Url != nil {
+			resolved := t.Url(*data.Url)
+			data.Url = &resolved
+		}
+		return component.BuildButton(data)
+	case component.Thumbnail:
+		data.Media.Url = t.Url(data.Media.Url)
+		return component.BuildThumbnail(data)
+	case component.MediaGallery:
+		items := make([]component.MediaGalleryItem, len(data.Items))
+		copy(items, data.Items)
+		for i := range items {
+			items[i].Media.Url = t.Url(items[i].Media.Url)
+		}
+		data.Items = items
+		return component.BuildMediaGallery(data)
+	}
+
+	return c
 }
 
 func BuildWelcomeMessageEmbed(
@@ -725,7 +961,7 @@ func getFormDataFields(formData map[database.FormInput]string) []embed.EmbedFiel
 	var fields []embed.EmbedField // Can't use len(formData), as form may have changed since modal was opened
 	for _, input := range inputs {
 		answer, ok := formData[input]
-		if answer == "" {
+		if strings.TrimSpace(answer) == "" {
 			answer = "N/A" // TODO: What should we use here?
 		}
 
