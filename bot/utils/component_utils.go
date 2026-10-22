@@ -49,7 +49,7 @@ func BuildContainerWithComponents[T string | i18n.MessageId](ctx registry.Comman
 	}
 
 	return component.BuildContainer(component.Container{
-		AccentColor: Ptr(ctx.GetColour(colour)),
+		AccentColor: ctx.GetColour(colour),
 		Components:  components,
 	})
 }

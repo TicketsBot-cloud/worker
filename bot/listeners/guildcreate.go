@@ -79,7 +79,7 @@ func sendIntroMessage(ctx context.Context, worker *worker.Context, guild guild.G
 	msg := embed.NewEmbed().
 		SetTitle("Tickets").
 		SetDescription(fmt.Sprintf("Thank you for inviting Tickets to your server! Below is a quick guide on setting up the bot, please don't hesitate to contact us in our [support server](%s) if you need any assistance!", config.Conf.Bot.SupportServerInvite)).
-		SetColor(customisation.GetColourOrDefault(ctx, guild.Id, customisation.Green)).
+		SetColorPtr(customisation.GetColourOrDefault(ctx, guild.Id, customisation.Green)).
 		AddField("Setup", fmt.Sprintf("You can setup the bot using `/setup`, or you can use the [web dashboard](%s) which has additional options", config.Conf.Bot.DashboardUrl), false).
 		AddField("Ticket Panels", fmt.Sprintf("Ticket panels are a commonly used feature of the bot. You can read about them [here](%s/setup/ticket-panels), or create one on the [web dashboard](%s/manage/%d/panels)", config.Conf.Bot.DocsUrl, config.Conf.Bot.DashboardUrl, guild.Id), false).
 		AddField("Adding Staff", "To allow staff to answer tickets, you must let the bot know about them first. You can do this through\n`/addsupport [@User / @Role]` and `/addadmin [@User / @Role]`. While both Support and Admin can access the dashboard, Bot Admins can change the settings of the bot.", false).
