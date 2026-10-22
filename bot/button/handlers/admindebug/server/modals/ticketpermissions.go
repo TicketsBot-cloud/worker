@@ -171,7 +171,7 @@ func (h *AdminDebugServerTicketPermissionsModalSubmitHandler) Execute(ctx *conte
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Green,
 			"Admin - Debug Server - User Permissions Check",
