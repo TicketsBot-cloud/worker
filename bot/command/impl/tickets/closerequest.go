@@ -18,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -61,6 +62,16 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 	if reason != nil && len(*reason) > 255 {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseReasonTooLong)
 		return
+	}
+
+	if reason != nil {
+		canonical, ok := logic.ResolveCloseReason(ctx, ctx, ticket, *reason)
+		if !ok {
+			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseReasonNotPredefined)
+			return
+		}
+
+		reason = &canonical
 	}
 
 	var closeAt *time.Time = nil

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
+	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button"
@@ -73,6 +75,20 @@ func (h *EditCloseReasonModalHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
+	closeReasons, err := dbclient.Client.PanelCloseReasons.GetByTicket(ctx.Context, guildId, ticketId)
+	if err != nil {
+		sentry.ErrorWithContext(err, ctx.ToErrorContext())
+	} else if len(closeReasons.Reasons) > 0 {
+		ctx.Modal(button.ResponseModal{
+			Data: interaction.ModalResponseData{
+				CustomId:   fmt.Sprintf("edit_close_reason_submit_%d_%d", guildId, ticketId),
+				Title:      "Edit Close Reason",
+				Components: buildEditCloseReasonPresetComponents(closeMetadata.Reason, closeReasons),
+			},
+		})
+		return
+	}
+
 	ctx.Modal(button.ResponseModal{
 		Data: interaction.ModalResponseData{
 			CustomId: fmt.Sprintf("edit_close_reason_submit_%d_%d", guildId, ticketId),
@@ -92,4 +108,36 @@ func (h *EditCloseReasonModalHandler) Execute(ctx *context.ButtonContext) {
 			},
 		},
 	})
+}
+
+func buildEditCloseReasonPresetComponents(current *string, closeReasons database.PanelCloseReasons) []component.Component {
+	components := []component.Component{
+		component.BuildLabel(component.Label{
+			Label:       "Close Reason",
+			Description: utils.Ptr("Update the reason this ticket was closed"),
+			Component:   buildCloseReasonSelectMenu(closeReasons, current),
+		}),
+	}
+
+	if !closeReasons.AllowCustom {
+		return components
+	}
+
+	value := current
+	if _, isPreset := closeReasons.Match(utils.ValueOrZero(current)); isPreset {
+		value = nil
+	}
+
+	return append(components, component.BuildLabel(component.Label{
+		Label:       "Custom Reason",
+		Description: utils.Ptr("Only used if no reason is selected above"),
+		Component: component.BuildInputText(component.InputText{
+			Style:       component.TextStyleParagraph,
+			CustomId:    "reason",
+			Placeholder: utils.Ptr("No reason specified"),
+			MaxLength:   utils.Ptr(uint32(1024)),
+			Required:    utils.Ptr(false),
+			Value:       value,
+		}),
+	}))
 }
