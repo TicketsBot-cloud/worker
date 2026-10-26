@@ -615,13 +615,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		span := sentry.StartSpan(rootSpan.Context(), "Send out-of-hours warning")
 		defer span.Finish()
 
-		colourHex := customisation.GetColourOrDefault(ctx, cmd.GuildId(), customisation.Red)
-		if outOfHoursColour != nil {
-			colourHex = *outOfHoursColour
-		}
-
 		warningEmbed := utils.BuildEmbedRaw(
-			colourHex,
+			outOfHoursColour,
 			*outOfHoursTitle,
 			*outOfHoursWarning,
 			nil,

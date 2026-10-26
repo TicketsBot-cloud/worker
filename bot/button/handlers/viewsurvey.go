@@ -98,7 +98,7 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 	e := embed.NewEmbed().
 		SetTitle("Exit Survey"). // TODO: i18n
 		SetAuthor(opener.Username, "", opener.AvatarUrl(256)).
-		SetColor(ctx.GetColour(customisation.Green))
+		SetColorPtr(ctx.GetColour(customisation.Green))
 
 	for _, answer := range surveyResponse.Responses {
 		var title string

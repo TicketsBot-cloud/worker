@@ -49,7 +49,6 @@ func replyIfPanelUnavailable(cmd registry.InteractionContext, panel *database.Pa
 // ValidatePanelAccess checks if the user can access the given panel.
 // Returns (canProceed, outOfHoursWarningTitle, outOfHoursWarning, outOfHoursColour, error).
 // outOfHoursWarning is non-nil when the panel is outside support hours but the behaviour is allow_with_warning.
-// outOfHoursColour is non-nil when a custom colour is configured for the out-of-hours embed.
 func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) (bool, *string, *string, *int, error) {
 	// Variables to hold out-of-hours warning info if behaviour is allow_with_warning
 	var outOfHoursWarningTitle *string
@@ -97,11 +96,7 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 				outOfHoursMessage = settings.OutOfHoursMessage
 			}
 
-			// Determine the custom colour (nil means use default)
-			var outOfHoursColour *int
-			if exists && settings.OutOfHoursColour != 0 {
-				outOfHoursColour = &settings.OutOfHoursColour
-			}
+			outOfHoursColour := resolveOutOfHoursColour(settings, exists, ctx.GetColour(customisation.Red))
 
 			behaviour := database.OutOfHoursBehaviourBlockCreation
 			if exists {
@@ -122,12 +117,8 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 				outOfHoursWarningMessage = &outOfHoursMessage
 				outOfHoursWarningColour = outOfHoursColour
 			default:
-				if outOfHoursColour != nil {
-					embed := utils.BuildEmbedRaw(*outOfHoursColour, outOfHoursTitle, outOfHoursMessage, nil, ctx.PremiumTier())
-					ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
-				} else {
-					ctx.ReplyRaw(customisation.Red, outOfHoursTitle, outOfHoursMessage)
-				}
+				embed := utils.BuildEmbedRaw(outOfHoursColour, outOfHoursTitle, outOfHoursMessage, nil, ctx.PremiumTier())
+				ctx.ReplyWith(command.NewEphemeralEmbedMessageResponse(embed))
 				return false, nil, nil, nil, nil
 			}
 		}
@@ -182,4 +173,12 @@ func ValidatePanelAccess(ctx registry.InteractionContext, panel database.Panel) 
 	}
 
 	return true, outOfHoursWarningTitle, outOfHoursWarningMessage, outOfHoursWarningColour, nil
+}
+
+func resolveOutOfHoursColour(settings database.PanelSupportHoursSettings, exists bool, guildRed *int) *int {
+	if !exists {
+		return guildRed
+	}
+
+	return settings.OutOfHoursColour
 }
