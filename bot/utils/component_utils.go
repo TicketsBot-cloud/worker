@@ -66,7 +66,7 @@ func buildContainer(ctx registry.CommandContext, colour customisation.Colour, ti
 	}
 
 	return component.BuildContainer(component.Container{
-		AccentColor: Ptr(ctx.GetColour(colour)),
+		AccentColor: ctx.GetColour(colour),
 		Components:  components,
 	})
 }

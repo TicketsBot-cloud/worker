@@ -55,7 +55,7 @@ type CommandContext interface {
 	HandleWarning(err error)
 
 	GetMessage(messageId i18n.MessageId, format ...interface{}) string
-	GetColour(colour customisation.Colour) int
+	GetColour(colour customisation.Colour) *int
 
 	// Utility functions
 	Channel() (channel.PartialChannel, error)
