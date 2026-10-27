@@ -68,7 +68,7 @@ func SendWelcomeMessage(
 	fields := getFormDataFields(formData)
 	if len(fields) > 0 {
 		formAnswersEmbed := embed.NewEmbed().
-			SetColor(welcomeMessageEmbed.Color)
+			SetColorPtr(welcomeMessageEmbed.Color)
 
 		if cmd.PremiumTier() == premium.None {
 			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
@@ -1070,7 +1070,10 @@ func BuildCustomEmbed(
 		Description: substitute(utils.ValueOrZero(customEmbed.Description)),
 		Url:         resolveAvatarUrl(utils.ValueOrZero(customEmbed.Url)),
 		Timestamp:   customEmbed.Timestamp,
-		Color:       int(customEmbed.Colour),
+	}
+
+	if customEmbed.Colour != nil {
+		e.SetColor(int(*customEmbed.Colour))
 	}
 
 	if footer.ShowBranding {

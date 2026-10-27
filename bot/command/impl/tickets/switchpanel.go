@@ -198,7 +198,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			}
 
 			for i := 1; i < len(embeds); i++ {
-				embeds[i].Color = embeds[0].Color
+				embeds[i].SetColorPtr(embeds[0].Color)
 			}
 
 			editData := rest.EditMessageData{
