@@ -14,6 +14,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -168,6 +169,6 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 }
 
 // ReasonAutoCompleteHandler TODO: Make a utility function rather than call the Close handler directly
-func (CloseRequestCommand) ReasonAutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
-	return CloseCommand{}.AutoCompleteHandler(data, value)
+func (CloseRequestCommand) ReasonAutoCompleteHandler(worker *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+	return CloseCommand{}.AutoCompleteHandler(worker, data, value)
 }

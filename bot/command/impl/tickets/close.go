@@ -7,7 +7,9 @@ import (
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
@@ -51,7 +53,7 @@ func (CloseCommand) Execute(ctx registry.CommandContext, reason *string) {
 	logic.CloseTicket(ctx, ctx, reason, false)
 }
 
-func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (CloseCommand) AutoCompleteHandler(worker *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	var reasons []string
 	var err error
 
@@ -65,31 +67,21 @@ func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoC
 	ctx, cancel := utils.ContextTimeout(time.Millisecond * 1500)
 	defer cancel()
 
-	if ticket.Id != 0 {
-		if closeReasons, err := logic.GetPanelCloseReasons(ctx, ticket); err != nil {
-			sentry.Error(err)
-		} else if len(closeReasons.Reasons) > 0 {
-			return closeReasonChoices(closeReasons.Reasons, value)
-		}
+	if ticket.Id == 0 || !memberCanClose(ctx, worker, data, ticket) {
+		// Not nil: Discord requires choices to be an array, and nil marshals to null
+		return []interaction.ApplicationCommandOptionChoice{}
 	}
 
-	// If there is no text provided by the user yet, and this is a ticket channel, we can use our materialised view to
-	// get the most common close reasons for that panel. Otherwise, perform a dynamic query to get the most common
-	// reasons for that text for all panels.
+	if closeReasons, err := logic.GetPanelCloseReasons(ctx, ticket); err != nil {
+		sentry.Error(err)
+	} else if len(closeReasons.Reasons) > 0 {
+		return closeReasonChoices(closeReasons.Reasons, value)
+	}
+
 	if len(value) == 0 {
-		var panelId *int
-		if ticket.Id != 0 {
-			panelId = ticket.PanelId
-		}
-
-		reasons, err = dbclient.Client.CloseReason.GetTopCloseReasons(ctx, data.GuildId.Value, panelId, 10)
+		reasons, err = dbclient.Client.CloseReason.GetTopCloseReasons(ctx, data.GuildId.Value, ticket.PanelId, 10)
 	} else {
-		var panelId *int
-		if ticket.Id != 0 {
-			panelId = ticket.PanelId
-		}
-
-		reasons, err = dbclient.Client.CloseReason.GetTopCloseReasonsContaining(ctx, data.GuildId.Value, panelId, value, 10)
+		reasons, err = dbclient.Client.CloseReason.GetTopCloseReasonsContaining(ctx, data.GuildId.Value, ticket.PanelId, value, 10)
 	}
 
 	if err != nil {
@@ -103,6 +95,26 @@ func (CloseCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoC
 	}
 
 	return choices
+}
+
+func memberCanClose(ctx context.Context, worker *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, ticket database.Ticket) bool {
+	if data.Member == nil {
+		return false
+	}
+
+	permissionLevel, err := permission.GetPermissionLevel(ctx, utils.ToRetriever(worker), *data.Member, data.GuildId.Value)
+	if err != nil {
+		sentry.Error(err)
+		return false
+	}
+
+	canClose, err := utils.UserCanClose(ctx, permissionLevel, data.Member.User.Id, ticket)
+	if err != nil {
+		sentry.Error(err)
+		return false
+	}
+
+	return canClose
 }
 
 func closeReasonChoices(reasons []string, value string) []interaction.ApplicationCommandOptionChoice {
