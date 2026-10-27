@@ -37,55 +37,49 @@ func GetDefaultColour(colour Colour) int {
 	return DefaultColours[colour]
 }
 
+func GetDefaultColours() map[Colour]*int {
+	colours := make(map[Colour]*int, len(DefaultColours))
+	for id, hex := range DefaultColours {
+		colours[id] = &hex
+	}
+
+	return colours
+}
+
+func defaultColour(colour Colour) *int {
+	hex := GetDefaultColour(colour)
+	return &hex
+}
+
 func IsValidColour(colour Colour) bool {
 	_, valid := DefaultColours[colour]
 	return valid
 }
 
-func GetColours(ctx context.Context, guildId uint64) (map[Colour]int, error) {
+func GetColours(ctx context.Context, guildId uint64) (map[Colour]*int, error) {
 	raw, err := dbclient.Client.CustomColours.GetAll(ctx, guildId)
 	if err != nil {
-		return DefaultColours, err
+		return GetDefaultColours(), err
 	}
 
-	colours := make(map[Colour]int)
+	colours := GetDefaultColours()
 	for id, hex := range raw {
 		colours[Colour(id)] = hex
-	}
-
-	for id, hex := range DefaultColours {
-		if _, ok := colours[id]; !ok {
-			colours[id] = hex
-		}
 	}
 
 	return colours, nil
 }
 
 // TODO: Premium check
-func GetColour(ctx context.Context, guildId uint64, colourCode Colour) (int, error) {
-	colour, ok, err := dbclient.Client.CustomColours.Get(ctx, guildId, colourCode.Int16())
-	if err != nil {
-		return 0, err
-	}
-
-	if !ok {
-		return GetDefaultColour(colourCode), nil
-	}
-
-	return colour, nil
-}
-
-// TODO: Premium check
-func GetColourOrDefault(ctx context.Context, guildId uint64, colourCode Colour) int {
+func GetColourOrDefault(ctx context.Context, guildId uint64, colourCode Colour) *int {
 	colour, ok, err := dbclient.Client.CustomColours.Get(ctx, guildId, colourCode.Int16())
 	if err != nil {
 		sentry.Error(err)
-		return GetDefaultColour(colourCode)
+		return defaultColour(colourCode)
 	}
 
 	if !ok {
-		return GetDefaultColour(colourCode)
+		return defaultColour(colourCode)
 	}
 
 	return colour

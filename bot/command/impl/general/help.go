@@ -95,7 +95,7 @@ func (c HelpCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	embed := embed.NewEmbed().
-		SetColor(ctx.GetColour(customisation.Green)).
+		SetColorPtr(ctx.GetColour(customisation.Green)).
 		SetTitle(ctx.GetMessage(i18n.TitleHelp))
 
 	for _, category := range commandCategories.Keys() {

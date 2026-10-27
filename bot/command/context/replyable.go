@@ -34,7 +34,7 @@ import (
 
 type Replyable struct {
 	ctx         registry.CommandContext
-	colourCodes map[customisation.Colour]int
+	colourCodes map[customisation.Colour]*int
 }
 
 type rateLimitResponse struct {
@@ -44,18 +44,18 @@ type rateLimitResponse struct {
 }
 
 func NewReplyable(ctx registry.CommandContext) *Replyable {
-	var colourCodes map[customisation.Colour]int
+	var colourCodes map[customisation.Colour]*int
 	if ctx.PremiumTier() > premium.None {
 		// TODO: Propagate context
 		tmp, err := customisation.GetColours(context.Background(), ctx.GuildId())
 		if err != nil {
 			sentry.ErrorWithContext(err, ctx.ToErrorContext())
-			colourCodes = customisation.DefaultColours
+			colourCodes = customisation.GetDefaultColours()
 		} else {
 			colourCodes = tmp
 		}
 	} else {
-		colourCodes = customisation.DefaultColours
+		colourCodes = customisation.GetDefaultColours()
 	}
 
 	return &Replyable{
@@ -64,8 +64,13 @@ func NewReplyable(ctx registry.CommandContext) *Replyable {
 	}
 }
 
-func (r *Replyable) GetColour(colour customisation.Colour) int {
-	return r.colourCodes[colour]
+func (r *Replyable) GetColour(colour customisation.Colour) *int {
+	code := r.colourCodes[colour]
+	if code == nil {
+		return nil
+	}
+
+	return utils.Ptr(*code)
 }
 
 func (r *Replyable) buildEmbed(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{}) *embed.Embed {
