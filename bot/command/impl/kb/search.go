@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -50,7 +51,7 @@ func (KBSearchCommand) Execute(ctx registry.CommandContext, query string) {
 	}
 }
 
-func (KBSearchCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (KBSearchCommand) AutoCompleteHandler(_ *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	if value == "" {
 		return nil
 	}

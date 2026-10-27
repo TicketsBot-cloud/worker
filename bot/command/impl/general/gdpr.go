@@ -7,6 +7,7 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -112,7 +113,7 @@ func buildButtonRow(ctx registry.CommandContext, locale *i18n.Locale, buttons []
 	return component.BuildActionRow(buttonComponents...)
 }
 
-func (GDPRCommand) LanguageAutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (GDPRCommand) LanguageAutoCompleteHandler(_ *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	choices := make([]interaction.ApplicationCommandOptionChoice, 0)
 
 	for _, locale := range i18n.Locales {
