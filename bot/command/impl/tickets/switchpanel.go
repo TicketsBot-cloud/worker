@@ -180,7 +180,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		msg, err := ctx.Worker().GetChannelMessage(*ticket.ChannelId, *ticket.WelcomeMessageId)
 
 		// Error is likely to be due to message being deleted, we want to continue further even if it is
-		if err == nil {
+		if err == nil && logic.ShouldRewriteClassicWelcome(ctx.Context, ctx, ticket, msg, &newPanel) {
 			var subject string
 
 			embeds := utils.PtrElems(msg.Embeds) // TODO: Fix types
@@ -340,7 +340,7 @@ func (SwitchPanelCommand) AutoCompleteHandler(data interaction.ApplicationComman
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3) // TODO: Propagate context
 	defer cancel()
 
-	panels, err := dbclient.Client.Panel.GetByGuild(ctx, data.GuildId.Value)
+	panels, err := dbclient.Client.Panel.GetByGuildWithoutComponents(ctx, data.GuildId.Value)
 	if err != nil {
 		sentry.Error(err) // TODO: Context
 		return nil

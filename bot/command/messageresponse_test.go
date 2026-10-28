@@ -71,3 +71,39 @@ func TestMessageResponseEditsOmitContentAndEmbedsUnderComponentsV2(t *testing.T)
 		})
 	}
 }
+
+func TestMessageResponseIntoEditMessageData(t *testing.T) {
+	components := []component.Component{component.BuildTextDisplay(component.TextDisplay{Content: "hello"})}
+	embeds := []*embed.Embed{embed.NewEmbed().SetTitle("legacy")}
+
+	tests := []struct {
+		name       string
+		flags      uint
+		wantLegacy bool
+	}{
+		{"components v2", message.SumFlags(message.FlagComponentsV2), false},
+		{"ephemeral components v2", message.SumFlags(message.FlagEphemeral, message.FlagComponentsV2), false},
+		{"legacy", 0, true},
+		{"ephemeral legacy", message.SumFlags(message.FlagEphemeral), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := MessageResponse{Content: "some text", Embeds: embeds, Components: components, Flags: tt.flags}
+			data := res.IntoEditMessageData()
+
+			require.Len(t, data.Components, 1)
+			require.Equal(t, tt.flags, data.Flags)
+
+			if tt.wantLegacy {
+				require.Equal(t, "some text", data.Content)
+				require.Len(t, data.Embeds, 1)
+				return
+			}
+
+			require.Empty(t, data.Content)
+			require.NotNil(t, data.Embeds, "Discord requires an empty array, not null, on a V2 message")
+			require.Empty(t, data.Embeds)
+		})
+	}
+}
