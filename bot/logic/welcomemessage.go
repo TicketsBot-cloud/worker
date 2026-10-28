@@ -85,6 +85,32 @@ func SendWelcomeMessage(
 		}
 	}
 
+	buttons := welcomeButtons(cmd, panel, ticket.IsThread)
+
+	data := rest.CreateMessageData{
+		Embeds: embeds,
+	}
+
+	if len(buttons) > 0 {
+		data.Components = []component.Component{
+			component.BuildActionRow(buttons...),
+		}
+	}
+
+	// Should never happen
+	if ticket.ChannelId == nil {
+		return 0, fmt.Errorf("channel is nil")
+	}
+
+	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
+	if err != nil {
+		return 0, err
+	}
+
+	return msg.Id, nil
+}
+
+func welcomeButtons(cmd registry.CommandContext, panel *database.Panel, isThread bool) []component.Component {
 	var hideClose, hideCloseWithReason, hideClaim bool
 	if panel != nil {
 		hideClose = panel.HideCloseButton
@@ -110,7 +136,7 @@ func SendWelcomeMessage(
 		}))
 	}
 
-	if !hideClaim && !ticket.IsThread {
+	if !hideClaim && !isThread {
 		buttons = append(buttons, component.BuildButton(component.Button{
 			Label:    cmd.GetMessage(i18n.TitleClaim),
 			CustomId: "claim",
@@ -119,38 +145,15 @@ func SendWelcomeMessage(
 		}))
 	}
 
-	data := rest.CreateMessageData{
-		Embeds: embeds,
-	}
-
-	if len(buttons) > 0 {
-		data.Components = []component.Component{
-			component.BuildActionRow(buttons...),
-		}
-	}
-
-	// Should never happen
-	if ticket.ChannelId == nil {
-		return 0, fmt.Errorf("channel is nil")
-	}
-
-	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
-	if err != nil {
-		return 0, err
-	}
-
-	return msg.Id, nil
+	return buttons
 }
 
-// welcomeV2Tree returns the stored Components V2 tree when the V2 welcome should be
-// sent, or nil when the classic welcome applies. Nothing is cleared on the panel, so
-// V2 resumes as soon as paid premium returns.
+// Nothing is cleared on the panel, so V2 resumes as soon as paid premium returns.
 func welcomeV2Tree(panel *database.Panel, paidPremium bool) ([]component.Component, error) {
 	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || !paidPremium {
 		return nil, nil
 	}
 
-	// Older rows store NULL where newer ones store an empty array.
 	if panel.WelcomeMessageComponents == nil {
 		return nil, nil
 	}
@@ -167,13 +170,11 @@ func welcomeV2Tree(panel *database.Panel, paidPremium bool) ([]component.Compone
 	return tree, nil
 }
 
-// hasPaidPremium mirrors FooterPolicyForContext: voting premium does not count.
 func hasPaidPremium(tier premium.PremiumTier, source model.EntitlementSource) bool {
 	return tier != premium.None && source != model.EntitlementSourceVoting
 }
 
-// loadWelcomeV2Tree resolves the premium source only for panels that opted into V2, so
-// classic panels never pay for the extra lookup.
+// Classic panels never pay for the premium lookup.
 func loadWelcomeV2Tree(ctx context.Context, cmd registry.CommandContext, ticket database.Ticket, panel *database.Panel) []component.Component {
 	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || cmd.PremiumTier() == premium.None {
 		return nil
@@ -218,43 +219,15 @@ func sendWelcomeMessageV2(
 			return truncateRunes(DoPlainTextPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders), buttonLabelLimit)
 		},
 		Url: func(s string) string {
-			return replaceAvatarPlaceholder(cmd.Worker(), ticket, s)
+			return withDefaultAvatar(s, replaceAvatarPlaceholder(cmd.Worker(), ticket, s), ticket.UserId)
 		},
 	})
 
-	var buttons []component.Component
-	if !panel.HideCloseButton {
-		buttons = append(buttons, component.BuildButton(component.Button{
-			Label:    cmd.GetMessage(i18n.TitleClose),
-			CustomId: "close",
-			Style:    component.ButtonStyleDanger,
-			Emoji:    &emoji.Emoji{Name: "🔒"},
-		}))
-	}
-
-	if !panel.HideCloseWithReasonButton {
-		buttons = append(buttons, component.BuildButton(component.Button{
-			Label:    cmd.GetMessage(i18n.TitleCloseWithReason),
-			CustomId: "close_with_reason",
-			Style:    component.ButtonStyleDanger,
-			Emoji:    &emoji.Emoji{Name: "🔒"},
-		}))
-	}
-
-	if !panel.HideClaimButton && !ticket.IsThread {
-		buttons = append(buttons, component.BuildButton(component.Button{
-			Label:    cmd.GetMessage(i18n.TitleClaim),
-			CustomId: "claim",
-			Style:    component.ButtonStyleSuccess,
-			Emoji:    &emoji.Emoji{Name: "🙋‍♂️"},
-		}))
-	}
-
-	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), buttons)
+	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), welcomeButtons(cmd, panel, ticket.IsThread))
 
 	// Form answers are ticket-opener input and V2 text is mention-parsed, unlike embed
-	// fields. CreateMessageData sends allowed_mentions without omitempty, so the zero
-	// value goes out as an explicit empty object and suppresses every mention.
+	// fields. CreateMessageData always sends allowed_mentions, and its zero value,
+	// {"replied_user":false}, has no parse list, so every mention is suppressed.
 	data := rest.CreateMessageData{
 		Flags:      message.SumFlags(message.FlagComponentsV2),
 		Components: finalTree,
@@ -268,27 +241,28 @@ func sendWelcomeMessageV2(
 	return msg.Id, nil
 }
 
-// Authored text takes priority for the text display budget; answers share what is left.
+// Answers are guaranteed some room because staff need them and nothing else shows them.
 func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
-	tree, used := fitTemplateText(tree, v2TextDisplayBudget)
-
 	headers := make([]string, len(fields))
-	values := make([]string, len(fields))
-	overheads := make([]int, len(fields))
+	needs := make([]int, len(fields))
+	reserve := 0
 	for i, field := range fields {
 		headers[i] = v2AnswerHeader(field)
-		values[i] = field.Value
-		overheads[i] = utf8.RuneCountInString(headers[i])
+		needs[i] = utf8.RuneCountInString(headers[i]) + utf8.RuneCountInString(utils.EscapeMarkdown(field.Value))
+		reserve += min(needs[i], v2AnswerFloor)
 	}
 
-	answers := fitAnswerValues(values, overheads, v2TextDisplayBudget-used, 0)
+	tree, used := fitTemplateText(tree, v2TextDisplayBudget-reserve)
+	// Shared over whole answers rather than values, so labels of different lengths can't push one under the floor.
+	allowances := waterFill(needs, v2TextDisplayBudget-used)
 
-	out := make([]component.Component, 0, len(tree)+len(answers)+1)
+	out := make([]component.Component, 0, len(tree)+len(fields)+1)
 	out = append(out, tree...)
 
-	for i, answer := range answers {
+	for i, field := range fields {
+		value := truncateEscaped(field.Value, allowances[i]-utf8.RuneCountInString(headers[i]))
 		out = append(out, component.BuildTextDisplay(component.TextDisplay{
-			Content: headers[i] + answer,
+			Content: headers[i] + value,
 		}))
 	}
 
@@ -299,16 +273,13 @@ func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedFi
 	return out
 }
 
-// componentTextTransform rewrites the authored strings of a component tree. Url is
-// applied to media and link button URLs, matching the classic path, which only
-// resolves the avatar placeholder there.
+// Url is separate because the classic path only resolves the avatar placeholder in URLs.
 type componentTextTransform struct {
 	Text  func(string) string
 	Label func(string) string
 	Url   func(string) string
 }
 
-// transformComponentText returns a rewritten copy of the tree and leaves the input untouched.
 func transformComponentText(components []component.Component, t componentTextTransform) []component.Component {
 	if components == nil {
 		return nil
@@ -1130,4 +1101,13 @@ func replaceAvatarPlaceholder(worker *worker.Context, ticket database.Ticket, ur
 	}
 
 	return user.AvatarUrl(256)
+}
+
+// An opener without a custom avatar resolves to "", which Discord rejects as a media URL.
+func withDefaultAvatar(raw, resolved string, userId uint64) string {
+	if raw != AvatarUrlPlaceholder || resolved != "" {
+		return resolved
+	}
+
+	return fmt.Sprintf("https://cdn.discordapp.com/embed/avatars/%d.png", (userId>>22)%6)
 }

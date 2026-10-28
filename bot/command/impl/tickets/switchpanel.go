@@ -180,7 +180,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		msg, err := ctx.Worker().GetChannelMessage(*ticket.ChannelId, *ticket.WelcomeMessageId)
 
 		// Error is likely to be due to message being deleted, we want to continue further even if it is
-		if err == nil && logic.ShouldRewriteClassicWelcome(msg, &newPanel) {
+		if err == nil && logic.ShouldRewriteClassicWelcome(ctx.Context, ctx, ticket, msg, &newPanel) {
 			var subject string
 
 			embeds := utils.PtrElems(msg.Embeds) // TODO: Fix types

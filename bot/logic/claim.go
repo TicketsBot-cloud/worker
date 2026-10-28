@@ -720,7 +720,6 @@ func UpdateWelcomeMessageClaimButton(ctx context.Context, worker *worker.Context
 	return err
 }
 
-// replaceButton swaps the first top-level action row button with the given custom id.
 // The bot's own row is always appended at the top level, including on V2 messages.
 func replaceButton(components []component.Component, customId string, replacement component.Component) bool {
 	for _, comp := range components {
@@ -741,21 +740,18 @@ func replaceButton(components []component.Component, customId string, replacemen
 	return false
 }
 
-// ShouldRewriteClassicWelcome reports whether /switchpanel may replace the welcome
-// embed. Only an embed can be rewritten in place, so a V2 message on either side is
-// left as it is.
-func ShouldRewriteClassicWelcome(msg message.Message, newPanel *database.Panel) bool {
-	return !IsComponentsV2Message(msg) && !newPanel.WelcomeMessageUsesComponentsV2
+// Only an embed can be rewritten in place, so a V2 message on either side is left as it is.
+func ShouldRewriteClassicWelcome(ctx context.Context, cmd registry.CommandContext, ticket database.Ticket, msg message.Message, newPanel *database.Panel) bool {
+	return !IsComponentsV2Message(msg) && loadWelcomeV2Tree(ctx, cmd, ticket, newPanel) == nil
 }
 
 func IsComponentsV2Message(msg message.Message) bool {
 	return msg.Flags&int(message.FlagComponentsV2) != 0
 }
 
-// welcomeMessageEditData rebuilds an edit from an existing welcome message. Discord
-// rejects an edit that drops IS_COMPONENTS_V2 and requires embeds to be empty on V2
-// messages. V2 text is mention-parsed, and an edit without allowed_mentions re-parses
-// it with default allowances, which would ping from form answers.
+// Discord rejects an edit that drops IS_COMPONENTS_V2 and requires embeds to be empty on V2
+// messages. V2 text is mention-parsed, and an edit without allowed_mentions re-parses it with
+// default allowances, which would ping from form answers.
 func welcomeMessageEditData(msg message.Message) rest.EditMessageData {
 	data := rest.EditMessageData{
 		Content:    msg.Content,

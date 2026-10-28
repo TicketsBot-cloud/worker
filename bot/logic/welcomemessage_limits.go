@@ -12,6 +12,7 @@ import (
 
 const (
 	v2TextDisplayBudget = 4000
+	v2AnswerFloor       = 200
 	buttonLabelLimit    = 80
 
 	embedFieldValueLimit = 1024
@@ -35,8 +36,7 @@ func truncateWithEllipsis(s string, limit int) string {
 	return cut + truncationEllipsis
 }
 
-// truncateEscaped returns EscapeMarkdown(raw) cut to at most limit runes. The raw text
-// is cut before escaping, so a cut can never split an escape sequence.
+// The raw text is cut before escaping, so a cut can never split an escape sequence.
 func truncateEscaped(raw string, limit int) string {
 	if limit <= 0 {
 		return ""
@@ -61,8 +61,7 @@ func truncateEscaped(raw string, limit int) string {
 	return utils.EscapeMarkdown(string(runes[:lo])) + truncationEllipsis
 }
 
-// waterFill shares budget between items, letting short items keep their full length
-// so one long item cannot starve the rest.
+// Short items keep their full length, so one long item cannot starve the rest.
 func waterFill(lengths []int, budget int) []int {
 	out := make([]int, len(lengths))
 	if budget <= 0 || len(lengths) == 0 {
@@ -88,7 +87,7 @@ func waterFill(lengths []int, budget int) []int {
 	return out
 }
 
-// Answers are dropped from the end once their overhead and an ellipsis no longer fit.
+// Each kept answer needs room for its header and at least an ellipsis.
 func fitAnswerValues(values []string, overheads []int, budget, perLimit int) []string {
 	kept := 0
 	used := 0
@@ -138,26 +137,27 @@ func textDisplayContents(tree []component.Component) []string {
 	return contents
 }
 
-// fitTemplateText trims authored text displays, in document order, so their combined
-// length fits within budget. Every later display keeps at least an ellipsis because
-// Discord rejects empty text displays and sections need at least one.
+// Every display keeps at least an ellipsis because Discord rejects empty text displays and
+// sections need at least one.
 func fitTemplateText(tree []component.Component, budget int) ([]component.Component, int) {
 	contents := textDisplayContents(tree)
 
+	lengths := make([]int, len(contents))
 	total := 0
-	for _, c := range contents {
-		total += utf8.RuneCountInString(c)
+	for i, c := range contents {
+		lengths[i] = utf8.RuneCountInString(c)
+		total += lengths[i]
 	}
 
 	if total <= budget {
 		return tree, total
 	}
 
+	allowances := waterFill(lengths, max(budget, len(contents)))
 	fitted := make([]string, len(contents))
 	used := 0
 	for i, c := range contents {
-		allowance := max(budget-used-(len(contents)-i-1), 1)
-		fitted[i] = truncateWithEllipsis(c, allowance)
+		fitted[i] = truncateWithEllipsis(c, max(allowances[i], 1))
 		used += utf8.RuneCountInString(fitted[i])
 	}
 

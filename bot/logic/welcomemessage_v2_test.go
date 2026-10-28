@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -11,6 +12,12 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/gdl/objects/user"
+	"github.com/TicketsBot-cloud/gdl/rest/ratelimit"
+	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,11 +120,33 @@ func TestTransformComponentText(t *testing.T) {
 	require.Equal(t, "top TEXT", got[1].ComponentData.(component.TextDisplay).Content)
 	require.Equal(t, component.ComponentSeparator, got[2].Type)
 
-	// The stored tree must not be mutated, as it is shared with the panel row.
 	require.Equal(t, "top %user%", tree[1].ComponentData.(component.TextDisplay).Content)
 	require.Equal(t, "Docs %user%", tree[0].ComponentData.(component.Container).Components[1].ComponentData.(component.ActionRow).Components[0].ComponentData.(component.Button).Label)
 
 	require.Nil(t, transformComponentText(nil, componentTextTransform{}))
+}
+
+func TestWithDefaultAvatar(t *testing.T) {
+	opener := user.User{Id: 80351110224678912}
+	custom := "https://cdn.discordapp.com/avatars/80351110224678912/abc.webp?size=256"
+
+	tests := []struct {
+		name     string
+		raw      string
+		resolved string
+		want     string
+	}{
+		{"opener without a custom avatar", AvatarUrlPlaceholder, opener.AvatarUrl(256), "https://cdn.discordapp.com/embed/avatars/5.png"},
+		{"opener with a custom avatar", AvatarUrlPlaceholder, custom, custom},
+		{"other url", "https://example.com/a.png", "https://example.com/a.png", "https://example.com/a.png"},
+		{"empty url", "", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, withDefaultAvatar(tt.raw, tt.resolved, opener.Id))
+		})
+	}
 }
 
 func TestBuildWelcomeV2ComponentsAppendsEveryAnswer(t *testing.T) {
@@ -264,27 +293,93 @@ func TestReplaceButton(t *testing.T) {
 	}
 }
 
+type premiumCommandContext struct {
+	registry.CommandContext
+	tier premium.PremiumTier
+}
+
+func (c premiumCommandContext) PremiumTier() premium.PremiumTier { return c.tier }
+func (c premiumCommandContext) GuildId() uint64                  { return 1 }
+func (c premiumCommandContext) Worker() *worker.Context          { return &worker.Context{} }
+
+type countingLookupClient struct {
+	premium.MockLookupClient
+	lookups int
+}
+
+func (c *countingLookupClient) GetTierByGuildIdWithSource(ctx context.Context, guildId uint64, token string, rl *ratelimit.Ratelimiter) (premium.PremiumTier, model.EntitlementSource, error) {
+	c.lookups++
+	return c.MockLookupClient.GetTierByGuildIdWithSource(ctx, guildId, token, rl)
+}
+
 func TestShouldRewriteClassicWelcome(t *testing.T) {
 	classicMsg := message.Message{}
 	v2Msg := message.Message{Flags: int(message.FlagComponentsV2)}
 	classicPanel := &database.Panel{}
-	v2Panel := &database.Panel{WelcomeMessageUsesComponentsV2: true}
+	v2Panel := &database.Panel{WelcomeMessageUsesComponentsV2: true, WelcomeMessageComponents: strPtr(`[{"type":10,"content":"hello"}]`)}
 
 	tests := []struct {
-		name  string
-		msg   message.Message
-		panel *database.Panel
-		want  bool
+		name       string
+		msg        message.Message
+		panel      *database.Panel
+		tier       premium.PremiumTier
+		source     model.EntitlementSource
+		want       bool
+		wantLookup bool
 	}{
-		{"classic message, classic panel", classicMsg, classicPanel, true},
-		{"classic message, v2 panel", classicMsg, v2Panel, false},
-		{"v2 message, classic panel", v2Msg, classicPanel, false},
-		{"v2 message, v2 panel", v2Msg, v2Panel, false},
+		{"classic message, classic panel", classicMsg, classicPanel, premium.Premium, model.EntitlementSourceDiscord, true, false},
+		{"classic message, v2 panel", classicMsg, v2Panel, premium.Premium, model.EntitlementSourceDiscord, false, true},
+		{"classic message, v2 panel, voting premium", classicMsg, v2Panel, premium.Premium, model.EntitlementSourceVoting, true, true},
+		{"classic message, v2 panel, no premium", classicMsg, v2Panel, premium.None, model.EntitlementSourceDiscord, true, false},
+		{"v2 message, classic panel", v2Msg, classicPanel, premium.Premium, model.EntitlementSourceDiscord, false, false},
+		{"v2 message, v2 panel", v2Msg, v2Panel, premium.Premium, model.EntitlementSourceDiscord, false, false},
+	}
+
+	previous := utils.PremiumClient
+	t.Cleanup(func() { utils.PremiumClient = previous })
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &countingLookupClient{MockLookupClient: premium.NewMockLookupClient(tt.tier, tt.source)}
+			utils.PremiumClient = client
+
+			cmd := premiumCommandContext{tier: tt.tier}
+			require.Equal(t, tt.want, ShouldRewriteClassicWelcome(context.Background(), cmd, database.Ticket{}, tt.msg, tt.panel))
+			require.Equal(t, tt.wantLookup, client.lookups > 0)
+		})
+	}
+}
+
+type messageCommandContext struct {
+	registry.CommandContext
+}
+
+func (messageCommandContext) GetMessage(id i18n.MessageId, _ ...any) string { return string(id) }
+
+func TestWelcomeButtons(t *testing.T) {
+	tests := []struct {
+		name     string
+		panel    *database.Panel
+		isThread bool
+		want     []string
+	}{
+		{"nil panel shows every button", nil, false, []string{"close", "close_with_reason", "claim"}},
+		{"channel ticket", &database.Panel{}, false, []string{"close", "close_with_reason", "claim"}},
+		{"thread ticket has no claim", &database.Panel{}, true, []string{"close", "close_with_reason"}},
+		{"close hidden", &database.Panel{HideCloseButton: true}, false, []string{"close_with_reason", "claim"}},
+		{"close with reason hidden", &database.Panel{HideCloseWithReasonButton: true}, false, []string{"close", "claim"}},
+		{"claim hidden", &database.Panel{HideClaimButton: true}, false, []string{"close", "close_with_reason"}},
+		{"everything hidden", &database.Panel{HideCloseButton: true, HideCloseWithReasonButton: true, HideClaimButton: true}, false, nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, ShouldRewriteClassicWelcome(tt.msg, tt.panel))
+			var got []string
+			for _, c := range welcomeButtons(messageCommandContext{}, tt.panel, tt.isThread) {
+				got = append(got, c.ComponentData.(component.Button).CustomId)
+			}
+
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

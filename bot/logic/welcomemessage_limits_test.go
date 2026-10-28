@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -129,13 +130,15 @@ func answerFields(values ...string) []embed.EmbedField {
 
 func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 	header := runeLen(v2AnswerHeader(embed.EmbedField{Name: "Q"}))
+	long := strings.Repeat("x", 4000)
 
 	tests := []struct {
-		name          string
-		template      []component.Component
-		answers       []string
-		wantAnswers   int
-		wantTruncated bool
+		name            string
+		template        []component.Component
+		answers         []string
+		wantAnswers     int
+		wantTruncated   bool
+		wantTemplateCut bool
 	}{
 		{
 			name:        "small template, small answers",
@@ -150,17 +153,32 @@ func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 			wantAnswers: 1,
 		},
 		{
-			name:          "template plus answers one over budget",
-			template:      []component.Component{textDisplay(strings.Repeat("a", v2TextDisplayBudget-header-10))},
-			answers:       []string{strings.Repeat("b", 11)},
-			wantAnswers:   1,
-			wantTruncated: true,
+			name:            "template plus answers one over budget",
+			template:        []component.Component{textDisplay(strings.Repeat("a", v2TextDisplayBudget-header-10))},
+			answers:         []string{strings.Repeat("b", 11)},
+			wantAnswers:     1,
+			wantTemplateCut: true,
 		},
 		{
 			name:          "long welcome and four max length answers",
 			template:      []component.Component{textDisplay(strings.Repeat("w", 3000))},
 			answers:       []string{strings.Repeat("x", 4000), strings.Repeat("y", 4000), "short", strings.Repeat("z", 4000)},
 			wantAnswers:   4,
+			wantTruncated: true,
+		},
+		{
+			name:            "welcome near the budget keeps every answer",
+			template:        []component.Component{textDisplay(strings.Repeat("w", 3990))},
+			answers:         []string{"builderman", strings.Repeat("x", 500)},
+			wantAnswers:     2,
+			wantTruncated:   true,
+			wantTemplateCut: true,
+		},
+		{
+			name:          "short template is never cut",
+			template:      []component.Component{textDisplay("welcome")},
+			answers:       []string{long, long, long, long, long},
+			wantAnswers:   5,
 			wantTruncated: true,
 		},
 		{
@@ -171,17 +189,19 @@ func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 			wantTruncated: true,
 		},
 		{
-			name:          "multibyte answers",
-			template:      []component.Component{textDisplay(strings.Repeat("日", 3900))},
-			answers:       []string{strings.Repeat("😀", 500)},
-			wantAnswers:   1,
-			wantTruncated: true,
+			name:            "multibyte answers",
+			template:        []component.Component{textDisplay(strings.Repeat("日", 3900))},
+			answers:         []string{strings.Repeat("😀", 500)},
+			wantAnswers:     1,
+			wantTruncated:   true,
+			wantTemplateCut: true,
 		},
 		{
-			name:        "template alone uses the whole budget drops answers",
-			template:    []component.Component{textDisplay(strings.Repeat("a", v2TextDisplayBudget))},
-			answers:     []string{"answer"},
-			wantAnswers: 0,
+			name:            "template alone uses the whole budget",
+			template:        []component.Component{textDisplay(strings.Repeat("a", v2TextDisplayBudget))},
+			answers:         []string{"answer"},
+			wantAnswers:     1,
+			wantTemplateCut: true,
 		},
 		{
 			name: "template alone over budget is trimmed",
@@ -195,8 +215,9 @@ func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 				}}),
 				textDisplay("tail"),
 			},
-			answers:     []string{"answer"},
-			wantAnswers: 0,
+			answers:         []string{"answer"},
+			wantAnswers:     1,
+			wantTemplateCut: true,
 		},
 		{
 			name:        "no answers",
@@ -222,6 +243,9 @@ func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 				require.True(t, utf8.ValidString(c))
 			}
 
+			templateCut := !slices.Equal(textDisplayContents(tt.template), textDisplayContents(got[:len(tt.template)]))
+			require.Equal(t, tt.wantTemplateCut, templateCut)
+
 			appended := got[len(tt.template):]
 			require.Len(t, appended, tt.wantAnswers)
 
@@ -244,6 +268,36 @@ func TestBuildWelcomeV2ComponentsKeepsShortAnswersWhole(t *testing.T) {
 	got := buildWelcomeV2Components(template, answerFields(strings.Repeat("x", 4000), "keep me", strings.Repeat("y", 4000)), nil)
 
 	require.Equal(t, "**Q**\nkeep me", got[2].ComponentData.(component.TextDisplay).Content)
+}
+
+func TestBuildWelcomeV2ComponentsAnswerFloor(t *testing.T) {
+	template := []component.Component{textDisplay(strings.Repeat("w", 3990))}
+	got := buildWelcomeV2Components(template, answerFields("builderman", strings.Repeat("x", 500)), nil)
+
+	require.Equal(t, "**Q**\nbuilderman", got[1].ComponentData.(component.TextDisplay).Content)
+	require.Equal(t, v2AnswerFloor, runeLen(got[2].ComponentData.(component.TextDisplay).Content))
+	require.Equal(t, v2TextDisplayBudget, totalTextDisplayLength(got))
+}
+
+func TestBuildWelcomeV2ComponentsAnswerFloorWithMixedLabels(t *testing.T) {
+	label := strings.Repeat("L", 45)
+	long := strings.Repeat("x", 4000)
+	short := strings.Repeat("s", 190)
+	fields := []embed.EmbedField{
+		{Name: label, Value: long},
+		{Name: label, Value: long},
+		{Name: "Q", Value: short},
+		{Name: label, Value: long},
+		{Name: label, Value: long},
+	}
+
+	got := buildWelcomeV2Components([]component.Component{textDisplay(strings.Repeat("w", 3990))}, fields, nil)
+
+	require.Equal(t, "**Q**\n"+short, got[3].ComponentData.(component.TextDisplay).Content)
+	for _, i := range []int{1, 2, 4, 5} {
+		require.Equal(t, v2AnswerFloor, runeLen(got[i].ComponentData.(component.TextDisplay).Content))
+	}
+	require.Equal(t, v2TextDisplayBudget, totalTextDisplayLength(got))
 }
 
 func TestFitTemplateText(t *testing.T) {
@@ -280,6 +334,15 @@ func TestFitTemplateText(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFitTemplateTextKeepsShortDisplays(t *testing.T) {
+	closing := "Press Close when you are done."
+	tree := []component.Component{textDisplay(strings.Repeat("a", 3400)), textDisplay(closing)}
+
+	got, used := fitTemplateText(tree, 3000)
+	require.Equal(t, 3000, used)
+	require.Equal(t, closing, textDisplayContents(got)[1])
 }
 
 func TestTransformComponentTextKeepsRawWhenBlank(t *testing.T) {
@@ -394,6 +457,12 @@ func TestFitClassicFormAnswers(t *testing.T) {
 			name:      "no room left drops answers",
 			fields:    []embed.EmbedField{{Name: "Q", Value: "a"}},
 			used:      embedTotalLimit,
+			wantCount: 0,
+		},
+		{
+			name:      "room for the name but not a value drops the answer",
+			fields:    []embed.EmbedField{{Name: "Q", Value: "a"}},
+			used:      embedTotalLimit - 1,
 			wantCount: 0,
 		},
 		{
