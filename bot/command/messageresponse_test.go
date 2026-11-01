@@ -98,12 +98,14 @@ func TestMessageResponseIntoEditMessageData(t *testing.T) {
 			if tt.wantLegacy {
 				require.Equal(t, "some text", data.Content)
 				require.Len(t, data.Embeds, 1)
+				require.Nil(t, data.AllowedMentions)
 				return
 			}
 
 			require.Empty(t, data.Content)
 			require.NotNil(t, data.Embeds, "Discord requires an empty array, not null, on a V2 message")
 			require.Empty(t, data.Embeds)
+			require.NotNil(t, data.AllowedMentions)
 		})
 	}
 }

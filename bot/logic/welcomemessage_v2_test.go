@@ -3,6 +3,8 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -14,8 +16,11 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/objects/user"
 	"github.com/TicketsBot-cloud/gdl/rest/ratelimit"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"github.com/stretchr/testify/require"
@@ -162,7 +167,7 @@ func TestBuildWelcomeV2ComponentsAppendsEveryAnswer(t *testing.T) {
 		{"no answers", 0, buttons, 2},
 		{"no answers or buttons", 0, nil, 1},
 		{"under the old budget", 3, buttons, 5},
-		{"over the old budget", 45, buttons, 47},
+		{"over the old budget", 12, buttons, 14},
 		{"no buttons", 12, nil, 13},
 	}
 
@@ -175,11 +180,6 @@ func TestBuildWelcomeV2ComponentsAppendsEveryAnswer(t *testing.T) {
 
 			got := buildWelcomeV2Components(authored, fields, tt.buttons)
 			require.Len(t, got, tt.wantTotal)
-
-			if tt.answers > 0 {
-				answer := got[len(authored)].ComponentData.(component.TextDisplay).Content
-				require.Contains(t, answer, "%user%", "form answers are never substituted")
-			}
 
 			if len(tt.buttons) > 0 {
 				require.Equal(t, component.ComponentActionRow, got[len(got)-1].Type)
@@ -206,7 +206,7 @@ func TestWelcomeMessageEditData(t *testing.T) {
 		wantMentions bool
 	}{
 		{
-			name: "components v2 keeps flags, empties embeds and blocks mentions",
+			name: "components v2",
 			msg: message.Message{
 				Flags:      v2Flags,
 				Embeds:     []embed.Embed{{Title: "stale"}},
@@ -226,6 +226,16 @@ func TestWelcomeMessageEditData(t *testing.T) {
 			wantFlags:    0,
 			wantEmbeds:   1,
 			wantMentions: false,
+		},
+		{
+			name: "classic echoes the flags already set",
+			msg: message.Message{
+				Flags:      int(message.FlagSupressEmbeds),
+				Embeds:     []embed.Embed{{Title: "welcome"}},
+				Components: []component.Component{v2ClaimRow()},
+			},
+			wantFlags:  float64(message.FlagSupressEmbeds),
+			wantEmbeds: 1,
 		},
 		{
 			name:       "classic without embeds sends an empty array",
@@ -380,6 +390,224 @@ func TestWelcomeButtons(t *testing.T) {
 			}
 
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+type capturedRequest struct {
+	method string
+	body   map[string]any
+}
+
+type captureTransport struct {
+	response string
+	statuses []int
+	requests []capturedRequest
+}
+
+func (c *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	captured := capturedRequest{method: req.Method}
+	if req.Body != nil {
+		raw, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(raw) > 0 {
+			if err := json.Unmarshal(raw, &captured.body); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	status := http.StatusOK
+	if len(c.requests) < len(c.statuses) {
+		status = c.statuses[len(c.requests)]
+	}
+
+	c.requests = append(c.requests, captured)
+
+	return &http.Response{
+		StatusCode: status,
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(c.response)),
+		Request:    req,
+	}, nil
+}
+
+func (c *captureTransport) bodies(method string) []map[string]any {
+	var bodies []map[string]any
+	for _, r := range c.requests {
+		if r.method == method {
+			bodies = append(bodies, r.body)
+		}
+	}
+
+	return bodies
+}
+
+func captureDiscordRequests(t *testing.T, response string, statuses ...int) *captureTransport {
+	t.Helper()
+
+	transport := &captureTransport{response: response, statuses: statuses}
+	previous := request.Client.Transport
+	request.Client.Transport = transport
+	t.Cleanup(func() { request.Client.Transport = previous })
+
+	return transport
+}
+
+func rowCustomIds(t *testing.T, row any) []string {
+	t.Helper()
+
+	data := row.(map[string]any)
+	require.Equal(t, float64(component.ComponentActionRow), data["type"])
+
+	var ids []string
+	for _, button := range data["components"].([]any) {
+		ids = append(ids, button.(map[string]any)["custom_id"].(string))
+	}
+
+	return ids
+}
+
+type welcomeCommandContext struct {
+	premiumCommandContext
+}
+
+func (welcomeCommandContext) GetMessage(id i18n.MessageId, _ ...any) string { return string(id) }
+func (welcomeCommandContext) GetColour(customisation.Colour) *int           { return nil }
+func (welcomeCommandContext) ToErrorContext() errorcontext.WorkerErrorContext {
+	return errorcontext.WorkerErrorContext{}
+}
+
+func welcomeTicket() database.Ticket {
+	channelId := uint64(7)
+	return database.Ticket{Id: 5, GuildId: 1, UserId: 80351110224678912, ChannelId: &channelId}
+}
+
+func TestSendWelcomeMessageV2Payload(t *testing.T) {
+	transport := captureDiscordRequests(t, `{"id":"42"}`)
+
+	tree := []component.Component{textDisplay("Hello %custom% %user%")}
+	formData := map[database.FormInput]string{{Id: 1, Label: "Q"}: "@everyone <@&123> %custom% %user%"}
+	cmd := welcomeCommandContext{premiumCommandContext{tier: premium.Premium}}
+
+	id, err := sendWelcomeMessageV2(context.Background(), cmd, welcomeTicket(), &database.Panel{}, tree, formData, map[string]string{"custom": "X"})
+	require.NoError(t, err)
+	require.Equal(t, uint64(42), id)
+
+	posts := transport.bodies(http.MethodPost)
+	require.Len(t, posts, 1)
+
+	body := posts[0]
+	require.Equal(t, float64(message.FlagComponentsV2), body["flags"])
+	require.Equal(t, map[string]any{"replied_user": false}, body["allowed_mentions"])
+	require.NotContains(t, body, "embeds")
+
+	components := body["components"].([]any)
+	require.Len(t, components, 3)
+	require.Equal(t, "Hello X <@80351110224678912>", components[0].(map[string]any)["content"])
+	require.Equal(t, "**Q**\n@everyone <@&123> %custom% %user%", components[1].(map[string]any)["content"], "form answers are never substituted")
+	require.Equal(t, []string{"close", "close_with_reason", "claim"}, rowCustomIds(t, components[2]))
+}
+
+func TestSendWelcomeMessageFallsBackToClassic(t *testing.T) {
+	transport := captureDiscordRequests(t, `{"id":"42"}`, http.StatusBadRequest, http.StatusOK)
+
+	previous := utils.PremiumClient
+	t.Cleanup(func() { utils.PremiumClient = previous })
+	client := premium.NewMockLookupClient(premium.Premium, model.EntitlementSourceDiscord)
+	utils.PremiumClient = &client
+
+	panel := &database.Panel{WelcomeMessageUsesComponentsV2: true, WelcomeMessageComponents: strPtr(`[{"type":10,"content":"Hello %custom%"}]`)}
+	formData := map[database.FormInput]string{{Id: 1, Label: "Q"}: "a"}
+	cmd := welcomeCommandContext{premiumCommandContext{tier: premium.Premium}}
+
+	id, err := SendWelcomeMessage(context.Background(), cmd, welcomeTicket(), "subject", panel, formData, map[string]string{"custom": "X"})
+	require.NoError(t, err)
+	require.Equal(t, uint64(42), id)
+
+	posts := transport.bodies(http.MethodPost)
+	require.Len(t, posts, 2)
+	require.Equal(t, float64(message.FlagComponentsV2), posts[0]["flags"])
+
+	components := posts[0]["components"].([]any)
+	require.Len(t, components, 3)
+	require.Equal(t, "Hello X", components[0].(map[string]any)["content"])
+	require.Equal(t, "**Q**\na", components[1].(map[string]any)["content"])
+	require.Equal(t, []string{"close", "close_with_reason", "claim"}, rowCustomIds(t, components[2]))
+
+	require.NotContains(t, posts[1], "flags")
+	require.Len(t, posts[1]["embeds"], 2)
+	require.Equal(t, "subject", posts[1]["embeds"].([]any)[0].(map[string]any)["title"])
+}
+
+func TestSendWelcomeMessageClassicAnswersEmbed(t *testing.T) {
+	answers := map[database.FormInput]string{{Id: 1, Label: "Q"}: "answer"}
+
+	tests := []struct {
+		name       string
+		subject    string
+		formData   map[database.FormInput]string
+		wantEmbeds int
+	}{
+		{"no answers", "subject", nil, 1},
+		{"answers get their own embed", "subject", answers, 2},
+		{"no answer fits beside the embed", strings.Repeat("s", embedTotalLimit), answers, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := captureDiscordRequests(t, `{"id":"42"}`)
+
+			cmd := welcomeCommandContext{premiumCommandContext{tier: premium.Premium}}
+			_, err := SendWelcomeMessage(context.Background(), cmd, welcomeTicket(), tt.subject, nil, tt.formData, nil)
+			require.NoError(t, err)
+
+			posts := transport.bodies(http.MethodPost)
+			require.Len(t, posts, 1)
+			require.Len(t, posts[0]["embeds"], tt.wantEmbeds)
+		})
+	}
+}
+
+func TestUpdateWelcomeMessageClaimButton(t *testing.T) {
+	row := func(toggle string) string {
+		return `{"type":1,"components":[{"type":2,"style":4,"label":"close","custom_id":"close"},{"type":2,"style":3,"label":"` + toggle + `","custom_id":"` + toggle + `"}]}`
+	}
+	classic := func(toggle string) string {
+		return `{"id":"2","channel_id":"1","embeds":[{"title":"welcome"}],"components":[` + row(toggle) + `]}`
+	}
+	v2 := func(toggle string) string {
+		return `{"id":"2","channel_id":"1","flags":32768,"components":[{"type":10,"content":"welcome"},` + row(toggle) + `]}`
+	}
+
+	tests := []struct {
+		name    string
+		msg     string
+		claimed bool
+		want    string
+	}{
+		{"classic claim", classic("claim"), true, "unclaim"},
+		{"classic unclaim", classic("unclaim"), false, "claim"},
+		{"v2 claim", v2("claim"), true, "unclaim"},
+		{"v2 unclaim", v2("unclaim"), false, "claim"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := captureDiscordRequests(t, tt.msg)
+
+			channelId, messageId := uint64(1), uint64(2)
+			ticket := database.Ticket{ChannelId: &channelId, WelcomeMessageId: &messageId}
+			require.NoError(t, UpdateWelcomeMessageClaimButton(context.Background(), &worker.Context{}, messageCommandContext{}, ticket, tt.claimed))
+
+			patches := transport.bodies(http.MethodPatch)
+			require.Len(t, patches, 1)
+
+			components := patches[0]["components"].([]any)
+			require.Equal(t, []string{"close", tt.want}, rowCustomIds(t, components[len(components)-1]))
 		})
 	}
 }

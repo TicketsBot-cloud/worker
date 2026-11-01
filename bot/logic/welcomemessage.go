@@ -148,7 +148,6 @@ func welcomeButtons(cmd registry.CommandContext, panel *database.Panel, isThread
 	return buttons
 }
 
-// Nothing is cleared on the panel, so V2 resumes as soon as paid premium returns.
 func welcomeV2Tree(panel *database.Panel, paidPremium bool) ([]component.Component, error) {
 	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || !paidPremium {
 		return nil, nil
@@ -174,7 +173,6 @@ func hasPaidPremium(tier premium.PremiumTier, source model.EntitlementSource) bo
 	return tier != premium.None && source != model.EntitlementSourceVoting
 }
 
-// Classic panels never pay for the premium lookup.
 func loadWelcomeV2Tree(ctx context.Context, cmd registry.CommandContext, ticket database.Ticket, panel *database.Panel) []component.Component {
 	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || cmd.PremiumTier() == premium.None {
 		return nil
@@ -202,15 +200,12 @@ func sendWelcomeMessageV2(
 	panel *database.Panel,
 	tree []component.Component,
 	formData map[database.FormInput]string,
-	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
 	if ticket.ChannelId == nil {
 		return 0, fmt.Errorf("channel is nil")
 	}
 
-	// Substitution happens before the form answers are appended, so ticket-opener
-	// input is never treated as a placeholder.
 	tree = transformComponentText(tree, componentTextTransform{
 		Text: func(s string) string {
 			return DoPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
@@ -225,9 +220,6 @@ func sendWelcomeMessageV2(
 
 	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), welcomeButtons(cmd, panel, ticket.IsThread))
 
-	// Form answers are ticket-opener input and V2 text is mention-parsed, unlike embed
-	// fields. CreateMessageData always sends allowed_mentions, and its zero value,
-	// {"replied_user":false}, has no parse list, so every mention is suppressed.
 	data := rest.CreateMessageData{
 		Flags:      message.SumFlags(message.FlagComponentsV2),
 		Components: finalTree,
@@ -241,7 +233,6 @@ func sendWelcomeMessageV2(
 	return msg.Id, nil
 }
 
-// Answers are guaranteed some room because staff need them and nothing else shows them.
 func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
 	headers := make([]string, len(fields))
 	needs := make([]int, len(fields))
@@ -253,7 +244,6 @@ func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedFi
 	}
 
 	tree, used := fitTemplateText(tree, v2TextDisplayBudget-reserve)
-	// Shared over whole answers rather than values, so labels of different lengths can't push one under the floor.
 	allowances := waterFill(needs, v2TextDisplayBudget-used)
 
 	out := make([]component.Component, 0, len(tree)+len(fields)+1)
@@ -273,7 +263,6 @@ func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedFi
 	return out
 }
 
-// Url is separate because the classic path only resolves the avatar placeholder in URLs.
 type componentTextTransform struct {
 	Text  func(string) string
 	Label func(string) string
@@ -407,6 +396,9 @@ func doPlaceholderSubstitutions(
 	// Process parameterized placeholders first (e.g., %date_days:30%)
 	message = doParameterizedSubstitutions(ctx, message, worker, ticket, plainTextOnly)
 
+	// The goroutines below reassign message, so lookups are picked from a copy.
+	original := message
+
 	var lock sync.Mutex
 
 	// do DB lookups in parallel
@@ -423,7 +415,7 @@ func doPlaceholderSubstitutions(
 
 		formatted := fmt.Sprintf("%%%s%%", placeholder)
 
-		if strings.Contains(message, formatted) {
+		if strings.Contains(original, formatted) {
 			group.Go(func() error {
 				ctx, cancel := context.WithTimeout(ctx, substitutionTimeout)
 				defer cancel()
@@ -1103,7 +1095,6 @@ func replaceAvatarPlaceholder(worker *worker.Context, ticket database.Ticket, ur
 	return user.AvatarUrl(256)
 }
 
-// An opener without a custom avatar resolves to "", which Discord rejects as a media URL.
 func withDefaultAvatar(raw, resolved string, userId uint64) string {
 	if raw != AvatarUrlPlaceholder || resolved != "" {
 		return resolved

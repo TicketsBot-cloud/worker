@@ -36,7 +36,6 @@ func truncateWithEllipsis(s string, limit int) string {
 	return cut + truncationEllipsis
 }
 
-// The raw text is cut before escaping, so a cut can never split an escape sequence.
 func truncateEscaped(raw string, limit int) string {
 	if limit <= 0 {
 		return ""
@@ -61,7 +60,6 @@ func truncateEscaped(raw string, limit int) string {
 	return utils.EscapeMarkdown(string(runes[:lo])) + truncationEllipsis
 }
 
-// Short items keep their full length, so one long item cannot starve the rest.
 func waterFill(lengths []int, budget int) []int {
 	out := make([]int, len(lengths))
 	if budget <= 0 || len(lengths) == 0 {
@@ -87,7 +85,6 @@ func waterFill(lengths []int, budget int) []int {
 	return out
 }
 
-// Each kept answer needs room for its header and at least an ellipsis.
 func fitAnswerValues(values []string, overheads []int, budget, perLimit int) []string {
 	kept := 0
 	used := 0
@@ -137,8 +134,6 @@ func textDisplayContents(tree []component.Component) []string {
 	return contents
 }
 
-// Every display keeps at least an ellipsis because Discord rejects empty text displays and
-// sections need at least one.
 func fitTemplateText(tree []component.Component, budget int) ([]component.Component, int) {
 	contents := textDisplayContents(tree)
 
@@ -175,8 +170,9 @@ func fitTemplateText(tree []component.Component, budget int) ([]component.Compon
 	return tree, used
 }
 
+// EscapeMarkdown leaves backslashes alone, and a trailing one would escape the closing **.
 func v2AnswerHeader(field embed.EmbedField) string {
-	return "**" + field.Name + "**\n"
+	return "**" + utils.EscapeMarkdown(strings.ReplaceAll(field.Name, `\`, `\\`)) + "**\n"
 }
 
 func fitClassicFormAnswers(fields []embed.EmbedField, used int) []embed.EmbedField {
@@ -222,8 +218,6 @@ func embedTextLength(e *embed.Embed) int {
 	return n
 }
 
-// expandOrKeepRaw mirrors the classic embed path: a placeholder that expands to nothing
-// would leave an empty string that Discord rejects, so the raw text is kept instead.
 func expandOrKeepRaw(raw, expanded string) string {
 	if strings.TrimSpace(expanded) == "" {
 		return raw

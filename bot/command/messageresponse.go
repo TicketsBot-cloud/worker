@@ -100,9 +100,9 @@ func (r *MessageResponse) IntoEditMessageData() rest.EditMessageData {
 		Components: r.Components,
 	}
 
-	// V2 messages cannot carry content, and Discord requires embeds to be an empty array.
 	if r.isComponentsV2() {
 		data.Embeds = []*embed.Embed{}
+		data.AllowedMentions = &r.AllowedMentions
 	} else {
 		data.Content = r.Content
 		data.Embeds = r.Embeds

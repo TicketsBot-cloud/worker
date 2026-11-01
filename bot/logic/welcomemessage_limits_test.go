@@ -300,6 +300,50 @@ func TestBuildWelcomeV2ComponentsAnswerFloorWithMixedLabels(t *testing.T) {
 	require.Equal(t, v2TextDisplayBudget, totalTextDisplayLength(got))
 }
 
+func TestV2AnswerHeaderEscapesLabel(t *testing.T) {
+	tests := []struct {
+		name  string
+		label string
+		want  string
+	}{
+		{"plain label", "Q", "**Q**\n"},
+		{"bold markers", "Order **ID**", `**Order \*\*ID\*\***` + "\n"},
+		{"trailing backslash", `Folder path \`, `**Folder path \\**` + "\n"},
+		{"underscores", "__init__ name", `**\_\_init\_\_ name**` + "\n"},
+		{"lone asterisk", "Email *", `**Email \***` + "\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, v2AnswerHeader(embed.EmbedField{Name: tt.label}))
+		})
+	}
+}
+
+func TestBuildWelcomeV2ComponentsEscapedLabelBudget(t *testing.T) {
+	label := strings.Repeat(`*\`, 22) + "*"
+	header := v2AnswerHeader(embed.EmbedField{Name: label})
+
+	fields := make([]embed.EmbedField, 5)
+	for i := range fields {
+		fields[i] = embed.EmbedField{Name: label, Value: strings.Repeat("x", 4000)}
+	}
+
+	got := buildWelcomeV2Components([]component.Component{textDisplay(strings.Repeat("w", 3990))}, fields, nil)
+
+	require.Len(t, got, 6)
+	require.LessOrEqual(t, totalTextDisplayLength(got), v2TextDisplayBudget)
+	for _, c := range got[1:] {
+		require.True(t, strings.HasPrefix(c.ComponentData.(component.TextDisplay).Content, header))
+	}
+}
+
+func TestBuildWelcomeV2ComponentsKeepsEscapedShortAnswerWhole(t *testing.T) {
+	got := buildWelcomeV2Components(nil, []embed.EmbedField{{Name: "Order **ID**", Value: "answer"}}, nil)
+
+	require.Equal(t, `**Order \*\*ID\*\***`+"\nanswer", got[0].ComponentData.(component.TextDisplay).Content)
+}
+
 func TestFitTemplateText(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -448,7 +492,7 @@ func TestFitClassicFormAnswers(t *testing.T) {
 			},
 		},
 		{
-			name:      "five max answers with a full welcome stay under the message total",
+			name:      "five max answers with a full welcome",
 			fields:    []embed.EmbedField{{Name: "Q1", Value: long}, {Name: "Q2", Value: long}, {Name: "Q3", Value: long}, {Name: "Q4", Value: long}, {Name: "Q5", Value: long}},
 			used:      4096 + 256,
 			wantCount: 5,
