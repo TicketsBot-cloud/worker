@@ -195,6 +195,12 @@ func fitClassicFormAnswers(fields []embed.EmbedField, used int) []embed.EmbedFie
 	return out
 }
 
+func AddFormAnswerFields(e *embed.Embed, fields []embed.EmbedField) {
+	for _, field := range fitClassicFormAnswers(fields, embedTextLength(e)) {
+		e.AddField(field.Name, field.Value, field.Inline)
+	}
+}
+
 func embedTextLength(e *embed.Embed) int {
 	if e == nil {
 		return 0

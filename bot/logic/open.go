@@ -465,7 +465,11 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		// Update message IDs in DB
 		span = sentry.StartSpan(rootSpan.Context(), "Update ticket properties in database")
 		defer span.Finish()
-		if err := dbclient.Client.Tickets.SetMessageIds(ctx, cmd.GuildId(), ticketId, welcomeMessageId, joinMessageId); err != nil {
+
+		// The welcome is already posted, so its id is stored even when slow sends used up the handler's deadline
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := dbclient.Client.Tickets.SetMessageIds(dbCtx, cmd.GuildId(), ticketId, welcomeMessageId, joinMessageId); err != nil {
 			return err
 		}
 

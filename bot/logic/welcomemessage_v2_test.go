@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -463,6 +464,8 @@ type captureTransport struct {
 	requests []capturedRequest
 }
 
+const transportFailure = -1
+
 func (c *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	captured := capturedRequest{method: req.Method}
 	if req.Body != nil {
@@ -484,6 +487,10 @@ func (c *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	}
 
 	c.requests = append(c.requests, captured)
+
+	if status == transportFailure {
+		return nil, errors.New("timeout awaiting response headers")
+	}
 
 	return &http.Response{
 		StatusCode: status,
@@ -563,8 +570,9 @@ func TestSendWelcomeMessageV2Payload(t *testing.T) {
 	formData := map[database.FormInput]string{{Id: 1, Label: "Q"}: "@everyone <@&123> %custom% %user%"}
 	cmd := welcomeCommandContext{premiumCommandContext{tier: premium.Premium}}
 
-	id, err := sendWelcomeMessageV2(context.Background(), cmd, welcomeTicket(), &database.Panel{}, tree, formData, map[string]string{"custom": "X"})
+	id, rejected, err := sendWelcomeMessageV2(context.Background(), cmd, welcomeTicket(), &database.Panel{}, tree, formData, map[string]string{"custom": "X"})
 	require.NoError(t, err)
+	require.False(t, rejected)
 	require.Equal(t, uint64(42), id)
 
 	posts := transport.bodies(http.MethodPost)
@@ -573,6 +581,8 @@ func TestSendWelcomeMessageV2Payload(t *testing.T) {
 	body := posts[0]
 	require.Equal(t, float64(message.FlagComponentsV2), body["flags"])
 	require.Equal(t, map[string]any{"replied_user": false}, body["allowed_mentions"])
+	require.Equal(t, "w7", body["nonce"])
+	require.Equal(t, true, body["enforce_nonce"])
 	require.NotContains(t, body, "embeds")
 
 	components := body["components"].([]any)
@@ -611,6 +621,63 @@ func TestSendWelcomeMessageFallsBackToClassic(t *testing.T) {
 	require.NotContains(t, posts[1], "flags")
 	require.Len(t, posts[1]["embeds"], 2)
 	require.Equal(t, "subject", posts[1]["embeds"].([]any)[0].(map[string]any)["title"])
+}
+
+func TestSendWelcomeMessageV2Failures(t *testing.T) {
+	previousDelay := welcomeRetryDelay
+	welcomeRetryDelay = 0
+	t.Cleanup(func() { welcomeRetryDelay = previousDelay })
+
+	previous := utils.PremiumClient
+	t.Cleanup(func() { utils.PremiumClient = previous })
+	client := premium.NewMockLookupClient(premium.Premium, model.EntitlementSourceDiscord)
+	utils.PremiumClient = &client
+
+	tests := []struct {
+		name     string
+		statuses []int
+		wantV2   int
+		wantErr  bool
+	}{
+		{"rejected falls back to classic", []int{http.StatusBadRequest, http.StatusOK}, 1, false},
+		{"rate limited falls back to classic", []int{http.StatusTooManyRequests, http.StatusOK}, 1, false},
+		{"server error retries", []int{http.StatusInternalServerError, http.StatusOK}, 2, false},
+		{"timeout retries", []int{transportFailure, http.StatusOK}, 2, false},
+		{"failed retry never falls back", []int{http.StatusBadGateway, http.StatusBadGateway}, 2, true},
+		{"rejected retry never falls back", []int{transportFailure, http.StatusBadRequest}, 2, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := captureDiscordRequests(t, `{"id":"42"}`, tt.statuses...)
+
+			panel := &database.Panel{WelcomeMessageUsesComponentsV2: true, WelcomeMessageComponents: strPtr(`[{"type":10,"content":"Hello"}]`)}
+			cmd := welcomeCommandContext{premiumCommandContext{tier: premium.Premium}}
+
+			_, err := SendWelcomeMessage(context.Background(), cmd, welcomeTicket(), "subject", panel, nil, nil)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			posts := transport.bodies(http.MethodPost)
+			require.Len(t, posts, 2)
+
+			v2 := 0
+			for _, body := range posts {
+				if body["flags"] != float64(message.FlagComponentsV2) {
+					require.NotContains(t, body, "nonce")
+					continue
+				}
+
+				v2++
+				require.Equal(t, "w7", body["nonce"])
+				require.Equal(t, true, body["enforce_nonce"])
+			}
+			require.Equal(t, tt.wantV2, v2)
+		})
+	}
 }
 
 func TestSendWelcomeMessageClassicAnswersEmbed(t *testing.T) {

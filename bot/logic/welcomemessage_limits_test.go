@@ -562,6 +562,34 @@ func TestEmbedTextLength(t *testing.T) {
 	require.Equal(t, 0, embedTextLength(nil))
 }
 
+func TestAddFormAnswerFields(t *testing.T) {
+	long := strings.Repeat("a", 3000)
+
+	tests := []struct {
+		name   string
+		values []string
+	}{
+		{"one long answer", []string{long, "short"}},
+		{"long answers past the embed total", []string{long, long, long, long, long, long, long, "*short*"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := embed.NewEmbed().SetTitle("Exit Survey").SetAuthor("opener", "", "")
+			AddFormAnswerFields(e, answerFields(tt.values...))
+
+			require.Len(t, e.Fields, len(tt.values))
+			for _, f := range e.Fields {
+				require.LessOrEqual(t, runeLen(f.Value), embedFieldValueLimit)
+			}
+
+			require.LessOrEqual(t, embedTextLength(e), embedTotalLimit)
+			require.True(t, strings.HasSuffix(e.Fields[0].Value, truncationEllipsis))
+			require.Contains(t, e.Fields[len(e.Fields)-1].Value, "short")
+		})
+	}
+}
+
 func TestGetFormDataFieldsBlankAnswers(t *testing.T) {
 	tests := []struct {
 		name   string

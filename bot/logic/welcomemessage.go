@@ -22,6 +22,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -48,9 +49,14 @@ func SendWelcomeMessage(
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
 	if tree := loadWelcomeV2Tree(ctx, cmd, ticket, panel); tree != nil {
-		msgId, err := sendWelcomeMessageV2(ctx, cmd, ticket, panel, tree, formData, additionalPlaceholders)
+		msgId, rejected, err := sendWelcomeMessageV2(ctx, cmd, ticket, panel, tree, formData, additionalPlaceholders)
 		if err == nil {
 			return msgId, nil
+		}
+
+		// A V2 message Discord didn't reject may still be posted, and a Classic one would then be a second welcome.
+		if !rejected {
+			return 0, err
 		}
 
 		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
@@ -201,9 +207,9 @@ func sendWelcomeMessageV2(
 	tree []component.Component,
 	formData map[database.FormInput]string,
 	additionalPlaceholders map[string]string,
-) (uint64, error) {
+) (msgId uint64, rejected bool, err error) {
 	if ticket.ChannelId == nil {
-		return 0, fmt.Errorf("channel is nil")
+		return 0, true, fmt.Errorf("channel is nil")
 	}
 
 	tree = transformComponentText(tree, componentTextTransform{
@@ -221,16 +227,36 @@ func sendWelcomeMessageV2(
 	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), welcomeButtons(cmd, panel, ticket.IsThread))
 
 	data := rest.CreateMessageData{
-		Flags:      message.SumFlags(message.FlagComponentsV2),
-		Components: finalTree,
+		Flags:        message.SumFlags(message.FlagComponentsV2),
+		Components:   finalTree,
+		Nonce:        "w" + strconv.FormatUint(*ticket.ChannelId, 10),
+		EnforceNonce: true,
 	}
 
 	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
-	if err != nil {
-		return 0, err
+	if err == nil {
+		return msg.Id, false, nil
 	}
 
-	return msg.Id, nil
+	if isRejection(err) {
+		return 0, true, err
+	}
+
+	// The first send may still be posted; with the same nonce Discord returns that message instead of posting another.
+	time.Sleep(welcomeRetryDelay)
+	if msg, err = cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data); err != nil {
+		return 0, false, err
+	}
+
+	return msg.Id, false, nil
+}
+
+var welcomeRetryDelay = 2 * time.Second
+
+// The http-proxy's own failures are 5xx, so a 4xx is Discord refusing the message.
+func isRejection(err error) bool {
+	var restErr request.RestError
+	return errors.As(err, &restErr) && restErr.StatusCode >= 400 && restErr.StatusCode < 500
 }
 
 func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
