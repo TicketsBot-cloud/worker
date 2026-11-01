@@ -246,14 +246,19 @@ func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedFi
 	tree, used := fitTemplateText(tree, v2TextDisplayBudget-reserve)
 	allowances := waterFill(needs, v2TextDisplayBudget-used)
 
-	out := make([]component.Component, 0, len(tree)+len(fields)+1)
+	out := make([]component.Component, 0, len(tree)+2)
 	out = append(out, tree...)
 
-	for i, field := range fields {
-		value := truncateEscaped(field.Value, allowances[i]-utf8.RuneCountInString(headers[i]))
-		out = append(out, component.BuildTextDisplay(component.TextDisplay{
-			Content: headers[i] + value,
-		}))
+	if len(fields) > 0 {
+		answers := make([]component.Component, len(fields))
+		for i, field := range fields {
+			value := truncateEscaped(field.Value, allowances[i]-utf8.RuneCountInString(headers[i]))
+			answers[i] = component.BuildTextDisplay(component.TextDisplay{
+				Content: headers[i] + value,
+			})
+		}
+
+		out = append(out, component.BuildContainer(component.Container{Components: answers}))
 	}
 
 	if len(buttons) > 0 {

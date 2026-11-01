@@ -166,9 +166,9 @@ func TestBuildWelcomeV2ComponentsAppendsEveryAnswer(t *testing.T) {
 	}{
 		{"no answers", 0, buttons, 2},
 		{"no answers or buttons", 0, nil, 1},
-		{"under the old budget", 3, buttons, 5},
-		{"over the old budget", 12, buttons, 14},
-		{"no buttons", 12, nil, 13},
+		{"under the old budget", 3, buttons, 3},
+		{"over the old budget", 12, buttons, 3},
+		{"no buttons", 12, nil, 2},
 	}
 
 	for _, tt := range tests {
@@ -180,12 +180,42 @@ func TestBuildWelcomeV2ComponentsAppendsEveryAnswer(t *testing.T) {
 
 			got := buildWelcomeV2Components(authored, fields, tt.buttons)
 			require.Len(t, got, tt.wantTotal)
+			if tt.answers > 0 {
+				require.Len(t, got[1].ComponentData.(component.Container).Components, tt.answers)
+			}
 
 			if len(tt.buttons) > 0 {
 				require.Equal(t, component.ComponentActionRow, got[len(got)-1].Type)
 			}
 		})
 	}
+}
+
+func countComponents(components []component.Component) int {
+	n := 0
+	for _, c := range components {
+		n++
+		switch d := c.ComponentData.(type) {
+		case component.Container:
+			n += countComponents(d.Components)
+		case component.ActionRow:
+			n += countComponents(d.Components)
+		case component.Section:
+			n += countComponents(d.Components) + 1
+		}
+	}
+	return n
+}
+
+func TestBuildWelcomeV2ComponentsUsesTheDashboardReservation(t *testing.T) {
+	buttons := []component.Component{
+		component.BuildButton(component.Button{CustomId: "close"}),
+		component.BuildButton(component.Button{CustomId: "close_with_reason"}),
+		component.BuildButton(component.Button{CustomId: "claim"}),
+	}
+
+	got := buildWelcomeV2Components(nil, answerFields("1", "2", "3", "4", "5"), buttons)
+	require.Equal(t, 10, countComponents(got))
 }
 
 func v2ClaimRow() component.Component {
@@ -486,6 +516,18 @@ func welcomeTicket() database.Ticket {
 	return database.Ticket{Id: 5, GuildId: 1, UserId: 80351110224678912, ChannelId: &channelId}
 }
 
+func containerTexts(t *testing.T, raw any) []string {
+	t.Helper()
+	container := raw.(map[string]any)
+	require.Equal(t, float64(component.ComponentContainer), container["type"])
+
+	var texts []string
+	for _, child := range container["components"].([]any) {
+		texts = append(texts, child.(map[string]any)["content"].(string))
+	}
+	return texts
+}
+
 func TestSendWelcomeMessageV2Payload(t *testing.T) {
 	transport := captureDiscordRequests(t, `{"id":"42"}`)
 
@@ -508,7 +550,7 @@ func TestSendWelcomeMessageV2Payload(t *testing.T) {
 	components := body["components"].([]any)
 	require.Len(t, components, 3)
 	require.Equal(t, "Hello X <@80351110224678912>", components[0].(map[string]any)["content"])
-	require.Equal(t, "**Q**\n@everyone <@&123> %custom% %user%", components[1].(map[string]any)["content"], "form answers are never substituted")
+	require.Equal(t, "**Q**\n@everyone <@&123> %custom% %user%", containerTexts(t, components[1])[0], "form answers are never substituted")
 	require.Equal(t, []string{"close", "close_with_reason", "claim"}, rowCustomIds(t, components[2]))
 }
 
@@ -535,7 +577,7 @@ func TestSendWelcomeMessageFallsBackToClassic(t *testing.T) {
 	components := posts[0]["components"].([]any)
 	require.Len(t, components, 3)
 	require.Equal(t, "Hello X", components[0].(map[string]any)["content"])
-	require.Equal(t, "**Q**\na", components[1].(map[string]any)["content"])
+	require.Equal(t, []string{"**Q**\na"}, containerTexts(t, components[1]))
 	require.Equal(t, []string{"close", "close_with_reason", "claim"}, rowCustomIds(t, components[2]))
 
 	require.NotContains(t, posts[1], "flags")

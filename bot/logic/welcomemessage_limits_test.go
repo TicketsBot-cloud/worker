@@ -128,6 +128,18 @@ func answerFields(values ...string) []embed.EmbedField {
 	return fields
 }
 
+func answerDisplays(t *testing.T, got []component.Component, templateLen int) []component.Component {
+	t.Helper()
+	if len(got) == templateLen {
+		return nil
+	}
+
+	require.Len(t, got, templateLen+1)
+	container, ok := got[templateLen].ComponentData.(component.Container)
+	require.True(t, ok)
+	return container.Components
+}
+
 func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 	header := runeLen(v2AnswerHeader(embed.EmbedField{Name: "Q"}))
 	long := strings.Repeat("x", 4000)
@@ -246,11 +258,11 @@ func TestBuildWelcomeV2ComponentsBudget(t *testing.T) {
 			templateCut := !slices.Equal(textDisplayContents(tt.template), textDisplayContents(got[:len(tt.template)]))
 			require.Equal(t, tt.wantTemplateCut, templateCut)
 
-			appended := got[len(tt.template):]
-			require.Len(t, appended, tt.wantAnswers)
+			answers := answerDisplays(t, got, len(tt.template))
+			require.Len(t, answers, tt.wantAnswers)
 
 			truncated := false
-			for _, c := range appended {
+			for _, c := range answers {
 				content := c.ComponentData.(component.TextDisplay).Content
 				require.True(t, strings.HasPrefix(content, "**Q**\n"))
 				if strings.HasSuffix(content, truncationEllipsis) {
@@ -267,15 +279,16 @@ func TestBuildWelcomeV2ComponentsKeepsShortAnswersWhole(t *testing.T) {
 	template := []component.Component{textDisplay(strings.Repeat("w", 3000))}
 	got := buildWelcomeV2Components(template, answerFields(strings.Repeat("x", 4000), "keep me", strings.Repeat("y", 4000)), nil)
 
-	require.Equal(t, "**Q**\nkeep me", got[2].ComponentData.(component.TextDisplay).Content)
+	require.Equal(t, "**Q**\nkeep me", answerDisplays(t, got, 1)[1].ComponentData.(component.TextDisplay).Content)
 }
 
 func TestBuildWelcomeV2ComponentsAnswerFloor(t *testing.T) {
 	template := []component.Component{textDisplay(strings.Repeat("w", 3990))}
 	got := buildWelcomeV2Components(template, answerFields("builderman", strings.Repeat("x", 500)), nil)
 
-	require.Equal(t, "**Q**\nbuilderman", got[1].ComponentData.(component.TextDisplay).Content)
-	require.Equal(t, v2AnswerFloor, runeLen(got[2].ComponentData.(component.TextDisplay).Content))
+	answers := answerDisplays(t, got, 1)
+	require.Equal(t, "**Q**\nbuilderman", answers[0].ComponentData.(component.TextDisplay).Content)
+	require.Equal(t, v2AnswerFloor, runeLen(answers[1].ComponentData.(component.TextDisplay).Content))
 	require.Equal(t, v2TextDisplayBudget, totalTextDisplayLength(got))
 }
 
@@ -293,9 +306,10 @@ func TestBuildWelcomeV2ComponentsAnswerFloorWithMixedLabels(t *testing.T) {
 
 	got := buildWelcomeV2Components([]component.Component{textDisplay(strings.Repeat("w", 3990))}, fields, nil)
 
-	require.Equal(t, "**Q**\n"+short, got[3].ComponentData.(component.TextDisplay).Content)
-	for _, i := range []int{1, 2, 4, 5} {
-		require.Equal(t, v2AnswerFloor, runeLen(got[i].ComponentData.(component.TextDisplay).Content))
+	answers := answerDisplays(t, got, 1)
+	require.Equal(t, "**Q**\n"+short, answers[2].ComponentData.(component.TextDisplay).Content)
+	for _, i := range []int{0, 1, 3, 4} {
+		require.Equal(t, v2AnswerFloor, runeLen(answers[i].ComponentData.(component.TextDisplay).Content))
 	}
 	require.Equal(t, v2TextDisplayBudget, totalTextDisplayLength(got))
 }
@@ -331,9 +345,10 @@ func TestBuildWelcomeV2ComponentsEscapedLabelBudget(t *testing.T) {
 
 	got := buildWelcomeV2Components([]component.Component{textDisplay(strings.Repeat("w", 3990))}, fields, nil)
 
-	require.Len(t, got, 6)
+	answers := answerDisplays(t, got, 1)
+	require.Len(t, answers, 5)
 	require.LessOrEqual(t, totalTextDisplayLength(got), v2TextDisplayBudget)
-	for _, c := range got[1:] {
+	for _, c := range answers {
 		require.True(t, strings.HasPrefix(c.ComponentData.(component.TextDisplay).Content, header))
 	}
 }
@@ -341,7 +356,7 @@ func TestBuildWelcomeV2ComponentsEscapedLabelBudget(t *testing.T) {
 func TestBuildWelcomeV2ComponentsKeepsEscapedShortAnswerWhole(t *testing.T) {
 	got := buildWelcomeV2Components(nil, []embed.EmbedField{{Name: "Order **ID**", Value: "answer"}}, nil)
 
-	require.Equal(t, `**Order \*\*ID\*\***`+"\nanswer", got[0].ComponentData.(component.TextDisplay).Content)
+	require.Equal(t, `**Order \*\*ID\*\***`+"\nanswer", answerDisplays(t, got, 0)[0].ComponentData.(component.TextDisplay).Content)
 }
 
 func TestFitTemplateText(t *testing.T) {
