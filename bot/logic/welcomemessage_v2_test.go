@@ -191,6 +191,34 @@ func TestBuildWelcomeV2ComponentsAppendsEveryAnswer(t *testing.T) {
 	}
 }
 
+func TestBuildWelcomeV2ComponentsAnswersAccent(t *testing.T) {
+	container := func(accent *int) component.Component {
+		return component.BuildContainer(component.Container{
+			AccentColor: accent,
+			Components:  []component.Component{textDisplay("welcome")},
+		})
+	}
+
+	tests := []struct {
+		name string
+		tree []component.Component
+		want *int
+	}{
+		{"no container", []component.Component{textDisplay("welcome")}, nil},
+		{"container without accent", []component.Component{container(nil)}, nil},
+		{"black is kept", []component.Component{container(utils.Ptr(0))}, utils.Ptr(0)},
+		{"last container wins", []component.Component{container(utils.Ptr(0xff0000)), container(utils.Ptr(0x5865f2)), textDisplay("-# footer")}, utils.Ptr(0x5865f2)},
+		{"uncoloured last container", []component.Component{container(utils.Ptr(0xff0000)), container(nil)}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildWelcomeV2Components(tt.tree, answerFields("a"), nil)
+			require.Equal(t, tt.want, got[len(got)-1].ComponentData.(component.Container).AccentColor)
+		})
+	}
+}
+
 func countComponents(components []component.Component) int {
 	n := 0
 	for _, c := range components {

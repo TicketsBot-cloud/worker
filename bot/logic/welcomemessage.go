@@ -258,7 +258,10 @@ func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedFi
 			})
 		}
 
-		out = append(out, component.BuildContainer(component.Container{Components: answers}))
+		out = append(out, component.BuildContainer(component.Container{
+			AccentColor: lastContainerAccent(tree),
+			Components:  answers,
+		}))
 	}
 
 	if len(buttons) > 0 {
@@ -266,6 +269,16 @@ func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedFi
 	}
 
 	return out
+}
+
+func lastContainerAccent(tree []component.Component) *int {
+	for i := len(tree) - 1; i >= 0; i-- {
+		if container, ok := tree[i].ComponentData.(component.Container); ok {
+			return container.AccentColor
+		}
+	}
+
+	return nil
 }
 
 type componentTextTransform struct {
