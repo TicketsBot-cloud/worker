@@ -99,6 +99,30 @@ func (c *ModalContext) GetInput(customId string) (string, bool) {
 	return "", false
 }
 
+func (c *ModalContext) GetValues(customId string) ([]string, bool) {
+	for _, c := range c.Interaction.Data.Components {
+		if (c.Type != component.ComponentActionRow && c.Type != component.ComponentLabel) || (len(c.Components) != 1 && c.Component == nil) {
+			continue
+		}
+
+		input := c.Component
+
+		if input == nil && len(c.Components) > 0 {
+			input = &c.Components[0]
+		}
+
+		if input.Type != component.ComponentSelectMenu {
+			continue
+		}
+
+		if input.CustomId == customId {
+			return input.Values, true
+		}
+	}
+
+	return nil, false
+}
+
 func (c *ModalContext) Worker() *worker.Context {
 	return c.worker
 }

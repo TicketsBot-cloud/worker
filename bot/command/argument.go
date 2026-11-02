@@ -2,6 +2,7 @@ package command
 
 import (
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -14,7 +15,7 @@ type Argument struct {
 	AutoCompleteHandler AutoCompleteHandler
 }
 
-type AutoCompleteHandler func(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice
+type AutoCompleteHandler func(worker *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice
 
 func NewOptionalArgument(name, description string, argumentType interaction.ApplicationCommandOptionType, invalidMessage i18n.MessageId) Argument {
 	return Argument{

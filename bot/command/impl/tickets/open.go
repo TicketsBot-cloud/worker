@@ -10,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/button/handlers"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
@@ -59,7 +60,7 @@ func (OpenCommand) Execute(ctx *cmdcontext.SlashCommandContext, customId string)
 	openWithPanel(ctx, panel)
 }
 
-func (OpenCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (OpenCommand) AutoCompleteHandler(_ *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	if data.GuildId.Value == 0 {
 		return nil
 	}
