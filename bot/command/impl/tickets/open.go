@@ -3,7 +3,6 @@ package tickets
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -84,7 +83,7 @@ func (OpenCommand) AutoCompleteHandler(_ *worker.Context, data interaction.Appli
 	if value != "" {
 		var filtered []database.Panel
 		for _, p := range eligible {
-			if strings.Contains(strings.ToLower(p.Title), strings.ToLower(value)) {
+			if logic.PanelMatches(p, value) {
 				filtered = append(filtered, p)
 			}
 			if len(filtered) == 25 {
@@ -101,7 +100,7 @@ func (OpenCommand) AutoCompleteHandler(_ *worker.Context, data interaction.Appli
 	choices := make([]interaction.ApplicationCommandOptionChoice, len(eligible))
 	for i, p := range eligible {
 		choices[i] = interaction.ApplicationCommandOptionChoice{
-			Name:  p.Title,
+			Name:  logic.PanelLabel(p),
 			Value: p.CustomId,
 		}
 	}

@@ -206,8 +206,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 
 	// Generate subject
-	if panel != nil && panel.Title != "" { // If we're using a panel, use the panel title as the subject
-		subject = panel.Title
+	if panel != nil && PanelLabel(*panel) != "" {
+		subject = PanelLabel(*panel)
 	} else { // Else, take command args as the subject
 		if subject == "" {
 			subject = "No subject given"
@@ -1473,7 +1473,7 @@ func buildJoinThreadMessage(
 
 	panelName := "None"
 	if panel != nil {
-		panelName = panel.Title
+		panelName = PanelLabel(*panel)
 	}
 
 	title := "Join Ticket"

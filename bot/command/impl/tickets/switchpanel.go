@@ -3,7 +3,6 @@ package tickets
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/TicketsBot-cloud/common/permission"
@@ -224,9 +223,9 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		}
 
 		member, err := ctx.Member()
-		auditReason := fmt.Sprintf("Switched ticket %d to panel '%s'", ticket.Id, newPanel.Title)
+		auditReason := fmt.Sprintf("Switched ticket %d to panel '%s'", ticket.Id, logic.PanelLabel(newPanel))
 		if err == nil {
-			auditReason = fmt.Sprintf("Switched ticket %d to panel '%s' by %s", ticket.Id, newPanel.Title, member.User.Username)
+			auditReason = fmt.Sprintf("Switched ticket %d to panel '%s' by %s", ticket.Id, logic.PanelLabel(newPanel), member.User.Username)
 		}
 
 		reasonCtx := request.WithAuditReason(ctx, auditReason)
@@ -235,7 +234,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 			return
 		}
 
-		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", newPanel.Title))
+		ctx.ReplyRaw(customisation.Green, "Success", fmt.Sprintf("This ticket has been switched to the panel **%s**.\n\nNote: As this is a thread, the permissions could not be bulk updated.", logic.PanelLabel(newPanel)))
 
 		// Modify join message
 		if ticket.JoinMessageId != nil {
@@ -304,16 +303,16 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 	data := rest.ModifyChannelData{
 		PermissionOverwrites: overwrites,
 		ParentId:             newPanel.TargetCategory,
-		Topic:                newPanel.Title,
+		Topic:                logic.PanelLabel(newPanel),
 	}
 	if shouldUpdateName {
 		data.Name = newChannelName
 	}
 
 	member, err := ctx.Member()
-	auditReason := fmt.Sprintf("Switched ticket %d to panel '%s'", ticket.Id, newPanel.Title)
+	auditReason := fmt.Sprintf("Switched ticket %d to panel '%s'", ticket.Id, logic.PanelLabel(newPanel))
 	if err == nil {
-		auditReason = fmt.Sprintf("Switched ticket %d to panel '%s' by %s", ticket.Id, newPanel.Title, member.User.Username)
+		auditReason = fmt.Sprintf("Switched ticket %d to panel '%s' by %s", ticket.Id, logic.PanelLabel(newPanel), member.User.Username)
 	}
 
 	reasonCtx := request.WithAuditReason(ctx, auditReason)
@@ -327,9 +326,9 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 		if err := logic.UpdateWelcomeMessageClaimButton(ctx.Context, ctx.Worker(), ctx, ticket, false); err != nil {
 			ctx.HandleWarning(err)
 		}
-		ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelAutoUnclaimed, newPanel.Title, ctx.UserId(), originalClaimer)
+		ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelAutoUnclaimed, logic.PanelLabel(newPanel), ctx.UserId(), originalClaimer)
 	} else {
-		ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelSuccess, newPanel.Title, ctx.UserId())
+		ctx.ReplyPermanent(customisation.Green, i18n.TitlePanelSwitched, i18n.MessageSwitchPanelSuccess, logic.PanelLabel(newPanel), ctx.UserId())
 	}
 }
 
@@ -356,7 +355,7 @@ func (SwitchPanelCommand) AutoCompleteHandler(_ *worker.Context, data interactio
 	} else {
 		var filtered []database.Panel
 		for _, panel := range panels {
-			if strings.Contains(strings.ToLower(panel.Title), strings.ToLower(value)) {
+			if logic.PanelMatches(panel, value) {
 				filtered = append(filtered, panel)
 			}
 
@@ -373,7 +372,7 @@ func panelsToChoices(panels []database.Panel) []interaction.ApplicationCommandOp
 	choices := make([]interaction.ApplicationCommandOptionChoice, len(panels))
 	for i, panel := range panels {
 		choices[i] = interaction.ApplicationCommandOptionChoice{
-			Name:  panel.Title,
+			Name:  logic.PanelLabel(panel),
 			Value: panel.PanelId,
 		}
 	}

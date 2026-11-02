@@ -14,6 +14,8 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
 type AdminDebugServerPermissionsHandler struct{}
@@ -63,7 +65,7 @@ func (h *AdminDebugServerPermissionsHandler) Execute(ctx *context.ButtonContext)
 		}
 		panelDesc := fmt.Sprintf("Check permissions for panel #%d", i+1)
 		options = append(options, component.SelectOption{
-			Label:       fmt.Sprintf("Panel: %s", panel.Title),
+			Label:       utils.StringMax(fmt.Sprintf("Panel: %s", logic.PanelLabel(panel)), 100),
 			Value:       fmt.Sprintf("panel_%d_%d", panel.MessageId, guildId),
 			Description: &panelDesc,
 		})
