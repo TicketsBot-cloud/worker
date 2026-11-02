@@ -100,7 +100,8 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 		SetAuthor(opener.Username, "", opener.AvatarUrl(256)).
 		SetColorPtr(ctx.GetColour(customisation.Green))
 
-	for _, answer := range surveyResponse.Responses {
+	fields := make([]embed.EmbedField, len(surveyResponse.Responses))
+	for i, answer := range surveyResponse.Responses {
 		var title string
 		if answer.Question == nil || *answer.Question == "" {
 			title = "Unknown Question"
@@ -115,8 +116,10 @@ func (h *ViewSurveyHandler) Execute(ctx *context.ButtonContext) {
 			response = "No response"
 		}
 
-		e.AddField(title, response, false)
+		fields[i] = embed.EmbedField{Name: title, Value: response}
 	}
+
+	logic.AddFormAnswerFields(e, fields)
 
 	var buttons []component.Component
 	buttons = append(buttons, logic.TranscriptLinkElement(ticket.HasTranscript)(ctx.Worker(), ticket)...)

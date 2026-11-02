@@ -39,7 +39,7 @@ func (c OnCallCommand) GetExecutor() interface{} {
 }
 
 func (OnCallCommand) Execute(ctx registry.CommandContext) {
-	panels, err := dbclient.Client.Panel.GetByGuild(ctx, ctx.GuildId())
+	panels, err := dbclient.Client.Panel.GetByGuildWithoutComponents(ctx, ctx.GuildId())
 	if err != nil {
 		ctx.HandleError(err)
 		return

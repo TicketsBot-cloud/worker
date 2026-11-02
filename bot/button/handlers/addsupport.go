@@ -157,7 +157,7 @@ func updateChannelPermissions(ctx cmdregistry.CommandContext, id uint64, mention
 		return
 	}
 
-	panels, err := dbclient.Client.Panel.GetByGuild(ctx, ctx.GuildId())
+	panels, err := dbclient.Client.Panel.GetByGuildWithoutComponents(ctx, ctx.GuildId())
 	if err != nil {
 		ctx.HandleError(err)
 		return

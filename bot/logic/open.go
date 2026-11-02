@@ -206,8 +206,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 
 	// Generate subject
-	if panel != nil && panel.Title != "" { // If we're using a panel, use the panel title as the subject
-		subject = panel.Title
+	if panel != nil && PanelLabel(*panel) != "" {
+		subject = PanelLabel(*panel)
 	} else { // Else, take command args as the subject
 		if subject == "" {
 			subject = "No subject given"
@@ -466,7 +466,11 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		// Update message IDs in DB
 		span = sentry.StartSpan(rootSpan.Context(), "Update ticket properties in database")
 		defer span.Finish()
-		if err := dbclient.Client.Tickets.SetMessageIds(ctx, cmd.GuildId(), ticketId, welcomeMessageId, joinMessageId); err != nil {
+
+		// The welcome is already posted, so its id is stored even when slow sends used up the handler's deadline
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := dbclient.Client.Tickets.SetMessageIds(dbCtx, cmd.GuildId(), ticketId, welcomeMessageId, joinMessageId); err != nil {
 			return err
 		}
 
@@ -1469,7 +1473,7 @@ func buildJoinThreadMessage(
 
 	panelName := "None"
 	if panel != nil {
-		panelName = panel.Title
+		panelName = PanelLabel(*panel)
 	}
 
 	title := "Join Ticket"

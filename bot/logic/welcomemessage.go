@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -10,15 +11,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/gdl/rest"
+	"github.com/TicketsBot-cloud/gdl/rest/request"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -44,6 +48,20 @@ func SendWelcomeMessage(
 	// Only custom integration placeholders for now - prevent making duplicate requests
 	additionalPlaceholders map[string]string,
 ) (uint64, error) {
+	if tree := loadWelcomeV2Tree(ctx, cmd, ticket, panel); tree != nil {
+		msgId, rejected, err := sendWelcomeMessageV2(ctx, cmd, ticket, panel, tree, formData, additionalPlaceholders)
+		if err == nil {
+			return msgId, nil
+		}
+
+		// A V2 message Discord didn't reject may still be posted, and a Classic one would then be a second welcome.
+		if !rejected {
+			return 0, err
+		}
+
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+	}
+
 	// Build embeds
 	welcomeMessageEmbed, err := BuildWelcomeMessageEmbed(ctx, cmd, ticket, subject, panel, additionalPlaceholders)
 	if err != nil {
@@ -58,17 +76,47 @@ func SendWelcomeMessage(
 		formAnswersEmbed := embed.NewEmbed().
 			SetColorPtr(welcomeMessageEmbed.Color)
 
-		for _, field := range fields {
-			formAnswersEmbed.AddField(field.Name, utils.EscapeMarkdown(field.Value), field.Inline)
-		}
-
 		if cmd.PremiumTier() == premium.None {
 			formAnswersEmbed.SetFooter(fmt.Sprintf("Powered by %s", config.Conf.Bot.PoweredBy), config.Conf.Bot.IconUrl)
 		}
 
-		embeds = append(embeds, formAnswersEmbed)
+		used := embedTextLength(welcomeMessageEmbed) + embedTextLength(formAnswersEmbed)
+		fitted := fitClassicFormAnswers(fields, used)
+		for _, field := range fitted {
+			formAnswersEmbed.AddField(field.Name, field.Value, field.Inline)
+		}
+
+		if len(fitted) > 0 {
+			embeds = append(embeds, formAnswersEmbed)
+		}
 	}
 
+	buttons := welcomeButtons(cmd, panel, ticket.IsThread)
+
+	data := rest.CreateMessageData{
+		Embeds: embeds,
+	}
+
+	if len(buttons) > 0 {
+		data.Components = []component.Component{
+			component.BuildActionRow(buttons...),
+		}
+	}
+
+	// Should never happen
+	if ticket.ChannelId == nil {
+		return 0, fmt.Errorf("channel is nil")
+	}
+
+	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
+	if err != nil {
+		return 0, err
+	}
+
+	return msg.Id, nil
+}
+
+func welcomeButtons(cmd registry.CommandContext, panel *database.Panel, isThread bool) []component.Component {
 	var hideClose, hideCloseWithReason, hideClaim bool
 	if panel != nil {
 		hideClose = panel.HideCloseButton
@@ -94,7 +142,7 @@ func SendWelcomeMessage(
 		}))
 	}
 
-	if !hideClaim && !ticket.IsThread {
+	if !hideClaim && !isThread {
 		buttons = append(buttons, component.BuildButton(component.Button{
 			Label:    cmd.GetMessage(i18n.TitleClaim),
 			CustomId: "claim",
@@ -103,27 +151,219 @@ func SendWelcomeMessage(
 		}))
 	}
 
-	data := rest.CreateMessageData{
-		Embeds: embeds,
+	return buttons
+}
+
+func welcomeV2Tree(panel *database.Panel, paidPremium bool) ([]component.Component, error) {
+	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || !paidPremium {
+		return nil, nil
 	}
 
-	if len(buttons) > 0 {
-		data.Components = []component.Component{
-			component.BuildActionRow(buttons...),
-		}
+	if panel.WelcomeMessageComponents == nil {
+		return nil, nil
 	}
 
-	// Should never happen
+	var tree []component.Component
+	if err := json.Unmarshal([]byte(*panel.WelcomeMessageComponents), &tree); err != nil {
+		return nil, fmt.Errorf("unmarshal welcome message components: %w", err)
+	}
+
+	if len(tree) == 0 {
+		return nil, nil
+	}
+
+	return tree, nil
+}
+
+func hasPaidPremium(tier premium.PremiumTier, source model.EntitlementSource) bool {
+	return tier != premium.None && source != model.EntitlementSourceVoting
+}
+
+func loadWelcomeV2Tree(ctx context.Context, cmd registry.CommandContext, ticket database.Ticket, panel *database.Panel) []component.Component {
+	if panel == nil || !panel.WelcomeMessageUsesComponentsV2 || cmd.PremiumTier() == premium.None {
+		return nil
+	}
+
+	tier, source, err := utils.PremiumClient.GetTierByGuildIdWithSource(ctx, cmd.GuildId(), cmd.Worker().Token, cmd.Worker().RateLimiter)
+	if err != nil {
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+		return nil
+	}
+
+	tree, err := welcomeV2Tree(panel, hasPaidPremium(tier, source))
+	if err != nil {
+		logging.WarnWithContext(err, cmd.ToErrorContext(), zap.Uint64("guild_id", ticket.GuildId), zap.Int("panel_id", panel.PanelId))
+		return nil
+	}
+
+	return tree
+}
+
+func sendWelcomeMessageV2(
+	ctx context.Context,
+	cmd registry.CommandContext,
+	ticket database.Ticket,
+	panel *database.Panel,
+	tree []component.Component,
+	formData map[database.FormInput]string,
+	additionalPlaceholders map[string]string,
+) (msgId uint64, rejected bool, err error) {
 	if ticket.ChannelId == nil {
-		return 0, fmt.Errorf("channel is nil")
+		return 0, true, fmt.Errorf("channel is nil")
+	}
+
+	tree = transformComponentText(tree, componentTextTransform{
+		Text: func(s string) string {
+			return DoPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders)
+		},
+		Label: func(s string) string {
+			return truncateRunes(DoPlainTextPlaceholderSubstitutions(ctx, s, cmd.Worker(), ticket, additionalPlaceholders), buttonLabelLimit)
+		},
+		Url: func(s string) string {
+			return withDefaultAvatar(s, replaceAvatarPlaceholder(cmd.Worker(), ticket, s), ticket.UserId)
+		},
+	})
+
+	finalTree := buildWelcomeV2Components(tree, getFormDataFields(formData), welcomeButtons(cmd, panel, ticket.IsThread))
+
+	data := rest.CreateMessageData{
+		Flags:        message.SumFlags(message.FlagComponentsV2),
+		Components:   finalTree,
+		Nonce:        "w" + strconv.FormatUint(*ticket.ChannelId, 10),
+		EnforceNonce: true,
 	}
 
 	msg, err := cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data)
-	if err != nil {
-		return 0, err
+	if err == nil {
+		return msg.Id, false, nil
 	}
 
-	return msg.Id, nil
+	if isRejection(err) {
+		return 0, true, err
+	}
+
+	// The first send may still be posted; with the same nonce Discord returns that message instead of posting another.
+	time.Sleep(welcomeRetryDelay)
+	if msg, err = cmd.Worker().CreateMessageComplex(*ticket.ChannelId, data); err != nil {
+		return 0, false, err
+	}
+
+	return msg.Id, false, nil
+}
+
+var welcomeRetryDelay = 2 * time.Second
+
+// The http-proxy's own failures are 5xx, so a 4xx is Discord refusing the message.
+func isRejection(err error) bool {
+	var restErr request.RestError
+	return errors.As(err, &restErr) && restErr.StatusCode >= 400 && restErr.StatusCode < 500
+}
+
+func buildWelcomeV2Components(tree []component.Component, fields []embed.EmbedField, buttons []component.Component) []component.Component {
+	headers := make([]string, len(fields))
+	needs := make([]int, len(fields))
+	reserve := 0
+	for i, field := range fields {
+		headers[i] = v2AnswerHeader(field)
+		needs[i] = utf8.RuneCountInString(headers[i]) + utf8.RuneCountInString(utils.EscapeMarkdown(field.Value))
+		reserve += min(needs[i], v2AnswerFloor)
+	}
+
+	tree, used := fitTemplateText(tree, v2TextDisplayBudget-reserve)
+	allowances := waterFill(needs, v2TextDisplayBudget-used)
+
+	out := make([]component.Component, 0, len(tree)+2)
+	out = append(out, tree...)
+
+	if len(fields) > 0 {
+		answers := make([]component.Component, len(fields))
+		for i, field := range fields {
+			value := truncateEscaped(field.Value, allowances[i]-utf8.RuneCountInString(headers[i]))
+			answers[i] = component.BuildTextDisplay(component.TextDisplay{
+				Content: headers[i] + value,
+			})
+		}
+
+		out = append(out, component.BuildContainer(component.Container{
+			AccentColor: lastContainerAccent(tree),
+			Components:  answers,
+		}))
+	}
+
+	if len(buttons) > 0 {
+		out = append(out, component.BuildActionRow(buttons...))
+	}
+
+	return out
+}
+
+func lastContainerAccent(tree []component.Component) *int {
+	for i := len(tree) - 1; i >= 0; i-- {
+		if container, ok := tree[i].ComponentData.(component.Container); ok {
+			return container.AccentColor
+		}
+	}
+
+	return nil
+}
+
+type componentTextTransform struct {
+	Text  func(string) string
+	Label func(string) string
+	Url   func(string) string
+}
+
+func transformComponentText(components []component.Component, t componentTextTransform) []component.Component {
+	if components == nil {
+		return nil
+	}
+
+	out := make([]component.Component, len(components))
+	for i, c := range components {
+		out[i] = transformComponentTextOne(c, t)
+	}
+
+	return out
+}
+
+func transformComponentTextOne(c component.Component, t componentTextTransform) component.Component {
+	switch data := c.ComponentData.(type) {
+	case component.TextDisplay:
+		data.Content = expandOrKeepRaw(data.Content, t.Text(data.Content))
+		return component.BuildTextDisplay(data)
+	case component.Section:
+		data.Components = transformComponentText(data.Components, t)
+		if data.Accessory.ComponentData != nil {
+			data.Accessory = transformComponentTextOne(data.Accessory, t)
+		}
+		return component.BuildSection(data)
+	case component.Container:
+		data.Components = transformComponentText(data.Components, t)
+		return component.BuildContainer(data)
+	case component.ActionRow:
+		data.Components = transformComponentText(data.Components, t)
+		return component.BuildActionRow(data.Components...)
+	case component.Button:
+		data.Label = expandOrKeepRaw(data.Label, t.Label(data.Label))
+		if data.Url != nil {
+			resolved := t.Url(*data.Url)
+			data.Url = &resolved
+		}
+		return component.BuildButton(data)
+	case component.Thumbnail:
+		data.Media.Url = t.Url(data.Media.Url)
+		return component.BuildThumbnail(data)
+	case component.MediaGallery:
+		items := make([]component.MediaGalleryItem, len(data.Items))
+		copy(items, data.Items)
+		for i := range items {
+			items[i].Media.Url = t.Url(items[i].Media.Url)
+		}
+		data.Items = items
+		return component.BuildMediaGallery(data)
+	}
+
+	return c
 }
 
 func BuildWelcomeMessageEmbed(
@@ -200,6 +440,9 @@ func doPlaceholderSubstitutions(
 	// Process parameterized placeholders first (e.g., %date_days:30%)
 	message = doParameterizedSubstitutions(ctx, message, worker, ticket, plainTextOnly)
 
+	// The goroutines below reassign message, so lookups are picked from a copy.
+	original := message
+
 	var lock sync.Mutex
 
 	// do DB lookups in parallel
@@ -216,7 +459,7 @@ func doPlaceholderSubstitutions(
 
 		formatted := fmt.Sprintf("%%%s%%", placeholder)
 
-		if strings.Contains(message, formatted) {
+		if strings.Contains(original, formatted) {
 			group.Go(func() error {
 				ctx, cancel := context.WithTimeout(ctx, substitutionTimeout)
 				defer cancel()
@@ -725,7 +968,7 @@ func getFormDataFields(formData map[database.FormInput]string) []embed.EmbedFiel
 	var fields []embed.EmbedField // Can't use len(formData), as form may have changed since modal was opened
 	for _, input := range inputs {
 		answer, ok := formData[input]
-		if answer == "" {
+		if strings.TrimSpace(answer) == "" {
 			answer = "N/A" // TODO: What should we use here?
 		}
 
@@ -894,4 +1137,12 @@ func replaceAvatarPlaceholder(worker *worker.Context, ticket database.Ticket, ur
 	}
 
 	return user.AvatarUrl(256)
+}
+
+func withDefaultAvatar(raw, resolved string, userId uint64) string {
+	if raw != AvatarUrlPlaceholder || resolved != "" {
+		return resolved
+	}
+
+	return fmt.Sprintf("https://cdn.discordapp.com/embed/avatars/%d.png", (userId>>22)%6)
 }

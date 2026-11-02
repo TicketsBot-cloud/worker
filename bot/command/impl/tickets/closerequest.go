@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/permission"
@@ -60,7 +61,7 @@ func (CloseRequestCommand) Execute(ctx registry.CommandContext, closeDelay *int,
 		return
 	}
 
-	if reason != nil && len(*reason) > 255 {
+	if reason != nil && utf8.RuneCountInString(*reason) > 255 {
 		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseReasonTooLong)
 		return
 	}

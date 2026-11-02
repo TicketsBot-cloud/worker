@@ -13,6 +13,14 @@ const (
 	MentionableTypeRole
 )
 
+func (m MentionableType) String() string {
+	if m == MentionableTypeRole {
+		return "role"
+	}
+
+	return "user"
+}
+
 func (m MentionableType) OverwriteType() channel.PermissionOverwriteType {
 	switch m {
 	case MentionableTypeUser:

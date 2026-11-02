@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
@@ -67,7 +69,7 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 			return
 		}
 
-		formAnswers := parseModalComponents(data.Components, inputs)
+		formAnswers := parseModalComponents(data, inputs)
 
 		if invalidLabel, valid := validateFormAnswers(formAnswers); !valid {
 			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageFormMissingInput, invalidLabel)
@@ -82,9 +84,9 @@ func (h *FormHandler) Execute(ctx *context.ModalContext) {
 }
 
 // parseModalComponents extracts answers from modal action rows, keyed by the matching FormInput.
-func parseModalComponents(actionRows []interaction.ModalSubmitInteractionActionRowData, inputsByCustomId map[string]database.FormInput) map[database.FormInput]string {
+func parseModalComponents(data interaction.ModalSubmitInteractionData, inputsByCustomId map[string]database.FormInput) map[database.FormInput]string {
 	answers := make(map[database.FormInput]string)
-	for _, actionRow := range actionRows {
+	for _, actionRow := range data.Components {
 		if actionRow.Component != nil {
 			c := actionRow.Component
 			var answer string
@@ -98,7 +100,7 @@ func parseModalComponents(actionRows []interaction.ModalSubmitInteractionActionR
 			case component.ComponentRoleSelect:
 				answer = joinMentions(c.Values, "role")
 			case component.ComponentMentionableSelect:
-				answer = strings.Trim(strings.Join(c.Values, ", "), "<@&!>")
+				answer = joinMentionables(c.Values, data.Resolved)
 			case component.ComponentChannelSelect:
 				answer = joinMentions(c.Values, "channel")
 			case component.ComponentRadioGroup:
@@ -161,4 +163,24 @@ func joinMentions(mentions []string, mentionType string) string {
 	}
 
 	return val
+}
+
+func joinMentionables(ids []string, resolved interaction.ResolvedData) string {
+	mentions := make([]string, len(ids))
+	for i, id := range ids {
+		mentions[i] = id
+
+		snowflake, err := strconv.ParseUint(id, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		if _, ok := resolved.Roles[objects.Snowflake(snowflake)]; ok {
+			mentions[i] = fmt.Sprintf("<@&%s>", id)
+		} else if _, ok := resolved.Users[objects.Snowflake(snowflake)]; ok {
+			mentions[i] = fmt.Sprintf("<@%s>", id)
+		}
+	}
+
+	return strings.Join(mentions, ", ")
 }

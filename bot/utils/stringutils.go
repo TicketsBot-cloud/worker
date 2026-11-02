@@ -4,6 +4,7 @@ import (
 	"golang.org/x/exp/constraints"
 	"math/rand"
 	"strings"
+	"unicode/utf8"
 )
 
 type Number interface {
@@ -11,8 +12,8 @@ type Number interface {
 }
 
 func StringMax(str string, max int, suffix ...string) string {
-	if len(str) > max {
-		return str[:max] + strings.Join(suffix, "")
+	if utf8.RuneCountInString(str) > max {
+		return string([]rune(str)[:max]) + strings.Join(suffix, "")
 	}
 
 	return str
