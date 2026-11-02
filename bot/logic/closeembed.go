@@ -136,10 +136,7 @@ func BuildCloseEmbed(
 	if reason == nil {
 		formattedReason = "No reason specified"
 	} else {
-		formattedReason = *reason
-		if len(formattedReason) > 1024 {
-			formattedReason = formattedReason[:1024]
-		}
+		formattedReason = truncateRunes(*reason, embedFieldValueLimit)
 	}
 
 	var claimedBy string

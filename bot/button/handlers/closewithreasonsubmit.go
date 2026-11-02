@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -43,7 +44,7 @@ func (h *CloseWithReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 	}
 
 	// This must be malicious
-	if len(reason) > 1024 {
+	if utf8.RuneCountInString(reason) > 1024 {
 		ctx.HandleError(fmt.Errorf("Reason is too long"))
 		return
 	}

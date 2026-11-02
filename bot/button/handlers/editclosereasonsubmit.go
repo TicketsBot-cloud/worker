@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
@@ -79,7 +80,7 @@ func (h *EditCloseReasonSubmitHandler) Execute(ctx *context.ModalContext) {
 		}
 	}
 
-	if len(reason) > 1024 {
+	if utf8.RuneCountInString(reason) > 1024 {
 		ctx.HandleError(fmt.Errorf("reason too long"))
 		return
 	}
