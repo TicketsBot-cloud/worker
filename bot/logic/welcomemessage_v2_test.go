@@ -709,6 +709,30 @@ func TestSendWelcomeMessageClassicAnswersEmbed(t *testing.T) {
 	}
 }
 
+func TestSendWelcomeMessageClassicLongAnswer(t *testing.T) {
+	transport := captureDiscordRequests(t, `{"id":"42"}`)
+
+	answer := strings.Repeat("word ", 600)
+	formData := map[database.FormInput]string{{Id: 1, Label: "Q"}: answer}
+	cmd := welcomeCommandContext{premiumCommandContext{tier: premium.Premium}}
+
+	_, err := SendWelcomeMessage(context.Background(), cmd, welcomeTicket(), "subject", nil, formData, nil)
+	require.NoError(t, err)
+
+	embeds := transport.bodies(http.MethodPost)[0]["embeds"].([]any)
+	require.Len(t, embeds, 2)
+
+	var names, values []string
+	for _, raw := range embeds[1].(map[string]any)["fields"].([]any) {
+		field := raw.(map[string]any)
+		names = append(names, field["name"].(string))
+		values = append(values, field["value"].(string))
+	}
+
+	require.Equal(t, []string{"Q", continuationFieldName, continuationFieldName}, names)
+	require.Equal(t, strings.TrimSpace(answer), strings.Join(values, " "))
+}
+
 func TestUpdateWelcomeMessageClaimButton(t *testing.T) {
 	row := func(toggle string) string {
 		return `{"type":1,"components":[{"type":2,"style":4,"label":"close","custom_id":"close"},{"type":2,"style":3,"label":"` + toggle + `","custom_id":"` + toggle + `"}]}`

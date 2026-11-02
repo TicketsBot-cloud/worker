@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"math/rand"
 	"slices"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -472,30 +474,54 @@ func TestFitClassicFormAnswers(t *testing.T) {
 			},
 		},
 		{
-			name:      "one over field limit",
+			name:      "one over field limit continues",
 			fields:    []embed.EmbedField{{Name: "Q", Value: strings.Repeat("a", embedFieldValueLimit+1)}},
-			wantCount: 1,
+			wantCount: 2,
 			check: func(t *testing.T, got []embed.EmbedField) {
-				require.Equal(t, embedFieldValueLimit, runeLen(got[0].Value))
-				require.True(t, strings.HasSuffix(got[0].Value, truncationEllipsis))
+				require.Equal(t, embed.EmbedField{Name: "Q", Value: strings.Repeat("a", embedFieldValueLimit)}, got[0])
+				require.Equal(t, embed.EmbedField{Name: continuationFieldName, Value: "a"}, got[1])
 			},
 		},
 		{
 			name:      "escaping pushes over field limit",
 			fields:    []embed.EmbedField{{Name: "Q", Value: strings.Repeat("*", 600)}},
-			wantCount: 1,
+			wantCount: 2,
 			check: func(t *testing.T, got []embed.EmbedField) {
-				require.LessOrEqual(t, runeLen(got[0].Value), embedFieldValueLimit)
-				require.False(t, strings.HasSuffix(strings.TrimSuffix(got[0].Value, truncationEllipsis), `\`))
+				require.Equal(t, strings.Repeat(`\*`, 600), got[0].Value+got[1].Value)
 			},
 		},
 		{
 			name:      "multibyte answer",
 			fields:    []embed.EmbedField{{Name: "Q", Value: strings.Repeat("😀", 2000)}},
-			wantCount: 1,
+			wantCount: 2,
 			check: func(t *testing.T, got []embed.EmbedField) {
 				require.Equal(t, embedFieldValueLimit, runeLen(got[0].Value))
-				require.True(t, utf8.ValidString(got[0].Value))
+				require.Equal(t, strings.Repeat("😀", 2000), got[0].Value+got[1].Value)
+			},
+		},
+		{
+			name:      "long answer shown in full",
+			fields:    []embed.EmbedField{{Name: "Q1", Value: long}, {Name: "Q2", Value: "short"}},
+			wantCount: 5,
+			check: func(t *testing.T, got []embed.EmbedField) {
+				names := []string{"Q1", continuationFieldName, continuationFieldName, continuationFieldName, "Q2"}
+				var text string
+				for i, f := range got {
+					require.Equal(t, names[i], f.Name)
+					if i < 4 {
+						text += f.Value
+					}
+				}
+				require.Equal(t, long, text)
+				require.Equal(t, "short", got[4].Value)
+			},
+		},
+		{
+			name:      "continuation names count towards the total",
+			fields:    []embed.EmbedField{{Name: "Q", Value: strings.Repeat("a", embedTotalLimit)}},
+			wantCount: 6,
+			check: func(t *testing.T, got []embed.EmbedField) {
+				require.True(t, strings.HasSuffix(got[5].Value, truncationEllipsis))
 			},
 		},
 		{
@@ -554,6 +580,101 @@ func TestFitClassicFormAnswers(t *testing.T) {
 	}
 }
 
+func TestSplitAnswer(t *testing.T) {
+	a := func(n int) string { return strings.Repeat("a", n) }
+	words := func(word string, n int) string { return strings.TrimSpace(strings.Repeat(word+" ", n)) }
+
+	tests := []struct {
+		name  string
+		value string
+		want  []string
+	}{
+		{"fits unchanged", a(1020) + "    ", []string{a(1020) + "    "}},
+		{"paragraph break first", a(600) + "\n\n" + words("b", 300), []string{a(600), words("b", 300)}},
+		{"line break", a(600) + "\n" + words("b", 300), []string{a(600), words("b", 300)}},
+		{"sentence end", a(598) + ". " + words("b", 300), []string{a(598) + ".", words("b", 300)}},
+		{"sentence end without a space", strings.Repeat("日", 600) + "。" + strings.Repeat("本", 600), []string{strings.Repeat("日", 600) + "。", strings.Repeat("本", 600)}},
+		{"word break", words("ab", 400), []string{words("ab", 341), words("ab", 59)}},
+		{"break too early is skipped", a(100) + "\n\n" + words("c", 600), []string{a(100) + "\n\n" + words("c", 461), words("c", 139)}},
+		{"escape stays together", a(1023) + `\*` + a(100), []string{a(1023), `\*` + a(100)}},
+		{"escaped backslash splits normally", a(1022) + `\\` + a(100), []string{a(1022) + `\\`, a(100)}},
+		{"blank block dropped", strings.Repeat(" ", 1100) + "x", []string{"x"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, splitAnswer(tt.value))
+		})
+	}
+}
+
+func randomAnswer(rng *rand.Rand, maxLen int) string {
+	tokens := []string{"word", "x", " ", " ", "\n", "\n\n", ". ", "!", "。", "*", "_", "#", "😀", "日本語", "<@123456789012345678>", "https://example.com/" + strings.Repeat("p", 40)}
+
+	var b strings.Builder
+	target := rng.Intn(maxLen)
+	for runeLen(b.String()) < target {
+		b.WriteString(tokens[rng.Intn(len(tokens))])
+	}
+
+	return b.String()
+}
+
+func withoutSpace(s string) string {
+	return strings.Join(strings.Fields(s), "")
+}
+
+func TestSplitAnswerProperties(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	for range 1000 {
+		value := utils.EscapeMarkdown(randomAnswer(rng, 6000))
+		chunks := splitAnswer(value)
+		if runeLen(value) <= embedFieldValueLimit {
+			require.Equal(t, []string{value}, chunks)
+			continue
+		}
+
+		for _, chunk := range chunks {
+			require.NotEmpty(t, strings.TrimSpace(chunk))
+			require.LessOrEqual(t, runeLen(chunk), embedFieldValueLimit)
+			require.Zero(t, trailingBackslashes([]rune(chunk))%2, "an escape was split from its character")
+		}
+
+		require.Equal(t, withoutSpace(value), withoutSpace(strings.Join(chunks, "")), "text lost or repeated")
+	}
+}
+
+func TestFitClassicFormAnswersProperties(t *testing.T) {
+	rng := rand.New(rand.NewSource(2))
+	for range 1000 {
+		fields := make([]embed.EmbedField, 1+rng.Intn(5))
+		for i := range fields {
+			fields[i] = embed.EmbedField{Name: "Question " + strings.Repeat("?", rng.Intn(45)), Value: randomAnswer(rng, 4000) + "x"}
+		}
+
+		used := rng.Intn(embedTotalLimit)
+		got := fitClassicFormAnswers(fields, used)
+		require.LessOrEqual(t, len(got), 25)
+
+		total := used
+		answers := 0
+		for _, f := range got {
+			require.NotEmpty(t, f.Value)
+			require.LessOrEqual(t, runeLen(f.Value), embedFieldValueLimit)
+			if f.Name != continuationFieldName {
+				require.Equal(t, fields[answers].Name, f.Name)
+				answers++
+			}
+			total += runeLen(f.Name) + runeLen(f.Value)
+		}
+
+		if len(got) > 0 {
+			require.NotEqual(t, continuationFieldName, got[0].Name)
+			require.LessOrEqual(t, total, embedTotalLimit)
+		}
+	}
+}
+
 func TestEmbedTextLength(t *testing.T) {
 	e := embed.NewEmbed().SetTitle("ab").SetDescription("日本").SetFooter("foot", "").SetAuthor("me", "", "")
 	e.AddField("n", "v", false)
@@ -566,11 +687,12 @@ func TestAddFormAnswerFields(t *testing.T) {
 	long := strings.Repeat("a", 3000)
 
 	tests := []struct {
-		name   string
-		values []string
+		name       string
+		values     []string
+		wantFields int
 	}{
-		{"one long answer", []string{long, "short"}},
-		{"long answers past the embed total", []string{long, long, long, long, long, long, long, "*short*"}},
+		{"long answer continues", []string{long, "short"}, 4},
+		{"long answers past the embed total", []string{long, long, long, long, long, long, long, "*short*"}, 8},
 	}
 
 	for _, tt := range tests {
@@ -578,13 +700,12 @@ func TestAddFormAnswerFields(t *testing.T) {
 			e := embed.NewEmbed().SetTitle("Exit Survey").SetAuthor("opener", "", "")
 			AddFormAnswerFields(e, answerFields(tt.values...))
 
-			require.Len(t, e.Fields, len(tt.values))
+			require.Len(t, e.Fields, tt.wantFields)
 			for _, f := range e.Fields {
 				require.LessOrEqual(t, runeLen(f.Value), embedFieldValueLimit)
 			}
 
 			require.LessOrEqual(t, embedTextLength(e), embedTotalLimit)
-			require.True(t, strings.HasSuffix(e.Fields[0].Value, truncationEllipsis))
 			require.Contains(t, e.Fields[len(e.Fields)-1].Value, "short")
 		})
 	}

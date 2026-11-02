@@ -3,6 +3,7 @@ package logic
 import (
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
@@ -17,6 +18,10 @@ const (
 
 	embedFieldValueLimit = 1024
 	embedTotalLimit      = 6000
+
+	// Discord needs a field name, and a zero-width space shows as a blank line, like a paragraph break.
+	continuationFieldName = "\u200b"
+	minAnswerChunk        = embedFieldValueLimit / 2
 
 	truncationEllipsis = "…"
 )
@@ -85,7 +90,7 @@ func waterFill(lengths []int, budget int) []int {
 	return out
 }
 
-func fitAnswerValues(values []string, overheads []int, budget, perLimit int) []string {
+func fitAnswerValues(values []string, overheads []int, budget int) []string {
 	kept := 0
 	used := 0
 	for i := range values {
@@ -101,10 +106,6 @@ func fitAnswerValues(values []string, overheads []int, budget, perLimit int) []s
 	overheadTotal := 0
 	for i := 0; i < kept; i++ {
 		lengths[i] = utf8.RuneCountInString(utils.EscapeMarkdown(values[i]))
-		if perLimit > 0 {
-			lengths[i] = min(lengths[i], perLimit)
-		}
-
 		overheadTotal += overheads[i]
 	}
 
@@ -185,14 +186,98 @@ func fitClassicFormAnswers(fields []embed.EmbedField, used int) []embed.EmbedFie
 		overheads[i] = utf8.RuneCountInString(names[i])
 	}
 
-	fitted := fitAnswerValues(values, overheads, embedTotalLimit-used, embedFieldValueLimit)
+	// Continuation names count towards the total too, so refit until enough room is left for them.
+	var parts [][]string
+	for reserved := 0; ; {
+		fitted := fitAnswerValues(values, overheads, embedTotalLimit-used-reserved)
 
-	out := make([]embed.EmbedField, len(fitted))
-	for i, value := range fitted {
-		out[i] = embed.EmbedField{Name: names[i], Value: value, Inline: fields[i].Inline}
+		parts = make([][]string, len(fitted))
+		continuations := 0
+		for i, value := range fitted {
+			parts[i] = splitAnswer(value)
+			continuations += len(parts[i]) - 1
+		}
+
+		if continuations <= reserved {
+			break
+		}
+
+		reserved = continuations
+	}
+
+	var out []embed.EmbedField
+	for i, chunks := range parts {
+		for j, chunk := range chunks {
+			name := names[i]
+			if j > 0 {
+				name = continuationFieldName
+			}
+
+			out = append(out, embed.EmbedField{Name: name, Value: chunk, Inline: fields[i].Inline})
+		}
 	}
 
 	return out
+}
+
+func splitAnswer(value string) []string {
+	runes := []rune(value)
+	if len(runes) <= embedFieldValueLimit {
+		return []string{value}
+	}
+
+	var chunks []string
+	for len(runes) > embedFieldValueLimit {
+		cut := answerCut(runes[:embedFieldValueLimit+1])
+		if chunk := strings.TrimRightFunc(string(runes[:cut]), unicode.IsSpace); chunk != "" {
+			chunks = append(chunks, chunk)
+		}
+
+		runes = []rune(strings.TrimLeftFunc(string(runes[cut:]), unicode.IsSpace))
+	}
+
+	if rest := strings.TrimRightFunc(string(runes), unicode.IsSpace); rest != "" {
+		chunks = append(chunks, rest)
+	}
+
+	return chunks
+}
+
+// Continue at the most natural break, but not before half a field, so an answer doesn't become many small blocks.
+func answerCut(window []rune) int {
+	limit := len(window) - 1
+	for _, isBreak := range []func(r []rune, i int) bool{isParagraphBreak, isLineBreak, isSentenceEnd, isWordBreak} {
+		for i := limit; i >= minAnswerChunk; i-- {
+			if isBreak(window, i) {
+				return i
+			}
+		}
+	}
+
+	// An escaping backslash stays with the character it escapes, or the next block would start unescaped.
+	cut := limit
+	if trailingBackslashes(window[:cut])%2 == 1 {
+		cut--
+	}
+
+	return cut
+}
+
+func isParagraphBreak(r []rune, i int) bool { return r[i] == '\n' && r[i-1] == '\n' }
+func isLineBreak(r []rune, i int) bool      { return r[i] == '\n' }
+func isWordBreak(r []rune, i int) bool      { return unicode.IsSpace(r[i]) }
+
+func isSentenceEnd(r []rune, i int) bool {
+	return strings.ContainsRune("。！？", r[i-1]) || unicode.IsSpace(r[i]) && strings.ContainsRune(".!?", r[i-1])
+}
+
+func trailingBackslashes(r []rune) int {
+	n := 0
+	for i := len(r) - 1; i >= 0 && r[i] == '\\'; i-- {
+		n++
+	}
+
+	return n
 }
 
 func AddFormAnswerFields(e *embed.Embed, fields []embed.EmbedField) {
