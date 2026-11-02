@@ -2,13 +2,15 @@ package handlers
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/TicketsBot-cloud/gdl/objects/interaction"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
 type CloseWithReasonSubmitHandler struct{}
@@ -25,39 +27,40 @@ func (h *CloseWithReasonSubmitHandler) Properties() registry.Properties {
 }
 
 func (h *CloseWithReasonSubmitHandler) Execute(ctx *context.ModalContext) {
-	data := ctx.Interaction.Data
-
-	// Get the reason
-	if len(data.Components) == 0 { // No action rows
-		ctx.HandleError(fmt.Errorf("No action rows found in modal components"))
-		return
-	}
-
-	actionRow := data.Components[0]
-	if len(actionRow.Components) == 0 && actionRow.Component == nil { // Text input missing
+	reason, hasInput := ctx.GetInput("reason")
+	presets, hasSelect := ctx.GetValues("preset")
+	if !hasInput && !hasSelect {
 		ctx.HandleError(fmt.Errorf("Modal missing text input"))
 		return
 	}
 
-	var textInput interaction.ModalSubmitInteractionComponentData
-
-	if actionRow.Component != nil {
-		textInput = *actionRow.Component
-	} else {
-		textInput = actionRow.Components[0]
-	}
-
-	if textInput.CustomId != "reason" {
-		ctx.HandleError(fmt.Errorf("Text input custom ID mismatch"))
-		return
+	if hasSelect {
+		reason = pickCloseReason(reason, presets)
+		if reason == "" {
+			ctx.Reply(customisation.Red, i18n.Error, i18n.MessageCloseReasonMissing)
+			return
+		}
 	}
 
 	// This must be malicious
-	if len(textInput.Value) > 1024 {
+	if len(reason) > 1024 {
 		ctx.HandleError(fmt.Errorf("Reason is too long"))
 		return
 	}
 
+	reason, ok := logic.ResolveChannelCloseReason(ctx.Context, ctx, reason)
+	if !ok {
+		return
+	}
+
 	ctx.Ack()
-	logic.CloseTicket(ctx.Context, ctx, &textInput.Value, false)
+	logic.CloseTicket(ctx.Context, ctx, &reason, false)
+}
+
+func pickCloseReason(text string, presets []string) string {
+	if len(presets) > 0 {
+		return presets[0]
+	}
+
+	return strings.TrimSpace(text)
 }
