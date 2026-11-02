@@ -3,325 +3,118 @@ package permissionwrapper
 import (
 	"errors"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/guild"
+	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/permission"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
 var ErrChannelObfuscated = errors.New("channel metadata is obfuscated")
 
 func HasPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, permissions ...permission.Permission) bool {
-	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
+	m, roles, ch, err := fetchChannelData(ctx, guildId, userId, channelId)
 	if err != nil {
+		// Administrator outranks anything the channel could say, including being unreadable
+		if errors.Is(err, ErrChannelObfuscated) {
+			return HasPermissions(ctx, guildId, userId, permission.Administrator)
+		}
+
+		sentry.Error(err)
 		return false
 	}
-
-	if permission.HasPermissionRaw(sum, permission.Administrator) {
+	effective := botpermissions.EffectivePermissions(guildId, userId, []uint64(m.Roles), ch.PermissionOverwrites, buildRoleMap(roles))
+	if permission.HasPermissionRaw(effective, permission.Administrator) {
 		return true
 	}
-
-	hasPermission := true
-
-	for _, perm := range permissions {
-		if !permission.HasPermissionRaw(sum, perm) {
-			hasPermission = false
-			break
+	for _, p := range permissions {
+		if !permission.HasPermissionRaw(effective, p) {
+			return false
 		}
 	}
-
-	return hasPermission
+	return true
 }
 
 func HasPermissions(ctx *worker.Context, guildId, userId uint64, permissions ...permission.Permission) bool {
-	sum, err := getEffectivePermissions(ctx, guildId, userId)
+	m, roles, err := fetchGuildData(ctx, guildId, userId)
 	if err != nil {
 		sentry.Error(err)
 		return false
 	}
-
-	if permission.HasPermissionRaw(sum, permission.Administrator) {
+	effective := botpermissions.EffectivePermissions(guildId, userId, []uint64(m.Roles), nil, buildRoleMap(roles))
+	if permission.HasPermissionRaw(effective, permission.Administrator) {
 		return true
 	}
-
-	hasPermission := true
-
-	for _, perm := range permissions {
-		if !permission.HasPermissionRaw(sum, perm) {
-			hasPermission = false
-			break
+	for _, p := range permissions {
+		if !permission.HasPermissionRaw(effective, p) {
+			return false
 		}
 	}
-
-	return hasPermission
-}
-
-func getAllPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64) []permission.Permission {
-	permissions := make([]permission.Permission, 0)
-
-	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
-	if err != nil {
-		if !errors.Is(err, ErrChannelObfuscated) {
-			sentry.Error(err)
-		}
-
-		return permissions
-	}
-
-	for _, perm := range permission.AllPermissions {
-		if permission.HasPermissionRaw(sum, perm) {
-			permissions = append(permissions, perm)
-		}
-	}
-
-	return permissions
-}
-
-func getAllPermissions(ctx *worker.Context, guildId, userId uint64) []permission.Permission {
-	permissions := make([]permission.Permission, 0)
-
-	sum, err := getEffectivePermissions(ctx, guildId, userId)
-	if err != nil {
-		sentry.Error(err)
-		return permissions
-	}
-
-	for _, perm := range permission.AllPermissions {
-		if permission.HasPermissionRaw(sum, perm) {
-			permissions = append(permissions, perm)
-		}
-	}
-
-	return permissions
+	return true
 }
 
 func GetMissingPermissions(ctx *worker.Context, guildId, userId uint64, required ...permission.Permission) []permission.Permission {
-	missing := make([]permission.Permission, 0)
-
-	sum, err := getEffectivePermissions(ctx, guildId, userId)
+	m, roles, err := fetchGuildData(ctx, guildId, userId)
 	if err != nil {
 		sentry.Error(err)
 		return required
 	}
-
-	if permission.HasPermissionRaw(sum, permission.Administrator) {
-		return missing
-	}
-
-	for _, perm := range required {
-		if !permission.HasPermissionRaw(sum, perm) {
-			missing = append(missing, perm)
-		}
-	}
-
-	return missing
+	return botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), nil, buildRoleMap(roles), required)
 }
 
-func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) []permission.Permission {
-	missing := make([]permission.Permission, 0)
-
-	sum, err := getEffectivePermissionsChannel(ctx, guildId, userId, channelId)
+func GetMissingPermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64, required ...permission.Permission) ([]permission.Permission, channel.Channel, error) {
+	m, roles, ch, err := fetchChannelData(ctx, guildId, userId, channelId)
 	if err != nil {
 		if errors.Is(err, ErrChannelObfuscated) {
-			return []permission.Permission{permission.ViewChannel}
+			return []permission.Permission{permission.ViewChannel}, ch, err
 		}
 
 		sentry.Error(err)
-		return required
+		return required, channel.Channel{}, err
 	}
-
-	if permission.HasPermissionRaw(sum, permission.Administrator) {
-		return missing
-	}
-
-	for _, perm := range required {
-		if !permission.HasPermissionRaw(sum, perm) {
-			missing = append(missing, perm)
-		}
-	}
-
-	return missing
+	missing := botpermissions.MissingPermissions(guildId, userId, []uint64(m.Roles), ch.PermissionOverwrites, buildRoleMap(roles), required)
+	return missing, ch, nil
 }
 
-func getEffectivePermissionsChannel(ctx *worker.Context, guildId, userId, channelId uint64) (uint64, error) {
-	permissions, err := getBasePermissions(ctx, guildId)
+func fetchGuildData(ctx *worker.Context, guildId, userId uint64) (member.Member, []guild.Role, error) {
+	m, err := ctx.GetGuildMember(guildId, userId)
 	if err != nil {
-		return 0, err
+		return member.Member{}, nil, err
 	}
-
-	permissions, err = getGuildTotalRolePermissions(ctx, guildId, userId, permissions)
-	if err != nil {
-		return 0, err
-	}
-
-	if permission.HasPermissionRaw(permissions, permission.Administrator) {
-		return permissions, nil
-	}
-
-	permissions, err = getChannelBasePermissions(ctx, guildId, channelId, permissions)
-	if err != nil {
-		return 0, err
-	}
-
-	permissions, err = getChannelTotalRolePermissions(ctx, guildId, userId, channelId, permissions)
-	if err != nil {
-		return 0, err
-	}
-
-	permissions, err = getChannelMemberPermissions(ctx, userId, channelId, permissions)
-	if err != nil {
-		return 0, err
-	}
-
-	return permissions, nil
-}
-
-func getEffectivePermissions(ctx *worker.Context, guildId, userId uint64) (uint64, error) {
-	permissions, err := getBasePermissions(ctx, guildId)
-	if err != nil {
-		return 0, err
-	}
-
-	permissions, err = getGuildTotalRolePermissions(ctx, guildId, userId, permissions)
-	if err != nil {
-		return 0, err
-	}
-
-	return permissions, nil
-}
-
-func getChannelMemberPermissions(ctx *worker.Context, userId, channelId uint64, initialPermissions uint64) (uint64, error) {
-	ch, err := ctx.GetChannel(channelId)
-	if err != nil {
-		return 0, err
-	}
-
-	for _, overwrite := range ch.PermissionOverwrites {
-		if overwrite.Type == channel.PermissionTypeMember && overwrite.Id == userId {
-			initialPermissions &= ^overwrite.Deny
-			initialPermissions |= overwrite.Allow
-		}
-	}
-
-	return initialPermissions, nil
-}
-
-func getChannelTotalRolePermissions(ctx *worker.Context, guildId, userId, channelId uint64, initialPermissions uint64) (uint64, error) {
-	member, err := ctx.GetGuildMember(guildId, userId)
-	if err != nil {
-		return 0, err
-	}
-
 	roles, err := ctx.GetGuildRoles(guildId)
 	if err != nil {
-		return 0, err
+		return member.Member{}, nil, err
 	}
-
-	ch, err := ctx.GetChannel(channelId)
-	if err != nil {
-		return 0, err
-	}
-
-	var allow, deny uint64
-
-	for _, memberRole := range member.Roles {
-		for _, role := range roles {
-			if memberRole == role.Id {
-				for _, overwrite := range ch.PermissionOverwrites {
-					if overwrite.Type == channel.PermissionTypeRole && overwrite.Id == role.Id {
-						allow |= overwrite.Allow
-						deny |= overwrite.Deny
-						break
-					}
-				}
-			}
-		}
-	}
-
-	initialPermissions &= ^deny
-	initialPermissions |= allow
-
-	return initialPermissions, nil
+	return m, roles, nil
 }
 
-func getChannelBasePermissions(ctx *worker.Context, guildId, channelId uint64, initialPermissions uint64) (uint64, error) {
-	roles, err := ctx.GetGuildRoles(guildId)
-	if err != nil {
-		return 0, err
-	}
-
-	var publicRole *guild.Role
-	for _, role := range roles {
-		if role.Id == guildId {
-			publicRole = &role
-			break
-		}
-	}
-
-	if publicRole == nil {
-		return 0, errors.New("couldn't find public role")
-	}
-
+func fetchChannelData(ctx *worker.Context, guildId, userId, channelId uint64) (member.Member, []guild.Role, channel.Channel, error) {
+	// Before the guild data, so an unreadable channel isn't masked by a member/role lookup failure
 	ch, err := ctx.GetChannel(channelId)
 	if err != nil {
-		return 0, err
+		if utils.IsMissingAccess(err) {
+			return member.Member{}, nil, channel.Channel{}, ErrChannelObfuscated
+		}
+		return member.Member{}, nil, channel.Channel{}, err
 	}
-
 	if ch.IsObfuscated() {
-		return 0, ErrChannelObfuscated
+		return member.Member{}, nil, ch, ErrChannelObfuscated
 	}
 
-	for _, overwrite := range ch.PermissionOverwrites {
-		if overwrite.Type == channel.PermissionTypeRole && overwrite.Id == publicRole.Id {
-			initialPermissions &= ^overwrite.Deny
-			initialPermissions |= overwrite.Allow
-			break
-		}
+	m, roles, err := fetchGuildData(ctx, guildId, userId)
+	if err != nil {
+		return member.Member{}, nil, channel.Channel{}, err
 	}
-
-	return initialPermissions, nil
+	return m, roles, ch, nil
 }
 
-func getGuildTotalRolePermissions(ctx *worker.Context, guildId, userId uint64, initialPermissions uint64) (uint64, error) {
-	member, err := ctx.GetGuildMember(guildId, userId)
-	if err != nil {
-		return 0, err
+func buildRoleMap(roles []guild.Role) map[uint64]guild.Role {
+	m := make(map[uint64]guild.Role, len(roles))
+	for _, r := range roles {
+		m[r.Id] = r
 	}
-
-	roles, err := ctx.GetGuildRoles(guildId)
-	if err != nil {
-		return 0, err
-	}
-
-	for _, memberRole := range member.Roles {
-		for _, role := range roles {
-			if memberRole == role.Id {
-				initialPermissions |= role.Permissions
-			}
-		}
-	}
-
-	return initialPermissions, nil
-}
-
-func getBasePermissions(ctx *worker.Context, guildId uint64) (uint64, error) {
-	roles, err := ctx.GetGuildRoles(guildId)
-	if err != nil {
-		return 0, err
-	}
-
-	var publicRole *guild.Role
-	for _, role := range roles {
-		if role.Id == guildId {
-			publicRole = &role
-			break
-		}
-	}
-
-	if publicRole == nil {
-		return 0, errors.New("couldn't find public role")
-	}
-
-	return publicRole.Permissions, nil
+	return m
 }

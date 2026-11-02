@@ -110,7 +110,7 @@ func (AdminGenPremiumCommand) Execute(ctx registry.CommandContext, skuIdRaw stri
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents(utils.Slice(
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Orange,
 			"Admin - Premium Key Generation",
