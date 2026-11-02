@@ -599,6 +599,12 @@ func TestSplitAnswer(t *testing.T) {
 		{"escape stays together", a(1023) + `\*` + a(100), []string{a(1023), `\*` + a(100)}},
 		{"escaped backslash splits normally", a(1022) + `\\` + a(100), []string{a(1022) + `\\`, a(100)}},
 		{"blank block dropped", strings.Repeat(" ", 1100) + "x", []string{"x"}},
+		{"sentence end before a dash", a(600) + ". - " + a(600), []string{a(600) + ". -", a(600)}},
+		{"sentence end before a quote", a(600) + ". > " + a(600), []string{a(600) + ". >", a(600)}},
+		{"word break before a number", words("ab", 340) + " xyz 2. " + a(100), []string{words("ab", 340), "xyz 2. " + a(100)}},
+		{"word break before a dash", a(1023) + " - " + a(100), []string{a(1022), "a - " + a(100)}},
+		{"flags stay whole", "x" + strings.Repeat("🇩🇰", 600), []string{"x" + strings.Repeat("🇩🇰", 511), strings.Repeat("🇩🇰", 89)}},
+		{"emoji sequences stay whole", strings.Repeat("👨‍👩‍👧‍👦", 200), []string{strings.Repeat("👨‍👩‍👧‍👦", 146), strings.Repeat("👨‍👩‍👧‍👦", 54)}},
 	}
 
 	for _, tt := range tests {
@@ -707,6 +713,68 @@ func TestAddFormAnswerFields(t *testing.T) {
 
 			require.LessOrEqual(t, embedTextLength(e), embedTotalLimit)
 			require.Contains(t, e.Fields[len(e.Fields)-1].Value, "short")
+		})
+	}
+}
+
+func TestTrimFormAnswers(t *testing.T) {
+	posted := func(welcomeLen int, values ...string) []*embed.Embed {
+		welcome := embed.NewEmbed().SetDescription(strings.Repeat("w", welcomeLen))
+		answers := embed.NewEmbed().SetFooter("Powered by tickets.bot", "")
+		for _, f := range fitClassicFormAnswers(answerFields(values...), embedTextLength(welcome)+embedTextLength(answers)) {
+			answers.AddField(f.Name, f.Value, f.Inline)
+		}
+
+		return []*embed.Embed{welcome, answers}
+	}
+
+	long := strings.Repeat("a", 3000)
+
+	tests := []struct {
+		name       string
+		embeds     []*embed.Embed
+		welcomeLen int
+		wantFields int
+	}{
+		{"fits unchanged", posted(145, "short"), 409, 1},
+		{"longer welcome cuts the last part", posted(145, long, long), 409, 6},
+		{"dropped part leaves an ellipsis", posted(145, long, long), 1012, 5},
+		{"whole parts dropped", posted(145, long, long), 3000, 4},
+		{"answers dropped when nothing fits", posted(145, long), 5990, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := make([]string, len(tt.embeds[1].Fields))
+			for i, f := range tt.embeds[1].Fields {
+				before[i] = f.Value
+			}
+
+			tt.embeds[0] = embed.NewEmbed().SetDescription(strings.Repeat("w", tt.welcomeLen))
+			got := TrimFormAnswers(tt.embeds)
+
+			total := 0
+			for _, e := range got {
+				total += embedTextLength(e)
+			}
+			require.LessOrEqual(t, total, embedTotalLimit)
+
+			if tt.wantFields == 0 {
+				require.Len(t, got, 1)
+				return
+			}
+
+			require.Len(t, got, 2)
+			fields := got[1].Fields
+			require.Len(t, fields, tt.wantFields)
+			for i, f := range fields[:len(fields)-1] {
+				require.Equal(t, before[i], f.Value)
+			}
+
+			last := fields[len(fields)-1]
+			if len(fields) < len(before) || last.Value != before[len(fields)-1] {
+				require.True(t, strings.HasSuffix(last.Value, truncationEllipsis))
+			}
 		})
 	}
 }

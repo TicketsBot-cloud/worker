@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -9,6 +10,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
+	"github.com/rivo/uniseg"
 )
 
 const (
@@ -228,7 +230,7 @@ func splitAnswer(value string) []string {
 
 	var chunks []string
 	for len(runes) > embedFieldValueLimit {
-		cut := answerCut(runes[:embedFieldValueLimit+1])
+		cut := answerCut(runes)
 		if chunk := strings.TrimRightFunc(string(runes[:cut]), unicode.IsSpace); chunk != "" {
 			chunks = append(chunks, chunk)
 		}
@@ -244,23 +246,52 @@ func splitAnswer(value string) []string {
 }
 
 // Continue at the most natural break, but not before half a field, so an answer doesn't become many small blocks.
-func answerCut(window []rune) int {
-	limit := len(window) - 1
+func answerCut(runes []rune) int {
+	window := runes[:embedFieldValueLimit+1]
+	limit := embedFieldValueLimit
 	for _, isBreak := range []func(r []rune, i int) bool{isParagraphBreak, isLineBreak, isSentenceEnd, isWordBreak} {
 		for i := limit; i >= minAnswerChunk; i-- {
-			if isBreak(window, i) {
+			// Text from mid-line would start a list or quote at the top of the next field.
+			if isBreak(window, i) && (window[i] == '\n' || !startsBlock(runes[i:])) {
 				return i
 			}
 		}
 	}
 
 	// An escaping backslash stays with the character it escapes, or the next block would start unescaped.
-	cut := limit
-	if trailingBackslashes(window[:cut])%2 == 1 {
-		cut--
+	starts := graphemeStarts(window)
+	for j := len(starts) - 1; j >= 0 && starts[j] >= minAnswerChunk; j-- {
+		if cut := starts[j]; trailingBackslashes(window[:cut])%2 == 0 && !startsBlock(runes[cut:]) {
+			return cut
+		}
 	}
 
-	return cut
+	return limit - trailingBackslashes(window[:limit])%2
+}
+
+var blockMarker = regexp.MustCompile(`^(?:>>> |> |[-*] |\d+\. )`)
+
+func startsBlock(rest []rune) bool {
+	i := 0
+	for i < len(rest) && unicode.IsSpace(rest[i]) {
+		i++
+	}
+
+	return blockMarker.MatchString(string(rest[i:min(len(rest), i+16)]))
+}
+
+func graphemeStarts(r []rune) []int {
+	var starts []int
+	s, state, pos := string(r), -1, 0
+	for s != "" {
+		starts = append(starts, pos)
+
+		var cluster string
+		cluster, s, _, state = uniseg.FirstGraphemeClusterInString(s, state)
+		pos += utf8.RuneCountInString(cluster)
+	}
+
+	return starts
 }
 
 func isParagraphBreak(r []rune, i int) bool { return r[i] == '\n' && r[i-1] == '\n' }
@@ -284,6 +315,39 @@ func AddFormAnswerFields(e *embed.Embed, fields []embed.EmbedField) {
 	for _, field := range fitClassicFormAnswers(fields, embedTextLength(e)) {
 		e.AddField(field.Name, field.Value, field.Inline)
 	}
+}
+
+func TrimFormAnswers(embeds []*embed.Embed) []*embed.Embed {
+	over := -embedTotalLimit
+	for _, e := range embeds {
+		over += embedTextLength(e)
+	}
+
+	for len(embeds) > 1 && over > 0 {
+		e := embeds[len(embeds)-1]
+		if len(e.Fields) == 0 {
+			over -= embedTextLength(e)
+			embeds = embeds[:len(embeds)-1]
+			continue
+		}
+
+		last := e.Fields[len(e.Fields)-1]
+		n := utf8.RuneCountInString(last.Value)
+		if n-over > 1 {
+			last.Value = truncateWithEllipsis(last.Value, n-over)
+			over -= n - utf8.RuneCountInString(last.Value)
+			continue
+		}
+
+		over -= utf8.RuneCountInString(last.Name) + n
+		e.Fields = e.Fields[:len(e.Fields)-1]
+		if last.Name == continuationFieldName {
+			// Cut into the part before, so the answer still ends with an ellipsis.
+			over = max(over, 1)
+		}
+	}
+
+	return embeds
 }
 
 func embedTextLength(e *embed.Embed) int {

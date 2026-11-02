@@ -197,6 +197,7 @@ func (SwitchPanelCommand) Execute(ctx *cmdcontext.SlashCommandContext, panelId i
 				return
 			}
 
+			embeds = logic.TrimFormAnswers(embeds)
 			for i := 1; i < len(embeds); i++ {
 				embeds[i].SetColorPtr(embeds[0].Color)
 			}
