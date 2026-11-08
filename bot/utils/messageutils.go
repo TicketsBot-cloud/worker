@@ -24,7 +24,7 @@ func BuildEmbed(
 	content := i18n.GetMessageFromGuild(ctx.GuildId(), contentId, format...)
 
 	msgEmbed := embed.NewEmbed().
-		SetColor(ctx.GetColour(colour)).
+		SetColorPtr(ctx.GetColour(colour)).
 		SetTitle(title).
 		SetDescription(content)
 
@@ -40,10 +40,10 @@ func BuildEmbed(
 }
 
 func BuildEmbedRaw(
-	colourHex int, title, content string, fields []embed.EmbedField, tier premium.PremiumTier,
+	colour *int, title, content string, fields []embed.EmbedField, tier premium.PremiumTier,
 ) *embed.Embed {
 	msgEmbed := embed.NewEmbed().
-		SetColor(colourHex).
+		SetColorPtr(colour).
 		SetTitle(title).
 		SetDescription(content)
 
@@ -58,23 +58,23 @@ func BuildEmbedRaw(
 	return msgEmbed
 }
 
-func GetColourForGuild(ctx context.Context, worker *worker.Context, colour customisation.Colour, guildId uint64) (int, error) {
+func GetColourForGuild(ctx context.Context, worker *worker.Context, colour customisation.Colour, guildId uint64) (*int, error) {
 	premiumTier, err := PremiumClient.GetTierByGuildId(ctx, guildId, true, worker.Token, worker.RateLimiter)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if premiumTier > premium.None {
 		colourCode, ok, err := dbclient.Client.CustomColours.Get(ctx, guildId, colour.Int16())
 		if err != nil {
-			return 0, err
+			return nil, err
 		} else if !ok {
-			return colour.Default(), nil
+			return Ptr(colour.Default()), nil
 		} else {
 			return colourCode, nil
 		}
 	} else {
-		return colour.Default(), nil
+		return Ptr(colour.Default()), nil
 	}
 }
 

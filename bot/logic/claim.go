@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
@@ -17,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 	"golang.org/x/sync/errgroup"
@@ -94,22 +96,47 @@ func ApplyClaim(ctx context.Context, cmd registry.CommandContext, ticket databas
 		return err
 	}
 
+	// Placeholder overwrites must not be written back
+	if currentChannel.IsObfuscated() {
+		currentChannel, err = rest.GetChannel(ctx, cmd.Worker().Token, cmd.Worker().RateLimiter, *ticket.ChannelId)
+		if err != nil {
+			return err
+		}
+
+		if currentChannel.IsObfuscated() {
+			return permissionwrapper.ErrChannelObfuscated
+		}
+	}
+
 	// Always update the name to match the new claimed naming scheme
 	shouldUpdateName := true
 	// But skip if the user has manually renamed the channel (doesn't match old unclaimed name)
 	oldChannelName, _ := GenerateChannelName(ctx, cmd.Worker(), panel, ticket.GuildId, ticket.Id, ticket.UserId, nil)
-	if currentChannel.Name != oldChannelName {
+	if currentChannel.Name != oldChannelName || newChannelName == oldChannelName {
 		shouldUpdateName = false
 	}
 
-	// Pin the claimer's access at the user level
+	claimer, err := cmd.Worker().GetGuildMember(ticket.GuildId, userId)
+	auditReason := fmt.Sprintf("Claimed ticket %d", ticket.Id)
+	if err == nil {
+		auditReason = fmt.Sprintf("Claimed ticket %d by %s", ticket.Id, claimer.User.Username)
+	}
+
+	reasonCtx := request.WithAuditReason(context.Background(), auditReason)
+
 	if newOverwrites == nil {
 		claimerOverwrite, err := BuildClaimerOverwrite(ctx, cmd.Worker(), ticket, userId)
 		if err != nil {
 			return err
 		}
 
-		newOverwrites = UpsertMemberOverwrite(currentChannel.PermissionOverwrites, claimerOverwrite)
+		if err := cmd.Worker().EditChannelPermissions(reasonCtx, *ticket.ChannelId, claimerOverwrite); err != nil {
+			return err
+		}
+	}
+
+	if newOverwrites == nil && !shouldUpdateName {
+		return nil
 	}
 
 	// Update channel permissions and name
@@ -120,13 +147,6 @@ func ApplyClaim(ctx context.Context, cmd registry.CommandContext, ticket databas
 		data.Name = newChannelName
 	}
 
-	claimer, err := cmd.Worker().GetGuildMember(ticket.GuildId, userId)
-	auditReason := fmt.Sprintf("Claimed ticket %d", ticket.Id)
-	if err == nil {
-		auditReason = fmt.Sprintf("Claimed ticket %d by %s", ticket.Id, claimer.User.Username)
-	}
-
-	reasonCtx := request.WithAuditReason(context.Background(), auditReason)
 	if _, err = cmd.Worker().ModifyChannel(reasonCtx, *ticket.ChannelId, data); err != nil {
 		return err
 	}
@@ -205,7 +225,7 @@ func UnclaimTicket(ctx context.Context, cmd registry.CommandContext, ticket data
 					overwrites = append(overwrites, channel.PermissionOverwrite{
 						Id:    whoClaimed,
 						Type:  channel.PermissionTypeMember,
-						Allow: permission.BuildPermissions(StandardPermissions[:]...),
+						Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 						Deny:  0,
 					})
 				}
@@ -364,7 +384,7 @@ func BuildClaimerOverwrite(ctx context.Context, worker *worker.Context, ticket d
 	standard := channel.PermissionOverwrite{
 		Id:    claimerId,
 		Type:  channel.PermissionTypeMember,
-		Allow: permission.BuildPermissions(StandardPermissions[:]...),
+		Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 		Deny:  0,
 	}
 
@@ -541,7 +561,7 @@ func overwritesCantView(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
 			Type:  channel.PermissionTypeMember,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}
@@ -550,7 +570,7 @@ func overwritesCantView(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
 			Type:  channel.PermissionTypeRole,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}
@@ -596,7 +616,7 @@ func overwritesCantType(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    userId,
 			Type:  channel.PermissionTypeMember,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}
@@ -605,7 +625,7 @@ func overwritesCantType(claimerOverwrite channel.PermissionOverwrite, claimerId,
 		overwrites = append(overwrites, channel.PermissionOverwrite{
 			Id:    roleId,
 			Type:  channel.PermissionTypeRole,
-			Allow: permission.BuildPermissions(StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 	}

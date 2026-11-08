@@ -8,6 +8,7 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
@@ -41,7 +42,7 @@ func (ReopenCommand) Execute(ctx registry.CommandContext, ticketId int) {
 	logic.ReopenTicket(ctx, ctx, ticketId)
 }
 
-func (ReopenCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (ReopenCommand) AutoCompleteHandler(_ *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	if data.GuildId.Value == 0 {
 		return nil
 	}

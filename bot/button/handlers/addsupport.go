@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/channel"
@@ -21,7 +22,6 @@ import (
 	cmdregistry "github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -236,11 +236,19 @@ func updateChannelPermissions(ctx cmdregistry.CommandContext, id uint64, mention
 			continue
 		}
 
+		// Placeholder overwrites must not be written back
+		if ch.IsObfuscated() {
+			ch, err = rest.GetChannel(ctx, ctx.Worker().Token, ctx.Worker().RateLimiter, *ticket.ChannelId)
+			if err != nil || ch.IsObfuscated() {
+				continue
+			}
+		}
+
 		// Apply overwrites to existing channels
 		overwrites := append(ch.PermissionOverwrites, channel.PermissionOverwrite{
 			Id:    id,
 			Type:  mentionableType.OverwriteType(),
-			Allow: permission.BuildPermissions(logic.StandardPermissions[:]...),
+			Allow: permission.BuildPermissions(botpermissions.StandardPermissions...),
 			Deny:  0,
 		})
 

@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/TicketsBot-cloud/common/botpermissions"
 	permcache "github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/premium"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/channel"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
@@ -22,16 +25,17 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/logging"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
+	"go.uber.org/zap"
 )
 
 type Replyable struct {
 	ctx         registry.CommandContext
-	colourCodes map[customisation.Colour]int
+	colourCodes map[customisation.Colour]*int
 }
 
 type rateLimitResponse struct {
@@ -41,18 +45,18 @@ type rateLimitResponse struct {
 }
 
 func NewReplyable(ctx registry.CommandContext) *Replyable {
-	var colourCodes map[customisation.Colour]int
+	var colourCodes map[customisation.Colour]*int
 	if ctx.PremiumTier() > premium.None {
 		// TODO: Propagate context
 		tmp, err := customisation.GetColours(context.Background(), ctx.GuildId())
 		if err != nil {
 			sentry.ErrorWithContext(err, ctx.ToErrorContext())
-			colourCodes = customisation.DefaultColours
+			colourCodes = customisation.GetDefaultColours()
 		} else {
 			colourCodes = tmp
 		}
 	} else {
-		colourCodes = customisation.DefaultColours
+		colourCodes = customisation.GetDefaultColours()
 	}
 
 	return &Replyable{
@@ -61,8 +65,13 @@ func NewReplyable(ctx registry.CommandContext) *Replyable {
 	}
 }
 
-func (r *Replyable) GetColour(colour customisation.Colour) int {
-	return r.colourCodes[colour]
+func (r *Replyable) GetColour(colour customisation.Colour) *int {
+	code := r.colourCodes[colour]
+	if code == nil {
+		return nil
+	}
+
+	return utils.Ptr(*code)
 }
 
 func (r *Replyable) buildEmbed(colour customisation.Colour, title, content i18n.MessageId, fields []embed.EmbedField, format ...interface{}) *embed.Embed {
@@ -133,7 +142,21 @@ func (r *Replyable) HandleError(err error) {
 		fmt.Printf("ctx.HandleError: %s\n", err.Error())
 	}
 
-	eventId := sentry.ErrorWithContext(err, r.ctx.ToErrorContext())
+	var eventId string
+	if isExpectedDiscordError(err) {
+		// No Sentry stack trace on this path, so record which handler raised it.
+		var restError request.RestError
+		errors.As(err, &restError)
+		_, file, line, _ := runtime.Caller(1)
+
+		eventId = logging.LocalOnly(err, r.ctx.ToErrorContext(),
+			zap.Int("discord_code", restError.ApiError.Code),
+			zap.Int("status_code", restError.StatusCode),
+			zap.String("call_site", fmt.Sprintf("%s:%d", file, line)),
+		)
+	} else {
+		eventId = logging.ErrorWithContext(err, r.ctx.ToErrorContext())
+	}
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return
@@ -150,8 +173,29 @@ func (r *Replyable) HandleError(err error) {
 	_, _ = r.ctx.ReplyWith(res)
 }
 
+// isExpectedDiscordError reports guild state/config errors that buildErrorResponse
+// already answers with a friendly message and no event ID, so Sentry gains nothing.
+// Kept out on purpose: 10062 and 40060 (slow or double ack, our fault), 429s, and
+// 50035, whose fallback branch shows the event ID.
+func isExpectedDiscordError(err error) bool {
+	var restError request.RestError
+	if !errors.As(err, &restError) {
+		return false
+	}
+
+	switch restError.ApiError.Code {
+	case 10003, 10004, 10007, 10008, 10011, 10013, 10059,
+		30007, 30013,
+		50001, 50013,
+		160005, 160006, 160007:
+		return true
+	default:
+		return false
+	}
+}
+
 func (r *Replyable) HandleWarning(err error) {
-	eventId := sentry.LogWithContext(err, r.ctx.ToErrorContext())
+	eventId := logging.WarnWithContext(err, r.ctx.ToErrorContext())
 
 	if errors.Is(err, ErrReplyLimitReached) {
 		return
@@ -212,15 +256,21 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 			interactionCtx, ok := r.ctx.(registry.InteractionContext)
 			docsUrl := fmt.Sprintf("%s/miscellaneous/permissions-explained", config.Conf.Bot.DocsUrl)
 			if ok {
-				missingPermissions, err := findMissingPermissions(interactionCtx)
+				missingByLocation, err := findMissingPermissions(interactionCtx)
 				if err == nil {
-					if len(missingPermissions) > 0 {
-						message = r.GetMessage(i18n.MessageErrorMissingPermissionsTitle) + ":\n"
-						for _, perm := range missingPermissions {
-							message += fmt.Sprintf("* `%s`\n", perm.String())
+					if len(missingByLocation) > 0 {
+						title := r.GetMessage(i18n.MessageErrorMissingPermissionsTitle) + ":\n"
+						footer := "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, docsUrl)
+
+						var locationMsg string
+						for _, loc := range missingByLocation {
+							locationMsg += fmt.Sprintf("**%s:**\n", loc.label)
+							for _, perm := range loc.missing {
+								locationMsg += fmt.Sprintf("* `%s`\n", loc.permissionName(perm))
+							}
 						}
 
-						message += "\n" + r.GetMessage(i18n.MessageErrorMissingPermissionsBody, docsUrl)
+						message = title + locationMsg + footer
 					} else {
 						message = r.GetMessage(i18n.MessageErrorMissingAccess, docsUrl)
 					}
@@ -308,61 +358,124 @@ func (r *Replyable) formatDiscordError(restError request.RestError, eventId stri
 		r.GetMessage(i18n.MessageErrorId) + ": `" + eventId + "`"
 }
 
-func findMissingPermissions(ctx registry.InteractionContext) ([]permission.Permission, error) {
+type missingPermLocation struct {
+	label       string
+	missing     []permission.Permission
+	channelType *channel.ChannelType // nil when guild-level or the channel couldn't be fetched (ChannelTypeGuildText is 0)
+}
+
+func (l missingPermLocation) permissionName(p permission.Permission) string {
+	if l.channelType == nil {
+		return p.String()
+	}
+
+	return p.ChannelName(*l.channelType)
+}
+
+func findMissingPermissions(ctx registry.InteractionContext) ([]missingPermLocation, error) {
 	if permission.HasPermissionRaw(ctx.InteractionMetadata().AppPermissions, permission.Administrator) {
 		return nil, nil
 	}
 
 	var useThreads bool
-	var targetChannelId uint64
+
+	var panelCustomId string
+	switch c := ctx.(type) {
+	case *ButtonContext:
+		panelCustomId = c.InteractionData.CustomId
+	case *SelectMenuContext:
+		if len(c.InteractionData.Values) > 0 {
+			panelCustomId = c.InteractionData.Values[0]
+		}
+	case *ModalContext:
+		panelCustomId = strings.TrimPrefix(c.Interaction.Data.CustomId, "form_")
+	}
 
 	var panel *database.Panel
-	if btnCtx, ok := ctx.(*ButtonContext); ok {
-		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), btnCtx.InteractionData.CustomId)
+	if panelCustomId != "" {
+		p, panelExists, err := dbclient.Client.Panel.GetByCustomId(context.Background(), ctx.GuildId(), panelCustomId)
 		if err == nil && panelExists {
 			panel = &p
 			useThreads = panel.UseThreads
 		}
 	}
 
+	checkChannel := func(channelId uint64, label string, required []permission.Permission) missingPermLocation {
+		missing, ch, _ := permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, channelId, required...)
+		loc := missingPermLocation{label: label, missing: missing}
+		if ch.Id != 0 {
+			loc.channelType = &ch.Type
+		}
+		return loc
+	}
+
+	var locations []missingPermLocation
+
+	var primaryChannelId uint64
+	var primaryLabel string
+	var primaryRequired []permission.Permission
+
 	if useThreads {
-		// Thread mode - check permissions in the current channel
-		targetChannelId = ctx.ChannelId()
+		primaryChannelId = ctx.ChannelId()
+		primaryLabel = "Panel channel"
+		primaryRequired = botpermissions.ThreadModeRequired
 	} else {
-		// Channel mode - check permissions in the panel's category (0 = no category, skip check)
+		primaryLabel = "Ticket category"
+		primaryRequired = botpermissions.ChannelModeRequired
 		if panel != nil {
-			targetChannelId = panel.TargetCategory
+			primaryChannelId = panel.TargetCategory
 		}
 	}
 
-	// Build required permissions based on mode
-	var requiredPermissions []permission.Permission
-	if useThreads {
-		// Thread mode permissions
-		requiredPermissions = append(
-			[]permission.Permission{
-				permission.CreatePrivateThreads,
-				permission.SendMessagesInThreads,
-				permission.ManageThreads,
-			},
-			logic.StandardPermissions[:]...,
-		)
+	if primaryChannelId != 0 {
+		loc := checkChannel(primaryChannelId, primaryLabel, primaryRequired)
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
+		}
 	} else {
-		// Channel mode permissions
-		requiredPermissions = append(
-			[]permission.Permission{
-				permission.ManageChannels,
-			},
-			logic.StandardPermissions[:]...,
-		)
+		missing := permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, primaryRequired...)
+		if len(missing) > 0 {
+			locations = append(locations, missingPermLocation{label: primaryLabel, missing: missing})
+		}
 	}
 
-	if targetChannelId != 0 {
-		return permissionwrapper.GetMissingPermissionsChannel(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, targetChannelId, requiredPermissions...), nil
+	if panel != nil && panel.TicketNotificationChannel != nil {
+		loc := checkChannel(*panel.TicketNotificationChannel, "Notification channel", botpermissions.NotifChannelRequired)
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
+		}
 	}
 
-	// If no target channel, just return guild-level missing permissions
-	return permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, requiredPermissions...), nil
+	if !useThreads && panel != nil && panel.OverflowEnabled {
+		if panel.OverflowCategoryId != nil {
+			loc := checkChannel(*panel.OverflowCategoryId, "Overflow category", botpermissions.ChannelModeRequired)
+			if len(loc.missing) > 0 {
+				locations = append(locations, loc)
+			}
+		} else if primaryChannelId != 0 {
+			// Skipped when the primary check was already guild-level
+			missing := permissionwrapper.GetMissingPermissions(ctx.Worker(), ctx.GuildId(), ctx.Worker().BotId, botpermissions.ChannelModeRequired...)
+			if len(missing) > 0 {
+				locations = append(locations, missingPermLocation{label: "Overflow (no category)", missing: missing})
+			}
+		}
+	}
+
+	if !useThreads && panel != nil && panel.PendingCategory != nil {
+		loc := checkChannel(*panel.PendingCategory, "Pending category", []permission.Permission{permission.ViewChannel, permission.ManageChannels})
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
+		}
+	}
+
+	if panel != nil && panel.TranscriptChannelId != nil {
+		loc := checkChannel(*panel.TranscriptChannelId, "Transcript channel", botpermissions.TranscriptChannelRequired)
+		if len(loc.missing) > 0 {
+			locations = append(locations, loc)
+		}
+	}
+
+	return locations, nil
 }
 
 func formatTimestamp(seconds float64) string {

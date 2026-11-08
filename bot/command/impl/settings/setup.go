@@ -80,7 +80,7 @@ func (SetupCommand) Execute(ctx registry.CommandContext) {
 
 	embed := embed.NewEmbed().
 		SetTitle("Setup").
-		SetColor(getColour(context.Background(), ctx.GuildId(), failed)). // TODO: Propagate context
+		SetColorPtr(getColour(context.Background(), ctx.GuildId(), failed)). // TODO: Propagate context
 		SetDescription(messageContent)
 
 	ctx.ReplyWithEmbed(embed)
@@ -132,7 +132,7 @@ func edit(ctx *cmdcontext.SlashCommandContext, e *embed.Embed) error {
 	return err
 }
 
-func getColour(ctx context.Context, guildId uint64, failed bool) int {
+func getColour(ctx context.Context, guildId uint64, failed bool) *int {
 	var colour customisation.Colour
 	if failed {
 		colour = customisation.Red
@@ -140,8 +140,7 @@ func getColour(ctx context.Context, guildId uint64, failed bool) int {
 		colour = customisation.Green
 	}
 
-	hex, _ := customisation.GetColour(ctx, guildId, colour)
-	return hex
+	return customisation.GetColourOrDefault(ctx, guildId, colour)
 }
 
 func getTranscriptChannelData(guildId, supportRoleId, adminRoleId uint64) rest.CreateChannelData {

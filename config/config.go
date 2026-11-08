@@ -87,7 +87,8 @@ type (
 		} `envPrefix:"WORKER_REDIS_"`
 
 		Streams struct {
-			GoroutineLimit int `env:"STREAMS_GOROUTINE_LIMIT" envDefault:"1000"`
+			GoroutineLimit int   `env:"STREAMS_GOROUTINE_LIMIT" envDefault:"1000"`
+			MaxLen         int64 `env:"STREAMS_MAX_LEN" envDefault:"50000"`
 		}
 
 		Prometheus struct {

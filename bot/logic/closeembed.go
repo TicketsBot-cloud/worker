@@ -159,13 +159,13 @@ func BuildCloseEmbed(
 	colour, err := utils.GetColourForGuild(ctx, worker, customisation.Green, ticket.GuildId)
 	if err != nil {
 		sentry.Error(err)
-		colour = customisation.Green.Default()
+		colour = utils.Ptr(customisation.Green.Default())
 	}
 
 	// TODO: Translate titles
 	closeEmbed := embed.NewEmbed().
 		SetTitle("Ticket Closed").
-		SetColor(colour).
+		SetColorPtr(colour).
 		AddField(formatTitle("Ticket ID", customisation.EmojiId, worker.IsWhitelabel), strconv.Itoa(ticket.Id), true).
 		AddField(formatTitle("Opened By", customisation.EmojiOpen, worker.IsWhitelabel), fmt.Sprintf("<@%d>", ticket.UserId), true).
 		AddField(formatTitle("Closed By", customisation.EmojiClose, worker.IsWhitelabel), fmt.Sprintf("<@%d>", closedBy), true).

@@ -121,7 +121,7 @@ func (h *AdminDebugServerUserTicketsModalSubmitHandler) Execute(ctx *context.Mod
 	}
 
 	ctx.ReplyWith(command.NewEphemeralMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Green,
 			"Admin - Debug Server - User Tickets",

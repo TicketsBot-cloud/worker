@@ -66,7 +66,7 @@ func (h *CloseRequestAcceptHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	ctx.Edit(command.MessageResponse{
-		Embeds: utils.Slice(utils.BuildEmbedRaw(customisation.DefaultColours[customisation.Green], "Close Request", "Closing ticket...", nil, premium.Whitelabel)), // TODO: Translations, calculate premium level
+		Embeds: utils.Slice(utils.BuildEmbedRaw(utils.Ptr(customisation.DefaultColours[customisation.Green]), "Close Request", "Closing ticket...", nil, premium.Whitelabel)), // TODO: Translations, calculate premium level
 	})
 
 	// Avoid users cant close issue

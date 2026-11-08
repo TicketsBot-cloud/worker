@@ -69,7 +69,7 @@ func (AdminWhitelabelAssignGuildCommand) Execute(ctx registry.CommandContext, bo
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerRaw(
+		utils.BuildAdminContainerRaw(
 			ctx,
 			customisation.Orange,
 			"Admin - Whitelabel Assign Guild",

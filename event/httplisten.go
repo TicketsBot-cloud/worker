@@ -260,7 +260,7 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 				return
 			}
 
-			choices := handler(interactionData, fmt.Sprintf("%v", focused.Value))
+			choices := handler(worker, interactionData, fmt.Sprintf("%v", focused.Value))
 			res := interaction.NewApplicationCommandAutoCompleteResultResponse(choices)
 			ctx.JSON(200, res)
 			ctx.Writer.Flush()

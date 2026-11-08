@@ -54,7 +54,7 @@ func (OnCallCommand) Execute(ctx registry.CommandContext) {
 	}
 
 	if !hasThreadPanel {
-		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode, "/on-call", fmt.Sprintf("%s/features/thread-mode", config.Conf.Bot.DocsUrl))
+		ctx.Reply(customisation.Red, i18n.Error, i18n.MessageOnCallChannelMode, "/on-call", fmt.Sprintf("%s/dashboard/settings/thread-mode", config.Conf.Bot.DocsUrl))
 		return
 	}
 

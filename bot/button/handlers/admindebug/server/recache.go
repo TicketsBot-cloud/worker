@@ -43,7 +43,7 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 
 	if onCooldown, cooldownTime := redis.GetRecacheCooldown(guildId); onCooldown {
 		ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-			utils.BuildContainerWithComponents(
+			utils.BuildAdminContainerWithComponents(
 				ctx,
 				customisation.Red,
 				"Admin - Recache",
@@ -59,7 +59,6 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 
 	// purge cache
 	ctx.Worker().Cache.DeleteGuild(ctx, guildId)
-	ctx.Worker().Cache.DeleteGuildChannels(ctx, guildId)
 	ctx.Worker().Cache.DeleteGuildRoles(ctx, guildId)
 
 	worker, err := utils.WorkerForGuild(ctx, ctx.Worker(), guildId)
@@ -74,7 +73,7 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	guildChannels, err := worker.GetGuildChannels(guildId)
+	guildChannels, err := utils.RecacheGuildChannels(ctx, worker, guildId, time.Second*3, true)
 	if err != nil {
 		ctx.HandleError(err)
 		return
@@ -87,7 +86,7 @@ func (h *AdminDebugServerRecacheHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	ctx.ReplyWith(command.NewMessageResponseWithComponents([]component.Component{
-		utils.BuildContainerWithComponents(
+		utils.BuildAdminContainerWithComponents(
 			ctx,
 			customisation.Orange,
 			"Admin - Recache",

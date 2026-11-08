@@ -12,6 +12,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -59,7 +60,7 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 	}
 
 	if !ok {
-		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagInvalidTag, utils.ToSlice(usageEmbed), fmt.Sprintf("%s/tags", config.Conf.Bot.FrontpageUrl))
+		ctx.ReplyWithFields(customisation.Red, i18n.Error, i18n.MessageTagInvalidTag, utils.ToSlice(usageEmbed), fmt.Sprintf("%s/dashboard/tags#using-a-tag-in-discord", config.Conf.Bot.DocsUrl))
 		return
 	}
 
@@ -130,7 +131,7 @@ func (TagCommand) Execute(ctx registry.CommandContext, tagId string) {
 	}
 }
 
-func (TagCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (TagCommand) AutoCompleteHandler(_ *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3) // TODO: Propagate context
 	defer cancel()
 

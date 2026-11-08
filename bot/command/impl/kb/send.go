@@ -9,6 +9,7 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
@@ -55,10 +56,6 @@ func (KBSendCommand) Execute(ctx registry.CommandContext, articleIdStr string) {
 		return
 	}
 
-	// TODO(review): custom-embed articles render as plain V2; full embed translation
-	// deferred. Articles carrying a stored custom embed still have their title, content
-	// and image rendered via BuildArticleView, so nothing is silently lost.
-	//
 	// SourcePublic omits navigation buttons: this is a public message any member can
 	// see, so it must not carry interactive Back controls.
 	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(
@@ -69,7 +66,7 @@ func (KBSendCommand) Execute(ctx registry.CommandContext, articleIdStr string) {
 	}
 }
 
-func (KBSendCommand) AutoCompleteHandler(data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
+func (KBSendCommand) AutoCompleteHandler(_ *worker.Context, data interaction.ApplicationCommandAutoCompleteInteraction, value string) []interaction.ApplicationCommandOptionChoice {
 	if value == "" {
 		return nil
 	}

@@ -83,14 +83,37 @@ func (p *SecureProxyClient) DoRequest(ctx context.Context, method, url string, h
 		return nil, errors.New(errorHeader)
 	}
 
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("integration request returned status code %d", res.StatusCode)
-	}
-
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
 
+	if res.StatusCode != 200 {
+		intErr := &IntegrationError{StatusCode: res.StatusCode}
+
+		var parsed struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(resBody, &parsed) == nil && parsed.Error != "" {
+			intErr.Message = parsed.Error
+		}
+
+		return nil, intErr
+	}
+
 	return resBody, nil
+}
+
+// IntegrationError preserves the status code and, where the integration supplied
+// one, its own error message, so callers can decide whether to surface it to the user.
+type IntegrationError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *IntegrationError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("integration request returned status code %d", e.StatusCode)
 }

@@ -104,13 +104,13 @@ func parseModalComponents(actionRows []interaction.ModalSubmitInteractionActionR
 			case component.ComponentRadioGroup:
 				answer = c.Value
 			}
-			if input, ok := inputsByCustomId[c.CustomId]; ok {
+			if input, ok := inputsByCustomId[c.CustomId]; ok && component.ComponentType(input.Type) == c.Type {
 				answers[input] = answer
 			}
 			continue
 		}
 		for _, comp := range actionRow.Components {
-			if formInput, ok := inputsByCustomId[comp.CustomId]; ok {
+			if formInput, ok := inputsByCustomId[comp.CustomId]; ok && component.ComponentType(formInput.Type) == comp.Type {
 				answers[formInput] = comp.Value
 			}
 		}
