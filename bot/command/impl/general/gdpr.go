@@ -32,6 +32,11 @@ var (
 		{i18n.GdprButtonAllMessages, "gdpr_all_messages"},
 		{i18n.GdprButtonSpecificMessages, "gdpr_specific_messages"},
 	}
+
+	exportButtons = []gdprButton{
+		{i18n.GdprButtonExportGuild, "gdpr_export_guild"},
+		{i18n.GdprButtonExportUser, "gdpr_export_user"},
+	}
 )
 
 type GDPRCommand struct{}
@@ -86,6 +91,9 @@ func buildGDPRComponents(ctx registry.CommandContext, locale *i18n.Locale) []com
 		component.BuildSeparator(component.Separator{}),
 		buildTextSection(i18n.GetMessage(locale, i18n.GdprMessageSectionTitle)),
 		buildButtonRow(ctx, locale, messageButtons),
+		component.BuildSeparator(component.Separator{}),
+		buildTextSection(i18n.GetMessage(locale, i18n.GdprExportSectionTitle)),
+		buildButtonRow(ctx, locale, exportButtons),
 		component.BuildSeparator(component.Separator{}),
 		buildTextSection(i18n.GetMessage(locale, i18n.GdprWarningText)),
 		component.BuildSeparator(component.Separator{}),
