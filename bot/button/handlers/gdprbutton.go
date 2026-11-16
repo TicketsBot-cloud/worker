@@ -3,16 +3,15 @@ package handlers
 import (
 	"strings"
 
-	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/common/gdprrelay"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/worker/bot/button"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
+	cmdregistry "github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
-	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -23,6 +22,18 @@ func gdprProperties() registry.Properties {
 		Flags:   registry.SumFlags(registry.DMsAllowed),
 		Timeout: constants.TimeoutGDPR,
 	}
+}
+
+func requireGDPRWorkerEdit(ctx interface {
+	cmdregistry.CommandContext
+	Edit(command.MessageResponse)
+}, locale *i18n.Locale) bool {
+	if gdprrelay.IsWorkerAlive(redis.Client) {
+		return true
+	}
+
+	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{utils.BuildGDPRWorkerOfflineView(ctx, locale)}))
+	return false
 }
 
 type GDPRAllTranscriptsHandler struct{}
@@ -40,9 +51,7 @@ func (h *GDPRAllTranscriptsHandler) Properties() registry.Properties {
 func (h *GDPRAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
@@ -64,9 +73,7 @@ func (h *GDPRSpecificTranscriptsHandler) Properties() registry.Properties {
 func (h *GDPRSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
@@ -88,9 +95,7 @@ func (h *GDPRAllMessagesHandler) Properties() registry.Properties {
 func (h *GDPRAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
@@ -112,9 +117,7 @@ func (h *GDPRSpecificMessagesHandler) Properties() registry.Properties {
 func (h *GDPRSpecificMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
@@ -133,24 +136,15 @@ func handleTranscriptRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale,
 		return
 	}
 
-	var modal interaction.ModalResponseData
-	if len(guilds) > 25 {
-		// Use text input fallback when there are more than 25 servers
-		if isAllTranscripts {
-			modal = buildAllTranscriptsTextModal(locale)
-		} else {
-			modal = buildSpecificTranscriptsTextModal(locale)
-		}
-	} else {
-		// Use select menu when there are 25 or fewer servers
-		if isAllTranscripts {
-			modal = buildAllTranscriptsModal(locale, guilds)
-		} else {
-			modal = buildSpecificTranscriptsModal(locale, guilds)
-		}
+	if isAllTranscripts {
+		ctx.Modal(buildGDPRModal(locale, "gdpr_modal_all_transcripts", i18n.GdprModalAllTranscriptsTitle, buildServersPicker(locale, guilds)))
+		return
 	}
 
-	ctx.Modal(button.ResponseModal{Data: modal})
+	ctx.Modal(buildGDPRModal(locale, "gdpr_modal_specific_transcripts", i18n.GdprModalSpecificTranscriptsTitle,
+		buildServerPicker(locale, guilds, false),
+		buildTicketIdsInput(locale, false),
+	))
 }
 
 func handleMessageRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, isAllMessages bool) {
@@ -161,26 +155,17 @@ func handleMessageRequest(ctx *cmdcontext.ButtonContext, locale *i18n.Locale, is
 	}
 
 	if len(guilds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNoServers))
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNoMessageServers))
 		return
 	}
 
-	var modal interaction.ModalResponseData
-	if len(guilds) > 25 {
-		// Use text input fallback when there are more than 25 servers
-		if isAllMessages {
-			modal = buildAllMessagesTextModal(locale)
-		} else {
-			modal = buildSpecificMessagesTextModal(locale)
-		}
-	} else {
-		// Use select menu when there are 25 or fewer servers
-		if isAllMessages {
-			modal = buildAllMessagesModal(locale, guilds)
-		} else {
-			modal = buildSpecificMessagesModal(locale, guilds)
-		}
+	if isAllMessages {
+		ctx.Modal(buildGDPRModal(locale, "gdpr_modal_all_messages", i18n.GdprModalAllMessagesTitle, buildServersPicker(locale, guilds)))
+		return
 	}
 
-	ctx.Modal(button.ResponseModal{Data: modal})
+	ctx.Modal(buildGDPRModal(locale, "gdpr_modal_specific_messages", i18n.GdprModalSpecificMessagesTitle,
+		buildServerPicker(locale, guilds, false),
+		buildTicketIdsInput(locale, false),
+	))
 }
