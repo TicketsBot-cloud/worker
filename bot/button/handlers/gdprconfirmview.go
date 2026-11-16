@@ -3,77 +3,91 @@ package handlers
 import (
 	"strings"
 
+	"github.com/TicketsBot-cloud/common/gdprrelay"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/worker/bot/command/context"
-	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/command"
+	cmdregistry "github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-type GDPRRequestType int
-
-const (
-	GDPRAllTranscripts GDPRRequestType = iota
-	GDPRSpecificTranscripts
-	GDPRAllMessages
-	GDPRSpecificMessages
-	GDPRExportGuild
-	GDPRExportUser
-)
+// Each action must match the gdprConfirmMatcher prefix of that type's confirm handler.
+var gdprConfirmActions = map[gdprrelay.RequestType]string{
+	gdprrelay.RequestTypeAllTranscripts:      "all_transcripts",
+	gdprrelay.RequestTypeSpecificTranscripts: "specific",
+	gdprrelay.RequestTypeAllMessages:         "all_messages",
+	gdprrelay.RequestTypeSpecificMessages:    "messages",
+	gdprrelay.RequestTypeExportGuild:         "export_guild",
+	gdprrelay.RequestTypeExportUser:          "export_user",
+}
 
 type GDPRConfirmationData struct {
-	RequestType     GDPRRequestType
-	UserId          uint64
-	GuildIds        []uint64
+	RequestType     gdprrelay.RequestType
 	GuildNames      []string
 	TicketIds       []int
-	TicketIdsStr    string
-	Locale          *i18n.Locale
+	Categories      []string
 	ConfirmButtonId string
 }
 
-func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRConfirmationData) []component.Component {
+func replyGDPRConfirmation(ctx cmdregistry.CommandContext, locale *i18n.Locale, requestType gdprrelay.RequestType, guildIds []uint64, guildNames map[uint64]string, ticketIds []int, categories []string) {
+	confirmId, err := storeGDPRConfirmation(ctx, gdprConfirmActions[requestType], locale, ctx.UserId(), guildIds, ticketIds, categories)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	components := buildGDPRConfirmationView(ctx, locale, GDPRConfirmationData{
+		RequestType:     requestType,
+		GuildNames:      guildDisplays(guildIds, guildNames),
+		TicketIds:       ticketIds,
+		Categories:      categories,
+		ConfirmButtonId: confirmId,
+	})
+	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
+		ctx.HandleError(err)
+	}
+}
+
+func buildGDPRConfirmationView(ctx cmdregistry.CommandContext, locale *i18n.Locale, data GDPRConfirmationData) []component.Component {
 	var content string
 
 	switch data.RequestType {
-	case GDPRAllTranscripts:
-		if len(data.GuildIds) == 1 {
+	case gdprrelay.RequestTypeAllTranscripts:
+		if len(data.GuildNames) == 1 {
 			content = i18n.GetMessage(locale, i18n.GdprConfirmAllTranscripts, data.GuildNames[0])
 		} else {
 			serversList := strings.Join(data.GuildNames, "\n* ")
 			content = i18n.GetMessage(locale, i18n.GdprConfirmAllTranscriptsMulti, serversList)
 		}
 
-	case GDPRSpecificTranscripts:
-		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificTranscripts, data.GuildNames[0], data.TicketIdsStr)
+	case gdprrelay.RequestTypeSpecificTranscripts:
+		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificTranscripts, data.GuildNames[0], ticketIdList(data.TicketIds))
 
-	case GDPRAllMessages:
-		if len(data.GuildIds) == 1 {
+	case gdprrelay.RequestTypeAllMessages:
+		if len(data.GuildNames) == 1 {
 			content = i18n.GetMessage(locale, i18n.GdprConfirmAllMessages, data.GuildNames[0])
 		} else {
 			serversList := strings.Join(data.GuildNames, "\n* ")
 			content = i18n.GetMessage(locale, i18n.GdprConfirmAllMessagesMulti, serversList)
 		}
 
-	case GDPRSpecificMessages:
-		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificMessages, data.GuildNames[0], data.TicketIdsStr)
+	case gdprrelay.RequestTypeSpecificMessages:
+		content = i18n.GetMessage(locale, i18n.GdprConfirmSpecificMessages, data.GuildNames[0], ticketIdList(data.TicketIds))
 
-	case GDPRExportGuild:
-		if len(data.GuildIds) == 1 {
-			content = i18n.GetMessage(locale, i18n.GdprConfirmExportGuild, data.GuildNames[0])
-		} else {
-			serversList := strings.Join(data.GuildNames, "\n* ")
-			content = i18n.GetMessage(locale, i18n.GdprConfirmExportGuildMulti, serversList)
-		}
+	case gdprrelay.RequestTypeExportGuild:
+		content = renderExportSummary(locale, database.GdprExportTypeServer, data.GuildNames, data.Categories, data.TicketIds)
 
-	case GDPRExportUser:
-		content = i18n.GetMessage(locale, i18n.GdprConfirmExportUser)
+	case gdprrelay.RequestTypeExportUser:
+		content = renderExportSummary(locale, database.GdprExportTypeUser, data.GuildNames, data.Categories, data.TicketIds)
 	}
 
-	isExport := data.RequestType == GDPRExportGuild || data.RequestType == GDPRExportUser
+	isExport := data.RequestType == gdprrelay.RequestTypeExportGuild || data.RequestType == gdprrelay.RequestTypeExportUser
 
-	if !isExport {
+	if isExport {
+		content += i18n.GetMessage(locale, i18n.GdprConfirmExportDownload)
+	} else {
 		content += i18n.GetMessage(locale, i18n.GdprConfirmWarning)
 	}
 
@@ -102,15 +116,5 @@ func buildGDPRConfirmationView(ctx interface{}, locale *i18n.Locale, data GDPRCo
 	}
 
 	title := i18n.GetMessage(locale, i18n.GdprConfirmTitle)
-	var container component.Component
-	switch v := ctx.(type) {
-	case *context.ModalContext:
-		container = utils.BuildContainerWithComponents(v, customisation.Orange, title, innerComponents)
-	case *cmdcontext.ButtonContext:
-		container = utils.BuildContainerWithComponents(v, customisation.Orange, title, innerComponents)
-	default:
-		return innerComponents
-	}
-
-	return []component.Component{container}
+	return []component.Component{utils.BuildContainerWithComponents(ctx, customisation.Orange, title, innerComponents)}
 }

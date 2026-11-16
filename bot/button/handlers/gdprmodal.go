@@ -2,22 +2,20 @@ package handlers
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/TicketsBot-cloud/gdl/objects/interaction"
+	"github.com/TicketsBot-cloud/common/gdprrelay"
+	commonutils "github.com/TicketsBot-cloud/common/utils"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
-	"github.com/TicketsBot-cloud/worker/bot/command"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
-	"github.com/TicketsBot-cloud/worker/bot/constants"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
-	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -27,221 +25,49 @@ type guildInfo struct {
 	Name    string
 }
 
+func getOwnedGuilds(ctx *cmdcontext.ButtonContext, userId uint64) ([]guildInfo, error) {
+	ownedGuildIds, err := ctx.Worker().Cache.GetGuildIdsByOwner(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return guildInfos(ctx, ownedGuildIds), nil
+}
+
 func getOwnedGuildsWithTranscripts(ctx *cmdcontext.ButtonContext, userId uint64) ([]guildInfo, error) {
-	// Get guilds owned by the user from the cache database
-	cacheQuery := `SELECT guild_id FROM guilds WHERE data->>'owner_id' = $1`
-	cacheRows, err := ctx.Worker().Cache.Query(ctx, cacheQuery, fmt.Sprintf("%d", userId))
+	ownedGuildIds, err := ctx.Worker().Cache.GetGuildIdsByOwner(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
-	defer cacheRows.Close()
 
-	var ownedGuildIds []uint64
-	for cacheRows.Next() {
-		var guildId uint64
-		if err := cacheRows.Scan(&guildId); err != nil {
-			continue
-		}
-		ownedGuildIds = append(ownedGuildIds, guildId)
-	}
-
-	if len(ownedGuildIds) == 0 {
-		return []guildInfo{}, nil
-	}
-
-	// Filter to only guilds with transcripts
-	placeholders := ""
-	params := make([]interface{}, len(ownedGuildIds))
-	for i, guildId := range ownedGuildIds {
-		if i > 0 {
-			placeholders += ", "
-		}
-		placeholders += fmt.Sprintf("$%d", i+1)
-		params[i] = guildId
-	}
-
-	transcriptQuery := fmt.Sprintf(`
-		SELECT DISTINCT guild_id
-		FROM tickets
-		WHERE has_transcript = true AND open = false AND guild_id IN (%s)
-		GROUP BY guild_id`, placeholders)
-
-	rows, err := dbclient.Client.Tickets.Query(ctx, transcriptQuery, params...)
+	guildIds, err := dbclient.Client.Tickets.GuildsWithClosedTranscripts(ctx, ownedGuildIds)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var guildsWithTranscripts []guildInfo
-	for rows.Next() {
-		var guildId uint64
-		if err := rows.Scan(&guildId); err != nil {
-			continue
-		}
-
-		guild, err := ctx.Worker().GetGuild(guildId)
-		var name string
-		if err != nil {
-			name = strconv.FormatUint(guildId, 10)
-		} else {
-			name = guild.Name
-		}
-
-		guildsWithTranscripts = append(guildsWithTranscripts, guildInfo{
-			GuildID: guildId,
-			Name:    name,
-		})
-	}
-
-	return guildsWithTranscripts, nil
+	return guildInfos(ctx, guildIds), nil
 }
 
 func getGuildsWithUserMessages(ctx *cmdcontext.ButtonContext, userId uint64) ([]guildInfo, error) {
-	query := `
-		SELECT DISTINCT guild_id
-		FROM tickets
-		WHERE has_transcript = true AND user_id = $1
-		GROUP BY guild_id`
-
-	rows, err := dbclient.Client.Tickets.Query(ctx, query, userId)
+	refs, err := dbclient.Client.Tickets.GetUserTranscriptRefs(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var guildIds []uint64
-	for rows.Next() {
-		var guildId uint64
-		if err := rows.Scan(&guildId); err != nil {
-			continue
-		}
-		guildIds = append(guildIds, guildId)
-	}
-
-	return batchFetchGuildsInfo(ctx, guildIds)
+	return guildInfos(ctx, database.TranscriptRefGuildIds(refs)), nil
 }
 
-func batchFetchOwnedGuilds(ctx *cmdcontext.ButtonContext, guildIds []uint64, userId uint64) ([]guildInfo, error) {
-	retriever := utils.ToRetriever(ctx.Worker())
-
-	type result struct {
-		info guildInfo
-		ok   bool
-	}
-
-	resultChan := make(chan result, len(guildIds))
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10)
-
-	for _, guildId := range guildIds {
-		wg.Add(1)
-		go func(gId uint64) {
-			defer wg.Done()
-
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			ownerId, err := retriever.GetGuildOwner(ctx, gId)
-			if err != nil {
-				resultChan <- result{ok: false}
-				return
-			}
-
-			if ownerId != userId {
-				resultChan <- result{ok: false}
-				return
-			}
-
-			guild, err := ctx.Worker().GetGuild(gId)
-			if err != nil {
-				resultChan <- result{
-					info: guildInfo{
-						GuildID: gId,
-						Name:    strconv.FormatUint(gId, 10),
-					},
-					ok: true,
-				}
-				return
-			}
-
-			resultChan <- result{
-				info: guildInfo{
-					GuildID: gId,
-					Name:    guild.Name,
-				},
-				ok: true,
-			}
-		}(guildId)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	var guilds []guildInfo
-	for res := range resultChan {
-		if res.ok {
-			guilds = append(guilds, res.info)
+func guildInfos(ctx *cmdcontext.ButtonContext, guildIds []uint64) []guildInfo {
+	names := utils.FetchGuildNames(ctx, guildIds)
+	guilds := make([]guildInfo, len(guildIds))
+	for i, guildId := range guildIds {
+		guilds[i] = guildInfo{GuildID: guildId, Name: names[guildId]}
+		if guilds[i].Name == "" {
+			guilds[i].Name = strconv.FormatUint(guildId, 10)
 		}
 	}
 
-	return guilds, nil
-}
-
-func batchFetchGuildsInfo(ctx *cmdcontext.ButtonContext, guildIds []uint64) ([]guildInfo, error) {
-	type result struct {
-		info guildInfo
-		ok   bool
-	}
-
-	resultChan := make(chan result, len(guildIds))
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10)
-
-	for _, guildId := range guildIds {
-		wg.Add(1)
-		go func(gId uint64) {
-			defer wg.Done()
-
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			guild, err := ctx.Worker().GetGuild(gId)
-			if err != nil {
-				resultChan <- result{
-					info: guildInfo{
-						GuildID: gId,
-						Name:    strconv.FormatUint(gId, 10),
-					},
-					ok: true,
-				}
-				return
-			}
-
-			resultChan <- result{
-				info: guildInfo{
-					GuildID: gId,
-					Name:    guild.Name,
-				},
-				ok: true,
-			}
-		}(guildId)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	var guilds []guildInfo
-	for res := range resultChan {
-		if res.ok {
-			guilds = append(guilds, res.info)
-		}
-	}
-
-	return guilds, nil
+	return guilds
 }
 
 func buildGuildSelectOptions(guilds []guildInfo) []component.SelectOption {
@@ -255,229 +81,7 @@ func buildGuildSelectOptions(guilds []guildInfo) []component.SelectOption {
 		})
 	}
 
-	if len(options) > 25 {
-		options = options[:25]
-	}
-
 	return options
-}
-
-func buildAllTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
-	options := buildGuildSelectOptions(guilds)
-	minVal, maxVal := 1, len(options)
-	if maxVal > 25 {
-		maxVal = 25
-	}
-
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_all_transcripts_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalAllTranscriptsTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
-				Component: component.BuildSelectMenu(component.SelectMenu{
-					CustomId:    "server_ids",
-					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
-					MinValues:   &minVal,
-					MaxValues:   &maxVal,
-					Options:     options,
-				}),
-			}),
-		},
-	}
-}
-
-func buildAllTranscriptsTextModal(locale *i18n.Locale) interaction.ModalResponseData {
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_all_transcripts_text_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalAllTranscriptsTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdsLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "server_ids",
-					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdsPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(17)),
-					MaxLength:   utils.Ptr(uint32(2000)),
-				}),
-			}),
-		},
-	}
-}
-
-func buildSpecificTranscriptsModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
-	options := buildGuildSelectOptions(guilds)
-	minVal, maxVal := 1, 1
-
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_specific_transcripts_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificTranscriptsTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
-				Component: component.BuildSelectMenu(component.SelectMenu{
-					CustomId:    "server_id",
-					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
-					MinValues:   &minVal,
-					MaxValues:   &maxVal,
-					Options:     options,
-				}),
-			}),
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "ticket_ids",
-					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(1)),
-					MaxLength:   utils.Ptr(uint32(1000)),
-				}),
-			}),
-		},
-	}
-}
-
-func buildSpecificTranscriptsTextModal(locale *i18n.Locale) interaction.ModalResponseData {
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_specific_transcripts_text_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificTranscriptsTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "server_id",
-					Style:       component.TextStyleShort,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(17)),
-					MaxLength:   utils.Ptr(uint32(20)),
-				}),
-			}),
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "ticket_ids",
-					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(1)),
-					MaxLength:   utils.Ptr(uint32(1000)),
-				}),
-			}),
-		},
-	}
-}
-
-func buildAllMessagesModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
-	options := buildGuildSelectOptions(guilds)
-	minVal, maxVal := 1, len(options)
-	if maxVal > 25 {
-		maxVal = 25
-	}
-
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_all_messages_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalAllMessagesTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
-				Component: component.BuildSelectMenu(component.SelectMenu{
-					CustomId:    "server_ids",
-					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServers),
-					MinValues:   &minVal,
-					MaxValues:   &maxVal,
-					Options:     options,
-				}),
-			}),
-		},
-	}
-}
-
-func buildAllMessagesTextModal(locale *i18n.Locale) interaction.ModalResponseData {
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_all_messages_text_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalAllMessagesTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdsLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "server_ids",
-					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdsPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(17)),
-					MaxLength:   utils.Ptr(uint32(2000)),
-				}),
-			}),
-		},
-	}
-}
-
-func buildSpecificMessagesModal(locale *i18n.Locale, guilds []guildInfo) interaction.ModalResponseData {
-	options := buildGuildSelectOptions(guilds)
-	minVal, maxVal := 1, 1
-
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_specific_messages_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificMessagesTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
-				Component: component.BuildSelectMenu(component.SelectMenu{
-					CustomId:    "server_id",
-					Placeholder: i18n.GetMessage(locale, i18n.GdprModalSelectServer),
-					MinValues:   &minVal,
-					MaxValues:   &maxVal,
-					Options:     options,
-				}),
-			}),
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "ticket_ids",
-					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(1)),
-					MaxLength:   utils.Ptr(uint32(1000)),
-				}),
-			}),
-		},
-	}
-}
-
-func buildSpecificMessagesTextModal(locale *i18n.Locale) interaction.ModalResponseData {
-	return interaction.ModalResponseData{
-		CustomId: fmt.Sprintf("gdpr_modal_specific_messages_text_%s", locale.IsoShortCode),
-		Title:    i18n.GetMessage(locale, i18n.GdprModalSpecificMessagesTitle),
-		Components: []component.Component{
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalServerIdLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "server_id",
-					Style:       component.TextStyleShort,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalServerIdPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(17)),
-					MaxLength:   utils.Ptr(uint32(20)),
-				}),
-			}),
-			component.BuildLabel(component.Label{
-				Label: i18n.GetMessage(locale, i18n.GdprModalTicketIdsLabel),
-				Component: component.BuildInputText(component.InputText{
-					CustomId:    "ticket_ids",
-					Style:       component.TextStyleParagraph,
-					Placeholder: utils.Ptr(i18n.GetMessage(locale, i18n.GdprModalTicketIdsPlaceholder)),
-					Required:    utils.Ptr(true),
-					MinLength:   utils.Ptr(uint32(1)),
-					MaxLength:   utils.Ptr(uint32(1000)),
-				}),
-			}),
-		},
-	}
 }
 
 type GDPRModalAllTranscriptsHandler struct{}
@@ -489,95 +93,28 @@ func (h *GDPRModalAllTranscriptsHandler) Matcher() matcher.Matcher {
 }
 
 func (h *GDPRModalAllTranscriptsHandler) Properties() registry.Properties {
-	return registry.Properties{
-		Flags:   registry.SumFlags(registry.DMsAllowed),
-		Timeout: constants.TimeoutGDPR,
-	}
+	return gdprProperties()
 }
 
 func (h *GDPRModalAllTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
-	userId := ctx.UserId()
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
-	var guildIds []uint64
-
-	for _, actionRow := range ctx.Interaction.Data.Components {
-		if actionRow.Component != nil {
-			switch actionRow.Component.CustomId {
-			case "server_ids":
-				if actionRow.Component.Values != nil {
-					for _, val := range actionRow.Component.Values {
-						if id, err := strconv.ParseUint(val, 10, 64); err == nil {
-							guildIds = append(guildIds, id)
-						}
-					}
-				} else if actionRow.Component.Value != "" {
-					guildIds = utils.ParseGuildIdsFromInput(actionRow.Component.Value)
-				}
-			}
-		} else {
-			for _, component := range actionRow.Components {
-				switch component.CustomId {
-				case "server_ids":
-					if component.Values != nil {
-						for _, val := range component.Values {
-							if id, err := strconv.ParseUint(val, 10, 64); err == nil {
-								guildIds = append(guildIds, id)
-							}
-						}
-					} else if component.Value != "" {
-						guildIds = utils.ParseGuildIdsFromInput(component.Value)
-					}
-				}
-			}
-		}
-	}
-
+	guildIds := modalGuildIds(ctx, "server_ids")
 	if len(guildIds) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
-	check := checkOwnedGuilds(ctx, ctx.Worker(), userId, guildIds)
-
-	if len(check.Unreachable) > 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, check.UnreachableList()))
+	guildNames, ok := requireOwnedGuilds(ctx, locale, guildIds)
+	if !ok {
 		return
 	}
 
-	if len(check.ValidIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
-		return
-	}
-
-	serverNames := check.Names
-	validGuildIds := check.ValidIds
-
-	confirmId, err := storeGDPRConfirmation(ctx, "all_transcripts", locale, userId, validGuildIds, nil)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	data := GDPRConfirmationData{
-		RequestType:     GDPRAllTranscripts,
-		UserId:          userId,
-		GuildIds:        validGuildIds,
-		GuildNames:      serverNames,
-		Locale:          locale,
-		ConfirmButtonId: confirmId,
-	}
-
-	components := buildGDPRConfirmationView(ctx, locale, data)
-	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
-		ctx.HandleError(err)
-	}
+	replyGDPRConfirmation(ctx, locale, gdprrelay.RequestTypeAllTranscripts, guildIds, guildNames, nil, nil)
 }
 
 type GDPRModalSpecificTranscriptsHandler struct{}
@@ -589,98 +126,43 @@ func (h *GDPRModalSpecificTranscriptsHandler) Matcher() matcher.Matcher {
 }
 
 func (h *GDPRModalSpecificTranscriptsHandler) Properties() registry.Properties {
-	return registry.Properties{
-		Flags:   registry.SumFlags(registry.DMsAllowed),
-		Timeout: constants.TimeoutGDPR,
-	}
+	return gdprProperties()
 }
 
 func (h *GDPRModalSpecificTranscriptsHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
-	userId := ctx.UserId()
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
-	var serverId string
-	var ticketIds string
-
-	for _, actionRow := range ctx.Interaction.Data.Components {
-		if actionRow.Component != nil {
-			switch actionRow.Component.CustomId {
-			case "server_id":
-				if actionRow.Component.Values != nil && len(actionRow.Component.Values) > 0 {
-					serverId = actionRow.Component.Values[0]
-				} else if actionRow.Component.Value != "" {
-					serverId = actionRow.Component.Value
-				}
-			case "ticket_ids":
-				ticketIds = actionRow.Component.Value
-			}
-		} else {
-			for _, component := range actionRow.Components {
-				switch component.CustomId {
-				case "server_id":
-					if component.Values != nil && len(component.Values) > 0 {
-						serverId = component.Values[0]
-					} else if component.Value != "" {
-						serverId = component.Value
-					}
-				case "ticket_ids":
-					ticketIds = component.Value
-				}
-			}
-		}
-	}
-
-	guildId, err := strconv.ParseUint(serverId, 10, 64)
-	if err != nil {
+	guildIds := modalGuildIds(ctx, "server_id")
+	if len(guildIds) != 1 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
-	ticketIdList := utils.ParseTicketIds(ticketIds)
+	input, _ := ctx.GetInput("ticket_ids")
+	ticketIdList, ok := parseTicketIdsOrReply(ctx, locale, input)
+	if !ok {
+		return
+	}
+
 	if len(ticketIdList) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIds))
 		return
 	}
 
-	check := checkOwnedGuilds(ctx, ctx.Worker(), userId, []uint64{guildId})
-
-	if len(check.Unreachable) > 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, check.UnreachableList()))
+	guildNames, ok := requireOwnedGuilds(ctx, locale, guildIds)
+	if !ok {
 		return
 	}
 
-	if len(check.ValidIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
+	if !requireTranscriptTickets(ctx, locale, guildIds[0], ticketIdList) {
 		return
 	}
 
-	confirmId, err := storeGDPRConfirmation(ctx, "specific", locale, userId, []uint64{guildId}, ticketIdList)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	data := GDPRConfirmationData{
-		RequestType:     GDPRSpecificTranscripts,
-		UserId:          userId,
-		GuildIds:        []uint64{guildId},
-		GuildNames:      check.Names,
-		TicketIds:       ticketIdList,
-		TicketIdsStr:    ticketIds,
-		Locale:          locale,
-		ConfirmButtonId: confirmId,
-	}
-
-	components := buildGDPRConfirmationView(ctx, locale, data)
-	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
-		ctx.HandleError(err)
-	}
+	replyGDPRConfirmation(ctx, locale, gdprrelay.RequestTypeSpecificTranscripts, guildIds, guildNames, ticketIdList, nil)
 }
 
 type GDPRModalAllMessagesHandler struct{}
@@ -692,98 +174,28 @@ func (h *GDPRModalAllMessagesHandler) Matcher() matcher.Matcher {
 }
 
 func (h *GDPRModalAllMessagesHandler) Properties() registry.Properties {
-	return registry.Properties{
-		Flags:   registry.SumFlags(registry.DMsAllowed),
-		Timeout: constants.TimeoutGDPR,
-	}
+	return gdprProperties()
 }
 
 func (h *GDPRModalAllMessagesHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
-	userId := ctx.UserId()
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
-	var guildIds []uint64
-
-	for _, actionRow := range ctx.Interaction.Data.Components {
-		if actionRow.Component != nil {
-			switch actionRow.Component.CustomId {
-			case "server_ids":
-				if actionRow.Component.Values != nil {
-					for _, val := range actionRow.Component.Values {
-						if id, err := strconv.ParseUint(val, 10, 64); err == nil {
-							guildIds = append(guildIds, id)
-						}
-					}
-				} else if actionRow.Component.Value != "" {
-					guildIds = utils.ParseGuildIdsFromInput(actionRow.Component.Value)
-				}
-			}
-		} else {
-			for _, component := range actionRow.Components {
-				switch component.CustomId {
-				case "server_ids":
-					if component.Values != nil {
-						for _, val := range component.Values {
-							if id, err := strconv.ParseUint(val, 10, 64); err == nil {
-								guildIds = append(guildIds, id)
-							}
-						}
-					} else if component.Value != "" {
-						guildIds = utils.ParseGuildIdsFromInput(component.Value)
-					}
-				}
-			}
-		}
-	}
-
+	guildIds := modalGuildIds(ctx, "server_ids")
 	if len(guildIds) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
-	var serverNames []string
-	var validGuildIds []uint64
-
-	for _, guildId := range guildIds {
-		guild, err := ctx.Worker().GetGuild(guildId)
-		if err != nil {
-			continue
-		}
-
-		serverNames = append(serverNames, fmt.Sprintf("%s (ID: %d)", guild.Name, guildId))
-		validGuildIds = append(validGuildIds, guildId)
-	}
-
-	if len(validGuildIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorServerNotFound))
+	guildNames, ok := requireMessageGuilds(ctx, locale, guildIds)
+	if !ok {
 		return
 	}
 
-	confirmId, err := storeGDPRConfirmation(ctx, "all_messages", locale, userId, validGuildIds, nil)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	data := GDPRConfirmationData{
-		RequestType:     GDPRAllMessages,
-		UserId:          userId,
-		GuildIds:        validGuildIds,
-		GuildNames:      serverNames,
-		Locale:          locale,
-		ConfirmButtonId: confirmId,
-	}
-
-	components := buildGDPRConfirmationView(ctx, locale, data)
-	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
-		ctx.HandleError(err)
-	}
+	replyGDPRConfirmation(ctx, locale, gdprrelay.RequestTypeAllMessages, guildIds, guildNames, nil, nil)
 }
 
 type GDPRModalSpecificMessagesHandler struct{}
@@ -795,190 +207,98 @@ func (h *GDPRModalSpecificMessagesHandler) Matcher() matcher.Matcher {
 }
 
 func (h *GDPRModalSpecificMessagesHandler) Properties() registry.Properties {
-	return registry.Properties{
-		Flags:   registry.SumFlags(registry.DMsAllowed),
-		Timeout: constants.TimeoutGDPR,
-	}
+	return gdprProperties()
 }
 
 func (h *GDPRModalSpecificMessagesHandler) Execute(ctx *context.ModalContext) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
-	userId := ctx.UserId()
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
-	var serverId string
-	var ticketIds string
-
-	for _, actionRow := range ctx.Interaction.Data.Components {
-		if actionRow.Component != nil {
-			switch actionRow.Component.CustomId {
-			case "server_id":
-				if actionRow.Component.Values != nil && len(actionRow.Component.Values) > 0 {
-					serverId = actionRow.Component.Values[0]
-				} else if actionRow.Component.Value != "" {
-					serverId = actionRow.Component.Value
-				}
-			case "ticket_ids":
-				ticketIds = actionRow.Component.Value
-			}
-		} else {
-			for _, component := range actionRow.Components {
-				switch component.CustomId {
-				case "server_id":
-					if component.Values != nil && len(component.Values) > 0 {
-						serverId = component.Values[0]
-					} else if component.Value != "" {
-						serverId = component.Value
-					}
-				case "ticket_ids":
-					ticketIds = component.Value
-				}
-			}
-		}
-	}
-
-	guildId, err := strconv.ParseUint(serverId, 10, 64)
-	if err != nil {
+	guildIds := modalGuildIds(ctx, "server_id")
+	if len(guildIds) != 1 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
 		return
 	}
 
-	ticketIdList := utils.ParseTicketIds(ticketIds)
+	input, _ := ctx.GetInput("ticket_ids")
+	ticketIdList, ok := parseTicketIdsOrReply(ctx, locale, input)
+	if !ok {
+		return
+	}
+
 	if len(ticketIdList) == 0 {
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIds))
 		return
 	}
 
-	guild, err := ctx.Worker().GetGuild(guildId)
-	if err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorServerNotFound))
+	guildNames, ok := requireMessageGuilds(ctx, locale, guildIds)
+	if !ok {
 		return
 	}
 
-	confirmId, err := storeGDPRConfirmation(ctx, "messages", locale, userId, []uint64{guildId}, ticketIdList)
+	if !requireTranscriptTickets(ctx, locale, guildIds[0], ticketIdList) {
+		return
+	}
+
+	replyGDPRConfirmation(ctx, locale, gdprrelay.RequestTypeSpecificMessages, guildIds, guildNames, ticketIdList, nil)
+}
+
+// Checked against the user's transcripts, not the guild cache, which drops a server once the bot
+// leaves even though its transcripts are kept.
+func requireMessageGuilds(ctx *context.ModalContext, locale *i18n.Locale, guildIds []uint64) (map[uint64]string, bool) {
+	refs, err := dbclient.Client.Tickets.GetUserTranscriptRefs(ctx, ctx.UserId())
 	if err != nil {
 		ctx.HandleError(err)
-		return
+		return nil, false
 	}
 
-	data := GDPRConfirmationData{
-		RequestType:     GDPRSpecificMessages,
-		UserId:          userId,
-		GuildIds:        []uint64{guildId},
-		GuildNames:      []string{fmt.Sprintf("%s (ID: %d)", guild.Name, guildId)},
-		TicketIds:       ticketIdList,
-		TicketIdsStr:    ticketIds,
-		Locale:          locale,
-		ConfirmButtonId: confirmId,
+	if len(notIn(guildIds, database.TranscriptRefGuildIds(refs))) > 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
+		return nil, false
 	}
 
-	components := buildGDPRConfirmationView(ctx, locale, data)
-	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(components)); err != nil {
+	return utils.FetchGuildNames(ctx, guildIds), true
+}
+
+func parseTicketIdsOrReply(ctx *context.ModalContext, locale *i18n.Locale, input string) ([]int, bool) {
+	ticketIds, invalid := commonutils.ParseTicketIds(input)
+	if len(invalid) > 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIdsList, utils.EscapeMarkdown(strings.Join(invalid, ", "))))
+		return nil, false
+	}
+
+	return ticketIds, true
+}
+
+func requireTranscriptTickets(ctx *context.ModalContext, locale *i18n.Locale, guildId uint64, ticketIds []int) bool {
+	found, err := dbclient.Client.Tickets.FilterClosedWithTranscript(ctx, guildId, ticketIds)
+	if err != nil {
 		ctx.HandleError(err)
-	}
-}
-
-type GDPRModalExportGuildHandler struct{}
-
-func (h *GDPRModalExportGuildHandler) Matcher() matcher.Matcher {
-	return matcher.NewFuncMatcher(func(customId string) bool {
-		return strings.HasPrefix(customId, "gdpr_modal_export_guild_")
-	})
-}
-
-func (h *GDPRModalExportGuildHandler) Properties() registry.Properties {
-	return registry.Properties{
-		Flags:   registry.SumFlags(registry.DMsAllowed),
-		Timeout: constants.TimeoutGDPR,
-	}
-}
-
-func (h *GDPRModalExportGuildHandler) Execute(ctx *context.ModalContext) {
-	locale := utils.ExtractLanguageFromCustomId(ctx.Interaction.Data.CustomId)
-	userId := ctx.UserId()
-
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
-		return
+		return false
 	}
 
-	var guildIds []uint64
+	return requireTicketIdsIn(ctx, locale, ticketIds, found)
+}
 
-	for _, actionRow := range ctx.Interaction.Data.Components {
-		if actionRow.Component != nil {
-			switch actionRow.Component.CustomId {
-			case "server_ids":
-				if actionRow.Component.Values != nil {
-					for _, val := range actionRow.Component.Values {
-						if id, err := strconv.ParseUint(val, 10, 64); err == nil {
-							guildIds = append(guildIds, id)
-						}
-					}
-				} else if actionRow.Component.Value != "" {
-					guildIds = utils.ParseGuildIdsFromInput(actionRow.Component.Value)
-				}
-			}
-		} else {
-			for _, comp := range actionRow.Components {
-				switch comp.CustomId {
-				case "server_ids":
-					if comp.Values != nil {
-						for _, val := range comp.Values {
-							if id, err := strconv.ParseUint(val, 10, 64); err == nil {
-								guildIds = append(guildIds, id)
-							}
-						}
-					} else if comp.Value != "" {
-						guildIds = utils.ParseGuildIdsFromInput(comp.Value)
-					}
-				}
-			}
+func requireTicketIdsIn(ctx *context.ModalContext, locale *i18n.Locale, ticketIds, allowed []int) bool {
+	if missing := notIn(ticketIds, allowed); len(missing) > 0 {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidTicketIdsList, ticketIdList(missing)))
+		return false
+	}
+
+	return true
+}
+
+func notIn[T comparable](values, allowed []T) []T {
+	var out []T
+	for _, v := range values {
+		if !slices.Contains(allowed, v) {
+			out = append(out, v)
 		}
 	}
 
-	if len(guildIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
-		return
-	}
-
-	check := checkOwnedGuilds(ctx, ctx.Worker(), userId, guildIds)
-
-	if len(check.Unreachable) > 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, check.UnreachableList()))
-		return
-	}
-
-	if len(check.ValidIds) == 0 {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwner))
-		return
-	}
-
-	serverNames := check.Names
-	validGuildIds := check.ValidIds
-
-	confirmId, err := storeGDPRConfirmation(ctx, "export_guild", locale, userId, validGuildIds, nil)
-	if err != nil {
-		ctx.HandleError(err)
-		return
-	}
-
-	exportGuildData := GDPRConfirmationData{
-		RequestType:     GDPRExportGuild,
-		UserId:          userId,
-		GuildIds:        validGuildIds,
-		GuildNames:      serverNames,
-		Locale:          locale,
-		ConfirmButtonId: confirmId,
-	}
-
-	exportComponents := buildGDPRConfirmationView(ctx, locale, exportGuildData)
-	if _, err := ctx.ReplyWith(command.NewMessageResponseWithComponents(exportComponents)); err != nil {
-		ctx.HandleError(err)
-	}
+	return out
 }

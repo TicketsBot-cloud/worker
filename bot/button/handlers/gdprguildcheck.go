@@ -2,52 +2,60 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
+	commonutils "github.com/TicketsBot-cloud/common/utils"
+	"github.com/TicketsBot-cloud/gdl/objects/guild"
 	"github.com/TicketsBot-cloud/gdl/rest"
 	"github.com/TicketsBot-cloud/worker"
+	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
+	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-type guildCheck struct {
-	ValidIds    []uint64
-	Names       []string
-	Unreachable []string
-	NotOwner    bool
-}
+var fetchGuild = rest.GetGuild
 
-// Deliberately not Worker.GetGuild: that answers from the cache, and a cached row outlives the bot
-// being removed from the guild. Any fetch failure counts as unreachable.
-func checkOwnedGuilds(ctx context.Context, w *worker.Context, userId uint64, guildIds []uint64) guildCheck {
-	var out guildCheck
-
-	for _, guildId := range guildIds {
-		guild, err := rest.GetGuild(ctx, w.Token, w.RateLimiter, guildId)
-		if err != nil {
-			out.Unreachable = append(out.Unreachable, formatGuildRef(guildId, ""))
-			continue
-		}
-
-		if guild.OwnerId != userId {
-			out.NotOwner = true
-			continue
-		}
-
-		out.Names = append(out.Names, formatGuildRef(guildId, guild.Name))
-		out.ValidIds = append(out.ValidIds, guildId)
+// Not Worker.GetGuild, whose cached row outlives the bot leaving. Servers the cache doesn't list as
+// owned are rejected unfetched, so typed IDs can't spend the rate limit or reveal other servers' names.
+func checkOwnedGuilds(ctx context.Context, w *worker.Context, userId uint64, guildIds, cachedOwned []uint64) (guildNames map[uint64]string, notOwned, unreachable []uint64, err error) {
+	if notOwned := notIn(guildIds, cachedOwned); len(notOwned) > 0 {
+		return nil, notOwned, nil, nil
 	}
 
-	return out
-}
-
-func (c guildCheck) UnreachableList() string {
-	return strings.Join(c.Unreachable, "\n* ")
-}
-
-func formatGuildRef(guildId uint64, name string) string {
-	if name == "" {
-		return fmt.Sprintf("%d", guildId)
+	owned, notOwned, unreachable, err := commonutils.SplitOwnedGuilds(ctx, userId, guildIds, func(ctx context.Context, guildId uint64) (guild.Guild, error) {
+		return fetchGuild(ctx, w.Token, w.RateLimiter, guildId)
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	return fmt.Sprintf("%s (ID: %d)", name, guildId)
+	guildNames = make(map[uint64]string, len(owned))
+	for _, g := range owned {
+		guildNames[g.Id] = g.Name
+	}
+
+	return guildNames, notOwned, unreachable, nil
+}
+
+func requireOwnedGuilds(ctx *cmdcontext.ModalContext, locale *i18n.Locale, guildIds []uint64) (map[uint64]string, bool) {
+	cachedOwned, err := ctx.Worker().Cache.GetGuildIdsByOwner(ctx, ctx.UserId())
+	if err != nil {
+		ctx.HandleError(err)
+		return nil, false
+	}
+
+	guildNames, notOwned, unreachable, err := checkOwnedGuilds(ctx, ctx.Worker(), ctx.UserId(), guildIds, cachedOwned)
+
+	switch {
+	case err != nil:
+		ctx.HandleError(err)
+	case len(unreachable) > 0:
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorBotNotInServer, strings.Join(guildDisplays(unreachable, nil), "\n* ")))
+	case len(notOwned) > 0:
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorNotOwnerServers, strings.Join(guildDisplays(notOwned, nil), ", ")))
+	default:
+		return guildNames, true
+	}
+
+	return nil, false
 }

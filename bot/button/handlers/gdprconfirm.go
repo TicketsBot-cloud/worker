@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"strings"
 
+	"github.com/TicketsBot-cloud/common/gdprrelay"
+	"github.com/TicketsBot-cloud/common/sentry"
+	commonutils "github.com/TicketsBot-cloud/common/utils"
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry"
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
@@ -13,76 +16,58 @@ import (
 	cmdcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/gdprrelay"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
-// All six confirmations resolve, log, publish and report back identically, differing only in
-// these fields.
 type gdprConfirmSpec struct {
 	requestType gdprrelay.RequestType
-	logName     string
-	colour      customisation.Colour
-	// Carries no selection, so there is nothing to look up.
-	stateless bool
-	render    func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string
+	render      func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string
 }
 
 func executeGDPRConfirm(ctx *cmdcontext.ButtonContext, spec gdprConfirmSpec) {
 	locale := utils.ExtractLanguageFromCustomId(ctx.InteractionData.CustomId)
 
-	if !gdprrelay.IsWorkerAlive(redis.Client) {
-		container := utils.BuildGDPRWorkerOfflineView(ctx, locale)
-		ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
+	if !requireGDPRWorkerEdit(ctx, locale) {
 		return
 	}
 
 	userId := ctx.UserId()
 
-	var guildIds []uint64
-	var ticketIds []int
-
-	if !spec.stateless {
-		// Consuming deletes the token, so a second click cannot queue the request twice.
-		data, ok := utils.ConsumeGDPRConfirmation(ctx, redis.Client, ctx.InteractionData.CustomId, userId)
-		if !ok {
-			ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorConfirmationExpired))
-			return
-		}
-
-		guildIds = data.GuildIds
-		ticketIds = data.TicketIds
-
-		if len(guildIds) == 0 {
-			ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorInvalidServerId))
-			return
-		}
+	data, ok := utils.ConsumeGDPRConfirmation(ctx, redis.Client, ctx.InteractionData.CustomId, userId)
+	if !ok {
+		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorConfirmationExpired))
+		return
 	}
 
-	guildNames := utils.FetchGuildNames(ctx, guildIds)
+	var guildNames map[uint64]string
+	if len(data.GuildIds) <= maxNamedGuilds {
+		guildNames = utils.FetchGuildNames(ctx, data.GuildIds)
+	}
 
 	request := gdprrelay.GDPRRequest{
 		Type:               spec.requestType,
 		UserId:             userId,
-		GuildIds:           guildIds,
+		GuildIds:           data.GuildIds,
 		GuildNames:         guildNames,
-		TicketIds:          ticketIds,
+		TicketIds:          data.TicketIds,
+		Categories:         data.Categories,
 		Language:           locale.IsoLongCode,
 		InteractionToken:   ctx.Interaction.Token,
 		InteractionGuildId: ctx.GuildId(),
 		ApplicationId:      ctx.Worker().BotId,
 	}
 
-	id, err := insertGDPRLog(userId, spec.logName)
+	_, next, err := gdprrelay.Queue(ctx, redis.Client, dbclient.Client, request)
 	if err != nil {
+		sentry.ErrorWithContext(err, ctx.ToErrorContext())
 		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
 		return
 	}
 
-	if err := gdprrelay.Publish(redis.Client, request, id); err != nil {
-		ctx.ReplyRaw(customisation.Red, "Error", i18n.GetMessage(locale, i18n.GdprErrorQueueFailed))
+	if next != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", utils.GDPRExportLimitMessage(locale, *next))
 		return
 	}
 
@@ -96,23 +81,16 @@ func executeGDPRConfirm(ctx *cmdcontext.ButtonContext, spec gdprConfirmSpec) {
 	}
 
 	title := i18n.GetMessage(locale, i18n.GdprQueuedTitle)
-	container := utils.BuildContainerWithComponents(ctx, spec.colour, title, components)
+	container := utils.BuildContainerWithComponents(ctx, customisation.Orange, title, components)
 	ctx.Edit(command.NewMessageResponseWithComponents([]component.Component{container}))
 }
 
-func insertGDPRLog(userId uint64, requestType string) (int, error) {
-	scrambledId := sha256.New()
-	fmt.Fprintf(scrambledId, "%d", userId)
-
-	return dbclient.Client.GdprLogs.InsertLog(fmt.Sprintf("%x", scrambledId.Sum(nil)), requestType, "Queued")
-}
-
-func storeGDPRConfirmation(ctx context.Context, action string, locale *i18n.Locale, userId uint64, guildIds []uint64, ticketIds []int) (string, error) {
+func storeGDPRConfirmation(ctx context.Context, action string, locale *i18n.Locale, userId uint64, guildIds []uint64, ticketIds []int, categories []string) (string, error) {
 	token, err := utils.StoreGDPRConfirmation(ctx, redis.Client, utils.GDPRConfirmation{
-		UserId:    userId,
-		GuildIds:  guildIds,
-		TicketIds: ticketIds,
-		Locale:    locale.IsoShortCode,
+		UserId:     userId,
+		GuildIds:   guildIds,
+		TicketIds:  ticketIds,
+		Categories: categories,
 	})
 	if err != nil {
 		return "", err
@@ -121,10 +99,17 @@ func storeGDPRConfirmation(ctx context.Context, action string, locale *i18n.Loca
 	return utils.BuildGDPRConfirmId(action, token, locale.IsoShortCode), nil
 }
 
+// Past one select menu's worth of servers, names could push a message over Discord's 4000-character limit.
+const maxNamedGuilds = 25
+
 func guildDisplays(guildIds []uint64, guildNames map[uint64]string) []string {
+	if len(guildIds) > maxNamedGuilds {
+		guildNames = nil
+	}
+
 	displays := make([]string, len(guildIds))
 	for i, guildId := range guildIds {
-		displays[i] = utils.FormatGuildDisplay(guildId, guildNames)
+		displays[i] = commonutils.FormatGuildDisplay(guildId, guildNames[guildId])
 	}
 
 	return displays
@@ -158,8 +143,6 @@ func (h *GDPRConfirmAllTranscriptsHandler) Properties() registry.Properties {
 func (h *GDPRConfirmAllTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	executeGDPRConfirm(ctx, gdprConfirmSpec{
 		requestType: gdprrelay.RequestTypeAllTranscripts,
-		logName:     "AllTranscripts",
-		colour:      customisation.Orange,
 		render: func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string {
 			displays := guildDisplays(request.GuildIds, guildNames)
 			if len(displays) == 1 {
@@ -183,10 +166,8 @@ func (h *GDPRConfirmSpecificTranscriptsHandler) Properties() registry.Properties
 func (h *GDPRConfirmSpecificTranscriptsHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	executeGDPRConfirm(ctx, gdprConfirmSpec{
 		requestType: gdprrelay.RequestTypeSpecificTranscripts,
-		logName:     "SpecificTranscripts",
-		colour:      customisation.Orange,
 		render: func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string {
-			guildDisplay := utils.FormatGuildDisplay(request.GuildIds[0], guildNames)
+			guildDisplay := commonutils.FormatGuildDisplay(request.GuildIds[0], guildNames[request.GuildIds[0]])
 			return i18n.GetMessage(locale, i18n.GdprQueuedSpecificTranscripts, guildDisplay, ticketIdList(request.TicketIds))
 		},
 	})
@@ -205,8 +186,6 @@ func (h *GDPRConfirmAllMessagesHandler) Properties() registry.Properties {
 func (h *GDPRConfirmAllMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	executeGDPRConfirm(ctx, gdprConfirmSpec{
 		requestType: gdprrelay.RequestTypeAllMessages,
-		logName:     "AllMessages",
-		colour:      customisation.Orange,
 		render: func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string {
 			displays := guildDisplays(request.GuildIds, guildNames)
 			if len(displays) == 1 {
@@ -230,10 +209,8 @@ func (h *GDPRConfirmMessagesHandler) Properties() registry.Properties {
 func (h *GDPRConfirmMessagesHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	executeGDPRConfirm(ctx, gdprConfirmSpec{
 		requestType: gdprrelay.RequestTypeSpecificMessages,
-		logName:     "SpecificMessages",
-		colour:      customisation.Orange,
 		render: func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string {
-			guildDisplay := utils.FormatGuildDisplay(request.GuildIds[0], guildNames)
+			guildDisplay := commonutils.FormatGuildDisplay(request.GuildIds[0], guildNames[request.GuildIds[0]])
 			return i18n.GetMessage(locale, i18n.GdprQueuedSpecificMessages, guildDisplay, ticketIdList(request.TicketIds))
 		},
 	})
@@ -252,14 +229,8 @@ func (h *GDPRConfirmExportGuildHandler) Properties() registry.Properties {
 func (h *GDPRConfirmExportGuildHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	executeGDPRConfirm(ctx, gdprConfirmSpec{
 		requestType: gdprrelay.RequestTypeExportGuild,
-		logName:     "ExportGuild",
-		colour:      customisation.Orange,
 		render: func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string {
-			displays := guildDisplays(request.GuildIds, guildNames)
-			if len(displays) == 1 {
-				return i18n.GetMessage(locale, i18n.GdprQueuedExportGuild, displays[0])
-			}
-			return i18n.GetMessage(locale, i18n.GdprQueuedExportGuildMulti, strings.Join(displays, "\n* "))
+			return renderExportSummary(locale, database.GdprExportTypeServer, guildDisplays(request.GuildIds, guildNames), request.Categories, request.TicketIds)
 		},
 	})
 }
@@ -277,11 +248,8 @@ func (h *GDPRConfirmExportUserHandler) Properties() registry.Properties {
 func (h *GDPRConfirmExportUserHandler) Execute(ctx *cmdcontext.ButtonContext) {
 	executeGDPRConfirm(ctx, gdprConfirmSpec{
 		requestType: gdprrelay.RequestTypeExportUser,
-		logName:     "ExportUser",
-		colour:      customisation.Orange,
-		stateless:   true,
 		render: func(locale *i18n.Locale, request gdprrelay.GDPRRequest, guildNames map[uint64]string) string {
-			return i18n.GetMessage(locale, i18n.GdprQueuedExportUser)
+			return renderExportSummary(locale, database.GdprExportTypeUser, guildDisplays(request.GuildIds, guildNames), request.Categories, request.TicketIds)
 		},
 	})
 }

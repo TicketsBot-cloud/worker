@@ -116,6 +116,7 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.GDPRModalAllMessagesHandler),
 		new(handlers.GDPRModalSpecificMessagesHandler),
 		new(handlers.GDPRModalExportGuildHandler),
+		new(handlers.GDPRModalExportUserHandler),
 		new(handlers.PremiumKeySubmitHandler),
 		new(edit.LabelChangeSubmitHandler),
 		new(modals.AdminDebugServerPanelSettingsModalHandler),

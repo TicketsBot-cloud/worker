@@ -12,7 +12,6 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-// Matches the lifetime of the interaction token the confirmation belongs to.
 const gdprConfirmationTTL = 15 * time.Minute
 
 const gdprConfirmationKeyPrefix = "tickets:gdpr:confirm:"
@@ -21,10 +20,10 @@ const gdprConfirmationKeyPrefix = "tickets:gdpr:confirm:"
 // selection here keeps the id a constant size whatever the user picked, and lets the handler
 // delete the key on use so a double click cannot queue the same request twice.
 type GDPRConfirmation struct {
-	UserId    uint64   `json:"user_id"`
-	GuildIds  []uint64 `json:"guild_ids,omitempty"`
-	TicketIds []int    `json:"ticket_ids,omitempty"`
-	Locale    string   `json:"locale,omitempty"`
+	UserId     uint64   `json:"user_id"`
+	GuildIds   []uint64 `json:"guild_ids,omitempty"`
+	TicketIds  []int    `json:"ticket_ids,omitempty"`
+	Categories []string `json:"categories,omitempty"`
 }
 
 func StoreGDPRConfirmation(ctx context.Context, client *redis.Client, data GDPRConfirmation) (string, error) {
@@ -56,12 +55,18 @@ func ConsumeGDPRConfirmation(ctx context.Context, client *redis.Client, customId
 
 	key := gdprConfirmationKeyPrefix + token
 
-	encoded, err := client.Get(ctx, key).Bytes()
-	if err != nil {
+	// MULTI/EXEC rather than GETDEL, which needs Redis 6.2.
+	pipe := client.TxPipeline()
+	get := pipe.Get(ctx, key)
+	pipe.Del(ctx, key)
+	if _, err := pipe.Exec(ctx); err != nil {
 		return GDPRConfirmation{}, false
 	}
 
-	client.Del(ctx, key)
+	encoded, err := get.Bytes()
+	if err != nil {
+		return GDPRConfirmation{}, false
+	}
 
 	var data GDPRConfirmation
 	if err := json.Unmarshal(encoded, &data); err != nil {
