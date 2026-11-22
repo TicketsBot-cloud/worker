@@ -141,6 +141,13 @@ type (
 			Logo       uint64 `env:"LOGO" envDefault:"1421596160379850783"`
 		} `envPrefix:"EMOJI_"`
 
+		// WhitelabelTokens configures the keyring that protects whitelabel bot
+		// tokens at rest. Format: "1:<base64 32 byte key>,2:<...>".
+		WhitelabelTokens struct {
+			Keys          string `env:"WORKER_WHITELABEL_TOKEN_KEYS"`
+			ActiveVersion string `env:"WORKER_WHITELABEL_TOKEN_ACTIVE_KEY_VERSION"`
+		}
+
 		VoteSkuId uuid.UUID `env:"VOTE_SKU_ID"`
 	}
 )

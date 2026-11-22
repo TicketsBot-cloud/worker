@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/errorcontext"
 	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -55,45 +56,32 @@ func ListenTicketClaim() {
 				return
 			}
 
-			// Get bot token for guild
-			var token string
-			var botId uint64
-			{
-				whiteLabelBotId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, payload.GuildId)
-				if err != nil {
-					sentry.ErrorWithContext(err, errorContext)
-				}
+			// Resolve the bot for the guild. A failure must stop here: carrying on
+			// would make a whitelabel guild act as the main bot.
+			whiteLabelBotId, isWhitelabel, err := dbclient.Client.WhitelabelGuilds.GetBotByGuild(ctx, payload.GuildId)
+			if err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+				return
+			}
 
-				if isWhitelabel {
-					bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, whiteLabelBotId)
-					if err != nil {
-						sentry.ErrorWithContext(err, errorContext)
-						return
-					}
+			botId := config.Conf.Discord.PublicBotId
+			if isWhitelabel {
+				botId = whiteLabelBotId
+			}
 
-					if bot.Token == "" {
-						token = config.Conf.Discord.Token
-					} else {
-						token = bot.Token
-						botId = whiteLabelBotId
-					}
-				} else {
-					token = config.Conf.Discord.Token
-				}
+			token, err := tokens.Resolve(ctx, botId, isWhitelabel)
+			if err != nil {
+				sentry.ErrorWithContext(err, errorContext)
+				return
 			}
 
 			// Create worker context
 			workerCtx := &worker.Context{
 				Token:        token,
 				BotId:        botId,
-				IsWhitelabel: botId != 0,
+				IsWhitelabel: isWhitelabel,
 				Cache:        cache.Client, // TODO: Less hacky
 				RateLimiter:  nil,          // Use http-proxy ratelimit functionality
-			}
-
-			// Fall back to the configured id for the main (non-whitelabel) bot
-			if workerCtx.BotId == 0 {
-				workerCtx.BotId = config.Conf.Discord.PublicBotId
 			}
 
 			premiumTier, err := utils.PremiumClient.GetTierByGuildId(ctx, payload.GuildId, true, token, workerCtx.RateLimiter)

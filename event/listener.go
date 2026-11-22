@@ -7,6 +7,7 @@ import (
 	"github.com/TicketsBot-cloud/common/rpc"
 	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"go.uber.org/zap"
 )
 
@@ -35,8 +36,19 @@ func (k *EventListener) HandleMessage(ctx context.Context, message []byte) {
 		return
 	}
 
+	token, err := tokens.Resolve(ctx, event.BotId, event.IsWhitelabel)
+	if err != nil {
+		k.logger.Error("Failed to resolve bot token for event",
+			zap.Uint64("bot_id", event.BotId),
+			zap.Bool("is_whitelabel", event.IsWhitelabel),
+			zap.Int("shard_id", event.ShardId),
+			zap.Error(err),
+		)
+		return
+	}
+
 	workerCtx := &worker.Context{
-		Token:        event.BotToken,
+		Token:        token,
 		BotId:        event.BotId,
 		IsWhitelabel: event.IsWhitelabel,
 		ShardId:      event.ShardId,
