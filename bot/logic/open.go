@@ -90,20 +90,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	span.Finish()
 
-	span = sentry.StartSpan(rootSpan.Context(), "Ticket ratelimit")
-
-	ok, err := redis.TakeTicketRateLimitToken(redis.Client, cmd.GuildId())
-	if err != nil {
-		cmd.HandleError(err)
-		return database.Ticket{}, err
-	}
-
-	span.Finish()
-
-	if !ok {
-		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenRatelimited)
-		return database.Ticket{}, nil
-	}
+	opened := false
 
 	// Check per-user per-panel cooldown
 	if panel != nil && panel.CooldownSeconds > 0 {
@@ -132,6 +119,19 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 				span.Finish()
 				return database.Ticket{}, nil
 			}
+
+			defer func() {
+				if opened {
+					return
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+				defer cancel()
+
+				if err := redis.ReleasePanelCooldownToken(ctx, cmd.GuildId(), panel.PanelId, cmd.UserId()); err != nil {
+					sentry.ErrorWithContext(err, cmd.ToErrorContext())
+				}
+			}()
 		}
 
 		span.Finish()
@@ -244,6 +244,22 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		category = newCategoryId
 	}
 
+	// Taken after the cache-only checks so failed opens on a full server don't ratelimit the whole guild
+	span = sentry.StartSpan(rootSpan.Context(), "Ticket ratelimit")
+
+	ok, err := redis.TakeTicketRateLimitToken(redis.Client, cmd.GuildId())
+	if err != nil {
+		cmd.HandleError(err)
+		return database.Ticket{}, err
+	}
+
+	span.Finish()
+
+	if !ok {
+		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageOpenRatelimited)
+		return database.Ticket{}, nil
+	}
+
 	var panelId *int
 	if panel != nil {
 		panelId = &panel.PanelId
@@ -257,6 +273,20 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		return database.Ticket{}, err
 	}
 	span.Finish()
+
+	// A channel-less open row would still count toward the user's ticket limit
+	defer func() {
+		if opened {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+
+		if err := dbclient.Client.Tickets.Close(ctx, ticketId, cmd.GuildId()); err != nil {
+			cmd.HandleError(err)
+		}
+	}()
 
 	unlocked = true
 	if _, err := mu.UnlockContext(ctx); err != nil && !errors.Is(err, redis.ErrLockExpired) {
@@ -288,12 +318,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		ch, err = cmd.Worker().CreatePrivateThread(reasonCtx, cmd.ChannelId(), name, uint16(threadArchiveDuration), false)
 		if err != nil {
 			cmd.HandleError(err)
-
-			// To prevent tickets getting in a glitched state, we should mark it as closed (or delete it completely?)
-			if err := dbclient.Client.Tickets.Close(ctx, ticketId, cmd.GuildId()); err != nil {
-				cmd.HandleError(err)
-			}
-
 			return database.Ticket{}, err
 		}
 		span.Finish()
@@ -351,11 +375,6 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 		if err != nil { // Bot likely doesn't have permission
 			cmd.HandleError(err)
 
-			// To prevent tickets getting in a glitched state, we should mark it as closed (or delete it completely?)
-			if err := dbclient.Client.Tickets.Close(ctx, ticketId, cmd.GuildId()); err != nil {
-				cmd.HandleError(err)
-			}
-
 			var restError request.RestError
 			if errors.As(err, &restError) && restError.ApiError.FirstErrorCode() == "CHANNEL_PARENT_MAX_CHANNELS" {
 				canRefresh, err := redis.TakeChannelRefetchToken(ctx, cmd.GuildId())
@@ -383,6 +402,8 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 		ch = tmp
 	}
+
+	opened = true
 
 	if err := dbclient.Client.Tickets.SetChannelId(ctx, cmd.GuildId(), ticketId, ch.Id); err != nil {
 		cmd.HandleError(err)
