@@ -326,7 +326,7 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 	} else if errors.Is(err, context.DeadlineExceeded) {
 		message = r.GetMessage(i18n.MessageErrorTimeout)
 	} else {
-		message = r.GetMessage(i18n.MessageErrorGeneral) + "\n" + r.GetMessage(i18n.MessageErrorId) + ": `" + eventId + "`"
+		message = r.generalErrorMessage(eventId)
 	}
 
 	embed := r.buildEmbedRaw(customisation.Red, r.GetMessage(i18n.Error), message)
@@ -352,7 +352,20 @@ func (r *Replyable) buildErrorResponse(err error, eventId string, includeInviteL
 	return res
 }
 
+func (r *Replyable) generalErrorMessage(eventId string) string {
+	return r.GetMessage(i18n.MessageErrorGeneral) + "\n" + r.GetMessage(i18n.MessageErrorId) + ": `" + eventId + "`"
+}
+
+// gdl puts an unparsable body in the message verbatim, e.g. the REST proxy's or Cloudflare's own error page.
+func isDiscordMessage(restError request.RestError) bool {
+	return restError.StatusCode < 500 && restError.ApiError.Code != 0
+}
+
 func (r *Replyable) formatDiscordError(restError request.RestError, eventId string) string {
+	if !isDiscordMessage(restError) {
+		return r.generalErrorMessage(eventId)
+	}
+
 	return r.GetMessage(i18n.MessageErrorGeneral) + ":\n```\n" +
 		restError.Error() + "\n```\n" +
 		r.GetMessage(i18n.MessageErrorId) + ": `" + eventId + "`"
