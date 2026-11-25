@@ -2,81 +2,20 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/TicketsBot-cloud/database"
 	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
 	"github.com/TicketsBot-cloud/worker/bot/cache"
 	"github.com/TicketsBot-cloud/worker/bot/command/registry"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
+	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
-
-func ParseGuildIds(customId string) []uint64 {
-	// Expected format: "gdpr_confirm_all_transcripts_{guildIds}_{langCode}"
-	// where {guildIds} is comma-separated like "123456,789012" and {langCode} is like "en"
-
-	// Find the last underscore which contains the language code
-	lastUnderscoreIdx := strings.LastIndex(customId, "_")
-	if lastUnderscoreIdx == -1 || lastUnderscoreIdx == len(customId)-1 {
-		return nil
-	}
-
-	// Remove the language code part to get everything before it
-	withoutLangCode := customId[:lastUnderscoreIdx]
-
-	// Find the second-to-last underscore which separates the prefix from the guild IDs
-	secondLastUnderscoreIdx := strings.LastIndex(withoutLangCode, "_")
-	if secondLastUnderscoreIdx == -1 || secondLastUnderscoreIdx == len(withoutLangCode)-1 {
-		return nil
-	}
-
-	// Extract guild IDs (everything between second-to-last and last underscore)
-	guildIdsStr := withoutLangCode[secondLastUnderscoreIdx+1:]
-
-	// Handle comma-separated guild IDs
-	guildIdParts := strings.Split(guildIdsStr, ",")
-
-	var guildIds []uint64
-	for _, idStr := range guildIdParts {
-		idStr = strings.TrimSpace(idStr)
-		if idStr == "" {
-			continue
-		}
-		if id, err := strconv.ParseUint(idStr, 10, 64); err == nil {
-			guildIds = append(guildIds, id)
-		}
-	}
-
-	return guildIds
-}
-
-func ParseTicketIds(input string) []int {
-	input = strings.ReplaceAll(input, ";", ",")
-	input = strings.ReplaceAll(input, "\n", ",")
-	input = strings.ReplaceAll(input, "\t", ",")
-
-	parts := strings.Split(input, ",")
-	seen := make(map[int]bool)
-	var ticketIds []int
-
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-
-		if id, err := strconv.Atoi(part); err == nil && id > 0 {
-			if !seen[id] {
-				ticketIds = append(ticketIds, id)
-				seen[id] = true
-			}
-		}
-	}
-
-	return ticketIds
-}
 
 func ParseGuildIdsFromInput(input string) []uint64 {
 	input = strings.ReplaceAll(input, ";", ",")
@@ -140,11 +79,23 @@ func FetchGuildNames(ctx context.Context, guildIds []uint64) map[uint64]string {
 	return guildNames
 }
 
-func FormatGuildDisplay(guildId uint64, guildNames map[uint64]string) string {
-	if name, ok := guildNames[guildId]; ok && name != "" {
-		return name + " (" + strconv.FormatUint(guildId, 10) + ")"
+func GDPRExportLimitMessage(locale *i18n.Locale, next time.Time) string {
+	return i18n.GetMessage(locale, i18n.GdprErrorExportLimited, fmt.Sprintf("<t:%d:R>", next.Unix()), fmt.Sprintf("<t:%d:f>", next.Unix()))
+}
+
+func RequireGDPRExportAllowed(ctx registry.CommandContext, locale *i18n.Locale, exportType database.GdprExportType) bool {
+	next, err := dbclient.Client.GdprExports.NextAllowedAt(ctx, ctx.UserId(), exportType)
+	if err != nil {
+		ctx.HandleError(err)
+		return false
 	}
-	return strconv.FormatUint(guildId, 10)
+
+	if next != nil {
+		ctx.ReplyRaw(customisation.Red, "Error", GDPRExportLimitMessage(locale, *next))
+		return false
+	}
+
+	return true
 }
 
 func BuildGDPRWorkerOfflineView(ctx registry.CommandContext, locale *i18n.Locale) component.Component {
