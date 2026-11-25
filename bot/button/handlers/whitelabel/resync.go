@@ -17,6 +17,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
@@ -60,7 +61,13 @@ func (h *WhitelabelResyncHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	if err := commonwl.ReapplyIntents(ctx, bot.Token); err != nil {
+	token, err := tokens.Resolve(ctx, bot.BotId, true)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
+	if err := commonwl.ReapplyIntents(ctx, token); err != nil {
 		if commonwl.IsIntentsRejection(err) {
 			ctx.ReplyRaw(customisation.Red, "Error", commonwl.IntentsRejectedMessage)
 		} else {
@@ -71,7 +78,6 @@ func (h *WhitelabelResyncHandler) Execute(ctx *context.ButtonContext) {
 	}
 
 	if err := tokenchange.PublishTokenChange(redis.Client, tokenchange.TokenChangeData{
-		Token: bot.Token,
 		NewId: bot.BotId,
 		OldId: 0,
 	}); err != nil {
@@ -79,7 +85,7 @@ func (h *WhitelabelResyncHandler) Execute(ctx *context.ButtonContext) {
 		return
 	}
 
-	if err := commonwl.SyncGuilds(ctx, dbclient.Client, bot.Token, bot.BotId); err != nil {
+	if err := commonwl.SyncGuilds(ctx, dbclient.Client, token, bot.BotId); err != nil {
 		ctx.HandleError(err)
 		return
 	}

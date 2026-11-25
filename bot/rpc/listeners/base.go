@@ -2,12 +2,12 @@ package listeners
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/config"
 )
 
@@ -34,27 +34,27 @@ func (b *BaseListener) ContextForGuild(ctx context.Context, guildId uint64) (*wo
 	}
 
 	if isWhitelabel {
-		// TODO: Merge lookup into one query
-		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
+		token, err := tokens.Resolve(ctx, botId, true)
 		if err != nil {
 			return nil, err
 		}
 
-		if bot.BotId == 0 {
-			return nil, errors.New("bot not found")
-		}
-
 		return &worker.Context{
-			Token:        bot.Token,
-			BotId:        bot.BotId,
+			Token:        token,
+			BotId:        botId,
 			IsWhitelabel: true,
 			ShardId:      0,
 			Cache:        b.cache,
 			RateLimiter:  nil,
 		}, nil
 	} else {
+		token, err := tokens.Resolve(ctx, config.Conf.Discord.PublicBotId, false)
+		if err != nil {
+			return nil, err
+		}
+
 		return &worker.Context{
-			Token:        config.Conf.Discord.Token,
+			Token:        token,
 			BotId:        config.Conf.Discord.PublicBotId,
 			IsWhitelabel: false,
 			ShardId:      0,

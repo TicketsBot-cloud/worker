@@ -2,11 +2,11 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	w "github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 )
 
 func ContextTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -25,18 +25,14 @@ func WorkerForGuild(ctx context.Context, mainWorker *w.Context, guildId uint64) 
 		return mainWorker, nil
 	}
 
-	bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
+	token, err := tokens.Resolve(ctx, botId, true)
 	if err != nil {
 		return nil, err
 	}
 
-	if bot.BotId == 0 {
-		return nil, errors.New("bot not found")
-	}
-
 	return &w.Context{
-		Token:        bot.Token,
-		BotId:        bot.BotId,
+		Token:        token,
+		BotId:        botId,
 		IsWhitelabel: true,
 		ShardId:      0,
 		Cache:        mainWorker.Cache,

@@ -7,6 +7,7 @@ import (
 	"github.com/TicketsBot-cloud/gdl/cache"
 	"github.com/TicketsBot-cloud/worker"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/config"
 )
 
@@ -24,15 +25,20 @@ func buildContext(ctx context.Context, ticket database.Ticket, cache *cache.PgCa
 	worker.IsWhitelabel = isWhitelabel
 
 	if isWhitelabel {
-		res, err := dbclient.Client.Whitelabel.GetByBotId(ctx, whitelabelBotId)
+		token, err := tokens.Resolve(ctx, whitelabelBotId, true)
 		if err != nil {
 			return nil, err
 		}
 
-		worker.Token = res.Token
+		worker.Token = token
 		worker.BotId = whitelabelBotId
 	} else {
-		worker.Token = config.Conf.Discord.Token
+		token, err := tokens.Resolve(ctx, config.Conf.Discord.PublicBotId, false)
+		if err != nil {
+			return nil, err
+		}
+
+		worker.Token = token
 		worker.BotId = config.Conf.Discord.PublicBotId
 	}
 
