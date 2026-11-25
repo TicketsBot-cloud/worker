@@ -2,21 +2,21 @@ module github.com/TicketsBot-cloud/worker
 
 go 1.26.0
 
-replace github.com/TicketsBot-cloud/database => ../database
+// replace github.com/TicketsBot-cloud/database => ../database
 
-replace github.com/TicketsBot-cloud/common => ../common
+// replace github.com/TicketsBot-cloud/common => ../common
 
 // replace github.com/TicketsBot-cloud/gdl => ../gdl
 
 // replace github.com/TicketsBot-cloud/archiverclient => ../archiverclient
 
-replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
+// replace github.com/TicketsBot-cloud/logarchiver => ../logarchiver
 
 require (
 	cloud.google.com/go/profiler v0.4.2
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20251015181023-f0b66a074704
-	github.com/TicketsBot-cloud/common v0.0.0-20261022190115-887ce60dce1b
-	github.com/TicketsBot-cloud/database v0.0.0-20261022191045-27b0736fc5a3
+	github.com/TicketsBot-cloud/common v0.0.0-20261125211506-1dc1b3403cad
+	github.com/TicketsBot-cloud/database v0.0.0-20261125210836-e9dee689b8ff
 	github.com/TicketsBot-cloud/gdl v0.0.0-20261022191043-9caa827c743a
 	github.com/caarlos0/env/v10 v10.0.0
 	github.com/elliotchance/orderedmap v1.8.0
@@ -37,9 +37,9 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
-	golang.org/x/net v0.60.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/tools v0.51.0
+	golang.org/x/net v0.62.0
+	golang.org/x/sync v0.25.0
+	golang.org/x/tools v0.52.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 )
 
@@ -130,12 +130,12 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.17.0 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
+	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/api v0.232.0 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
