@@ -14,6 +14,7 @@ import (
 
 	"cloud.google.com/go/profiler"
 	"github.com/TicketsBot-cloud/archiverclient"
+	"github.com/TicketsBot-cloud/common/encryption"
 	"github.com/TicketsBot-cloud/common/featureflags"
 	"github.com/TicketsBot-cloud/common/model"
 	"github.com/TicketsBot-cloud/common/observability"
@@ -34,6 +35,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/rpc/listeners"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/event"
@@ -89,6 +91,13 @@ func main() {
 		}
 	}
 
+	// The error from ParseKeyring never contains key material, so it is safe to log.
+	tokenKeyring, err := encryption.ParseKeyring(config.Conf.WhitelabelTokens.Keys, config.Conf.WhitelabelTokens.ActiveVersion)
+	if err != nil {
+		logger.Fatal("Invalid whitelabel token key configuration", zap.Error(err))
+		return
+	}
+
 	logger.Info("Connecting to Redis")
 	if err := redis.Connect(); err != nil {
 		logger.Fatal("Failed to connect to Redis", zap.Error(err))
@@ -100,6 +109,14 @@ func main() {
 	logger.Info("Connecting to DB")
 	dbclient.Connect(logger.With(zap.String("service", "database")))
 	logger.Info("Connected to DB")
+
+	tokenResolver := tokens.NewResolver(
+		config.Conf.Discord.Token,
+		tokens.NewDBLoader(dbclient.Client.Whitelabel, tokenKeyring),
+		tokens.DefaultTTL,
+	)
+	tokens.SetDefault(tokenResolver)
+	tokenResolver.Listen(redis.Client)
 
 	logger.Info("Loading i18n files")
 	i18n.Init()

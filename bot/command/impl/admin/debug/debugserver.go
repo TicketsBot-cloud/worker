@@ -1,7 +1,6 @@
 package debug
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,6 +20,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/permissionwrapper"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/TicketsBot-cloud/worker/experiments"
@@ -67,21 +67,16 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 	var bInf application.Application
 
 	if botFound {
-		bot, err := dbclient.Client.Whitelabel.GetByBotId(ctx, botId)
+		botToken, err := tokens.Resolve(ctx, botId, true)
 		if err != nil {
 			ctx.HandleError(err)
 			return
 		}
 
-		if bot.BotId == 0 {
-			ctx.HandleError(errors.New("whitelabel bot not found"))
-			return
-		}
-
 		// Create worker context for whitelabel bot
 		worker = &w.Context{
-			Token:        bot.Token,
-			BotId:        bot.BotId,
+			Token:        botToken,
+			BotId:        botId,
 			IsWhitelabel: true,
 			ShardId:      0,
 			Cache:        ctx.Worker().Cache,
@@ -89,7 +84,7 @@ func (AdminDebugServerCommand) Execute(ctx registry.CommandContext, raw string) 
 		}
 
 		// Get application info for display
-		botInfo, err := rest.GetCurrentApplication(ctx, bot.Token, nil)
+		botInfo, err := rest.GetCurrentApplication(ctx, botToken, nil)
 		if err != nil {
 			ctx.HandleError(err)
 			return

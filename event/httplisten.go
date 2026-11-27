@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	stdjson "encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,12 +20,15 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command"
 	cmd_manager "github.com/TicketsBot-cloud/worker/bot/command/manager"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
+
+var errTokenUnavailable = errors.New("bot token unavailable")
 
 type response struct {
 	Success bool `json:"success"`
@@ -82,8 +86,15 @@ func eventHandler(cache *cache.PgCache) func(*gin.Context) {
 			return
 		}
 
+		token, err := tokens.Resolve(c.Request.Context(), event.BotId, event.IsWhitelabel)
+		if err != nil {
+			logrus.Warnf("failed to resolve bot token for event (bot_id: %d, whitelabel: %t, shard_id: %d): %v", event.BotId, event.IsWhitelabel, event.ShardId, err)
+			c.AbortWithStatusJSON(500, newErrorResponse(errTokenUnavailable))
+			return
+		}
+
 		workerCtx := &worker.Context{
-			Token:        event.BotToken,
+			Token:        token,
 			BotId:        event.BotId,
 			IsWhitelabel: event.IsWhitelabel,
 			ShardId:      event.ShardId,
@@ -94,8 +105,7 @@ func eventHandler(cache *cache.PgCache) func(*gin.Context) {
 		c.AbortWithStatusJSON(200, successResponse)
 
 		if err := execute(workerCtx, event.Event); err != nil {
-			marshalled, _ := json.Marshal(event)
-			logrus.Warnf("error executing event: %v (payload: %s)", err, string(marshalled))
+			logrus.Warnf("error executing event: %v (bot_id: %d, whitelabel: %t, shard_id: %d)", err, event.BotId, event.IsWhitelabel, event.ShardId)
 		}
 	}
 }
@@ -115,8 +125,15 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 			return
 		}
 
+		token, err := tokens.Resolve(ctx.Request.Context(), payload.BotId, payload.IsWhitelabel)
+		if err != nil {
+			logrus.Warnf("failed to resolve bot token for interaction (bot_id: %d, whitelabel: %t, interaction_type: %d): %v", payload.BotId, payload.IsWhitelabel, payload.InteractionType, err)
+			ctx.JSON(500, newErrorResponse(errTokenUnavailable))
+			return
+		}
+
 		worker := &worker.Context{
-			Token:        payload.BotToken,
+			Token:        token,
 			BotId:        payload.BotId,
 			IsWhitelabel: payload.IsWhitelabel,
 			Cache:        cache,
@@ -137,8 +154,7 @@ func interactionHandler(redis *redis.Client, cache *cache.PgCache) func(*gin.Con
 
 			disableAutoDefer, defaultEphemeral, err := executeCommand(ctx, worker, commandManager.GetCommands(), interactionData, responseCh)
 			if err != nil {
-				marshalled, _ := json.Marshal(payload)
-				logrus.Warnf("error executing payload: %v (payload: %s)", err, string(marshalled))
+				logrus.Warnf("error executing command (bot_id: %d, interaction_type: %d, interaction_id: %d): %v", payload.BotId, payload.InteractionType, interactionData.Id, err)
 				return
 			}
 

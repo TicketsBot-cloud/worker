@@ -15,6 +15,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/model"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
@@ -64,7 +65,13 @@ func (AdminWhitelabelDataCommand) Execute(ctx registry.CommandContext, userId ui
 	if data.BotId != 0 {
 		botIdFormatted = fmt.Sprintf("%d (<@%d>)", data.BotId, data.BotId)
 
-		application, err := rest.GetCurrentApplication(ctx, data.Token, nil)
+		token, err := tokens.Resolve(ctx, data.BotId, true)
+		if err != nil {
+			ctx.HandleError(err)
+			return
+		}
+
+		application, err := rest.GetCurrentApplication(ctx, token, nil)
 		if err != nil {
 			ctx.HandleError(err)
 			return

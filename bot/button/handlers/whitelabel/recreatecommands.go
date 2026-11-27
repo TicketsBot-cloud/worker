@@ -18,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
+	"github.com/TicketsBot-cloud/worker/bot/tokens"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
@@ -75,6 +76,12 @@ func (h *WhitelabelRecreateCommandsHandler) Execute(ctx *context.ButtonContext) 
 		return
 	}
 
+	token, err := tokens.Resolve(ctx, bot.BotId, true)
+	if err != nil {
+		ctx.HandleError(err)
+		return
+	}
+
 	// Cooldown to avoid Discord global-command rate limits (shared with the dashboard).
 	key := fmt.Sprintf("tickets:interaction-create-cooldown:%d", bot.BotId)
 	wasSet, err := redis.Client.SetNX(ctx, key, 1, time.Minute).Result()
@@ -90,7 +97,7 @@ func (h *WhitelabelRecreateCommandsHandler) Execute(ctx *context.ButtonContext) 
 
 	commands, _ := getCommandManager().BuildCreatePayload(true, nil)
 
-	if _, err := rest.ModifyGlobalCommands(ctx, bot.Token, nil, bot.BotId, commands); err != nil {
+	if _, err := rest.ModifyGlobalCommands(ctx, token, nil, bot.BotId, commands); err != nil {
 		ctx.HandleError(err)
 		return
 	}
