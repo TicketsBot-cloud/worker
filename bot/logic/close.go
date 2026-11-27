@@ -211,7 +211,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 				fields = []embed.EmbedField{
 					{
 						Name:   cmd.GetMessage(i18n.Reason),
-						Value:  fmt.Sprintf("```%s```", *reason),
+						Value:  fmt.Sprintf("```%s```", truncateRunes(*reason, embedFieldValueLimit-6)),
 						Inline: false,
 					},
 				}
@@ -230,7 +230,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 				fields := []embed.EmbedField{
 					{
 						Name:   cmd.GetMessage(i18n.Reason),
-						Value:  fmt.Sprintf("```%s```", *reason),
+						Value:  fmt.Sprintf("```%s```", truncateRunes(*reason, embedFieldValueLimit-6)),
 						Inline: false,
 					},
 				}

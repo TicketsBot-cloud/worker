@@ -15,6 +15,7 @@ import (
 	commandcontext "github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/i18n"
 )
 
@@ -81,7 +82,7 @@ func (h *LabelChangeSubmitHandler) Execute(ctx *commandcontext.ModalContext) {
 			return
 		}
 		if panel.PanelId != 0 {
-			topicMsg = fmt.Sprintf("%s | ", panel.Title)
+			topicMsg = fmt.Sprintf("%s | ", logic.PanelLabel(panel))
 		}
 	}
 

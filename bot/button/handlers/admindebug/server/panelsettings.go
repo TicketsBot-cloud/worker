@@ -14,6 +14,8 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/button/registry/matcher"
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
+	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
 type AdminDebugServerPanelSettingsHandler struct{}
@@ -54,7 +56,7 @@ func (h *AdminDebugServerPanelSettingsHandler) Execute(ctx *context.ButtonContex
 		}
 		panelDesc := fmt.Sprintf("View settings for panel #%d", i+1)
 		options = append(options, component.SelectOption{
-			Label:       fmt.Sprintf("Panel: %s", panel.Title),
+			Label:       utils.StringMax(fmt.Sprintf("Panel: %s", logic.PanelLabel(panel)), 100),
 			Value:       fmt.Sprintf("panel_%d", panel.MessageId),
 			Description: &panelDesc,
 		})

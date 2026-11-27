@@ -95,12 +95,20 @@ func (r *MessageResponse) IntoCreateMessageData() rest.CreateMessageData {
 }
 
 func (r *MessageResponse) IntoEditMessageData() rest.EditMessageData {
-	return rest.EditMessageData{
-		Content:    r.Content,
-		Embeds:     r.Embeds,
+	data := rest.EditMessageData{
 		Flags:      r.Flags,
 		Components: r.Components,
 	}
+
+	if r.isComponentsV2() {
+		data.Embeds = []*embed.Embed{}
+		data.AllowedMentions = &r.AllowedMentions
+	} else {
+		data.Content = r.Content
+		data.Embeds = r.Embeds
+	}
+
+	return data
 }
 
 func (r *MessageResponse) IntoWebhookBody() rest.WebhookBody {

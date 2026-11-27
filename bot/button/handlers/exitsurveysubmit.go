@@ -129,7 +129,7 @@ func (h *ExitSurveySubmitHandler) Execute(cmd *cmdcontext.ModalContext) {
 		inputsByCustomId[input.CustomId] = input
 	}
 
-	formAnswers := parseModalComponents(cmd.Interaction.Data.Components, inputsByCustomId)
+	formAnswers := parseModalComponents(cmd.Interaction.Data, inputsByCustomId)
 
 	if invalidLabel, valid := validateFormAnswers(formAnswers); !valid {
 		cmd.Reply(customisation.Red, i18n.Error, i18n.MessageFormMissingInput, invalidLabel)

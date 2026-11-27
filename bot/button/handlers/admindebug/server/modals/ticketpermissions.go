@@ -229,7 +229,7 @@ func checkUserTicketPermissions(ctx *context.ModalContext, worker *w.Context, gu
 
 		// Check support roles
 		supportRoles, err := dbclient.Client.RolePermissions.GetSupportRoles(ctx, guildId)
-		if err == nil && ticketPermLevel != "**Ticket Permission:** Admin" && ticketPermLevel != "**Ticket Permission:** Server Owner" && ticketPermLevel != "**Ticket Permission:** Admin" {
+		if err == nil && ticketPermLevel != "**Ticket Permission:** Admin" && ticketPermLevel != "**Ticket Permission:** Server Owner" {
 			var supportRoleNames []string
 			for _, roleId := range member.Roles {
 				if utils.Contains(supportRoles, roleId) {
@@ -282,9 +282,9 @@ func checkUserTicketPermissions(ctx *context.ModalContext, worker *w.Context, gu
 					}
 
 					if userInTeam {
-						teamPanelDetails = append(teamPanelDetails, fmt.Sprintf("`%s` (direct)", panel.Title))
+						teamPanelDetails = append(teamPanelDetails, fmt.Sprintf("`%s` (direct)", logic.PanelLabel(panel)))
 					} else if len(accessViaRoles) > 0 {
-						teamPanelDetails = append(teamPanelDetails, fmt.Sprintf("`%s` (via %s)", panel.Title, strings.Join(accessViaRoles, ", ")))
+						teamPanelDetails = append(teamPanelDetails, fmt.Sprintf("`%s` (via %s)", logic.PanelLabel(panel), strings.Join(accessViaRoles, ", ")))
 					}
 				}
 
@@ -342,7 +342,7 @@ func checkRoleTicketPermissions(ctx *context.ModalContext, worker *w.Context, gu
 		}
 
 		if utils.Contains(teamRoles, roleId) {
-			teamPanels = append(teamPanels, fmt.Sprintf("`%s`", panel.Title))
+			teamPanels = append(teamPanels, fmt.Sprintf("`%s`", logic.PanelLabel(panel)))
 		}
 	}
 

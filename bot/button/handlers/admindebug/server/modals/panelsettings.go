@@ -18,6 +18,7 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/command/context"
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
+	"github.com/TicketsBot-cloud/worker/bot/logic"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 )
 
@@ -152,7 +153,7 @@ func buildPanelSettings(ctx *context.ModalContext, worker *w.Context, selectedPa
 	var settings []string
 
 	// Panel header
-	settings = append(settings, fmt.Sprintf("**Panel: %s**", selectedPanel.Title))
+	settings = append(settings, fmt.Sprintf("**Panel: %s**", logic.PanelLabel(*selectedPanel)))
 
 	// Basic settings
 	settings = append(settings, fmt.Sprintf("**Message ID:** `%d`", selectedPanel.MessageId))
