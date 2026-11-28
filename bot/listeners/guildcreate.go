@@ -34,7 +34,17 @@ func OnGuildCreate(worker *worker.Context, e events.GuildCreate) {
 		return
 	}
 
-	if time.Now().Sub(e.JoinedAt) < time.Minute {
+	sinceJoin := time.Since(e.JoinedAt)
+
+	// Wider than the intro window so a re-add processed late still clears the purge queue,
+	// but bounded so an identify flood does not issue a delete for every guild.
+	if sinceJoin < 30*24*time.Hour {
+		if err := dbclient.Client.GuildLeaveTime.Delete(ctx, e.Guild.Id); err != nil {
+			sentry.Error(err)
+		}
+	}
+
+	if sinceJoin < time.Minute {
 		statsd.Client.IncrementKey(statsd.KeyJoins)
 
 		sendIntroMessage(ctx, worker, e.Guild, e.Guild.OwnerId)
@@ -42,10 +52,6 @@ func OnGuildCreate(worker *worker.Context, e events.GuildCreate) {
 		// find who invited the bot
 		if inviter := getInviter(worker, e.Guild.Id); inviter != 0 && inviter != e.Guild.OwnerId {
 			sendIntroMessage(ctx, worker, e.Guild, inviter)
-		}
-
-		if err := dbclient.Client.GuildLeaveTime.Delete(ctx, e.Guild.Id); err != nil {
-			sentry.Error(err)
 		}
 
 		// Add guild owner as ticket admin
